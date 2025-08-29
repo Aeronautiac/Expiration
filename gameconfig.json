@@ -1,0 +1,44 @@
+{
+    "monologueCategoryPrefix": "Monologues ",
+    "loungeCategoryPrefix": "Private Messages ",
+    "maxChannelsPerCategory": 50,
+    "dailyTokens": 5,
+
+    "guildIds": {
+        "main": "1406115825844359314",
+        "kira": "1406119060227231784",
+        "bb": "1406124666837536799",
+        "kk": "1406124121636737096",
+        "tf": "1406119726656262205",
+        "lwatari": "1406120447501926500",
+        "pi": "1406121249758908478",
+        "2kira": "1406120699654836344",
+        "notebook1": "1406302123901321216",
+        "notebook2": "1406302376083722270",
+        "notebook3": "1406302628450930708"
+    },
+
+    "roleGuilds": {
+        "Kira": ["kira"],
+        "BB": ["bb"],
+        "L": ["lwatari"],
+        "Watari": ["lwatari"],
+        "PI": ["pi"],
+        "2nd Kira": ["2kira"],
+        "Extra": ["tf", "kk"]
+    },
+
+    "channelIds": {
+        "hostContactLogs": "1406169333280804885",
+        "watariContactLogs": "1406120605001973862",
+        "news": "1406115827274612755"
+    },
+
+    "roleIds": {
+        "spec": "1406115825844359315",
+        "pi": "1406115825957732546",
+        "watari": "1406115825957732548",
+        "civ": "1406115825886167047",
+        "shinigami": "1406115825886167046"
+    }
+}
