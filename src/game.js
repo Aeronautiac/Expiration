@@ -316,6 +316,7 @@ async function createLoungeChannel(guild, channelName, monologue, users) {
         allow: [PermissionsBitField.Flags.ViewChannel],
     });
 
+    // need to do this for all members of the lounge, not just civ role. this causes issues for things like custody as it is currently.
     permissionOverwrites.push({
         id: gameConfig.roleIds.civ,
         allow: [
@@ -335,9 +336,10 @@ async function createLoungeChannel(guild, channelName, monologue, users) {
     await Season.findByIdAndUpdate("season", {
         $addToSet: {
             temporaryChannels: newChannel.id,
-            messageLoggedChannels: newChannel.id,
         },
     });
+
+    if (!monologue) await setChannelLoggable(newChannel.id, true);
 
     return newChannel;
 }
@@ -1080,7 +1082,7 @@ async function cleanSlate(client) {
     await clearContactLogs(client.channels);
     await clearTemporaryChannels(client);
     // must be called last
-    await mongoose.connection.dropDatabase();
+    await resetDatabase();
 }
 
 // returns true if the user is able to use the under the radar ability
@@ -1260,6 +1262,30 @@ async function applyIppCooldowns(client) {
     }
 }
 
+async function removeBugs(guild) {
+    const buggedPlayers = await Player.find({ bugged: true });
+
+    await Player.updateMany({ bugged: true }, { bugged: false });
+
+    // remove asterisks
+    for (const player of buggedPlayers) {
+        try {
+            const member = await guild.members
+                .fetch(player.userId)
+                .catch(() => null);
+            if (!member) continue;
+
+            const cleanName = member.displayName.replace(/\*/g, "");
+            await member.setNickname(cleanName);
+        } catch (err) {
+            console.warn(
+                `Failed to reset nickname for ${player.userId}:`,
+                err.message
+            );
+        }
+    }
+}
+
 // resets tokens for all player, progresses cooldowns by one day, and deactivates any abilities that should only last for a day.
 async function nextDay(client) {
     const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
@@ -1267,6 +1293,7 @@ async function nextDay(client) {
     await returnNotebooks(client);
     await progressCooldowns();
     await Player.updateMany({ underTheRadar: true }, { underTheRadar: false });
+    await removeBugs(mainGuild);
     await disableIPPs(mainGuild);
     await resetNotebookCooldowns();
     await applyPseudocideCooldowns(client);
@@ -1478,6 +1505,82 @@ async function announce(client, message) {
     await news.send(message);
 }
 
+async function setChannelLoggable(channelId, toggle) {
+    const season = await Season.findOne({});
+
+    if (!season) return "No season is currently active.";
+
+    if (toggle) {
+        if (!season.messageLoggedChannels.includes(channelId)) {
+            season.messageLoggedChannels.push(channelId);
+        }
+    } else {
+        season.messageLoggedChannels = season.messageLoggedChannels.filter(
+            (id) => {
+                return id !== channelId;
+            }
+        );
+    }
+
+    await season.save();
+
+    return true;
+}
+
+async function resetDatabase() {
+    const collections = await mongoose.connection.db
+        .listCollections()
+        .toArray();
+
+    for (const collection of collections) {
+        if (collection.name !== "config") {
+            await mongoose.connection.dropCollection(collection.name);
+        }
+    }
+}
+
+async function bug(interaction) {
+    const season = await Season.findOne({});
+    const user = interaction.user;
+    const target = interaction.options.getUser("target");
+    const userData = await getPlayerData(user);
+    const targetData = await getPlayerData(target);
+    const mainGuild = await interaction.client.guilds.fetch(
+        gameConfig.guildIds.main
+    );
+    const targetMember = await mainGuild.members.fetch(target.id);
+
+    if (!season) return "The season has not yet begun.";
+    if (user.id === target.id) return "Cannot bug yourself";
+    if (!userData.alive) return "You are dead.";
+    if (!targetData) return "This user has no data.";
+    if (!targetData.alive) return "This user is dead.";
+    if (userData.role !== "Watari") return "You are not Watari.";
+    if (userData.cooldowns.get("bug")) return "Bug on cooldown.";
+
+    await addCooldown(user, "bug", 2);
+
+    await updatePlayerData(target, {
+        bugged: true,
+    });
+
+    // Function to insert '*' before any parenthetical suffix (chatgpt generated)
+    function addBugAsterisk(displayName) {
+        if (displayName.includes("*")) return displayName; // prevent double asterisk
+        const match = displayName.match(/\s\([^)]+\)$/);
+        if (match) {
+            return displayName.replace(match[0], `*${match[0]}`);
+        } else {
+            return displayName + "*";
+        }
+    }
+
+    const newNickname = addBugAsterisk(targetMember.displayName);
+    await targetMember.setNickname(newNickname);
+
+    return true;
+}
+
 module.exports = {
     contact,
     role,
@@ -1508,4 +1611,6 @@ module.exports = {
     incarcerate,
     release,
     announce,
+    setChannelLoggable,
+    bug,
 };

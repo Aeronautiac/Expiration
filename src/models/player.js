@@ -19,6 +19,7 @@ const playerSchema = new mongoose.Schema({
     loungeHideReasons: { type: [String], required: true },
     affiliations: { type: [String], required: true },
     notebookRestrictReasons: { type: [String], required: true },
+    bugged: Boolean,
 
     // death protection
     ipp: Boolean,

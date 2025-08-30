@@ -3,12 +3,12 @@ const game = require("../../game");
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName("ipp")
-        .setDescription("Put a player under IPP.")
+        .setName("bug")
+        .setDescription("Bug a player.")
         .addUserOption((option) =>
             option
                 .setName("target")
-                .setDescription("The person to protect.")
+                .setDescription("The person to bug.")
                 .setRequired(true)
         ),
     async execute(interaction) {
@@ -17,7 +17,7 @@ module.exports = {
         });
 
         // do the thing here
-        const result = await game.ipp(interaction);
+        const result = await game.bug(interaction);
 
         if (result !== true) {
             await interaction.editReply({
