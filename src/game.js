@@ -366,9 +366,9 @@ async function logContact(client, loungeId, user, target, anonymous) {
     let userDisplay = userMember.displayName;
     let targetDisplay = targetMember.displayName;
 
-    if (playerData.role === "Watari" && anonymous) userDisplay = `<@Watari`;
+    if (playerData.role === "Watari" && anonymous) userDisplay = `@Watari`;
 
-    if (playerData.role === "PI" && anonymous) userDisplay = `<@PI`;
+    if (playerData.role === "PI" && anonymous) userDisplay = `@P.I`;
 
     let logMessage = `${userDisplay} contacted ${targetDisplay} at <t:${time}>`;
 
@@ -511,9 +511,9 @@ async function contact(client, user, target, anonymous) {
         loungeChannelIds.push(channel2.id);
 
         if (playerData.role === "Watari")
-            await channel2.send(`<@Watari> ${target}`);
+            await channel2.send(`@Watari ${target}`);
 
-        if (playerData.role === "PI") await channel2.send(`<@PI> ${target}`);
+        if (playerData.role === "PI") await channel2.send(`@P.I ${target}`);
     } else {
         channelReturn = await createLoungeChannel(
             mainGuild,
@@ -1409,6 +1409,7 @@ async function ipp(interaction) {
     const targetMember = await mainGuild.members.fetch(target.id);
 
     if (!season) return "The season has not yet begun.";
+    if (!userData) return "You have no data.";
     if (!userData.alive) return "You are dead.";
     if (!targetData) return "This user has no data.";
     if (!targetData.alive) return "This user is dead.";
@@ -1552,6 +1553,7 @@ async function bug(interaction) {
 
     if (!season) return "The season has not yet begun.";
     if (user.id === target.id) return "Cannot bug yourself";
+    if (!userData) return "You have no data.";
     if (!userData.alive) return "You are dead.";
     if (!targetData) return "This user has no data.";
     if (!targetData.alive) return "This user is dead.";
