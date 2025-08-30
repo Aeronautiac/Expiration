@@ -1560,6 +1560,13 @@ async function bug(interaction) {
 
     await addCooldown(user, "bug", 2);
 
+    // notify user that they have been bugged
+    try {
+        await target.send("You have been bugged by Watari.");
+    } catch (err) {
+        console.log("Failed to notify user of bug.", err);
+    }
+
     await updatePlayerData(target, {
         bugged: true,
     });
