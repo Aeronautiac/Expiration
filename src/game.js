@@ -1367,19 +1367,23 @@ async function pseudocide(interaction) {
     if (targetData.ipp) return "This user is under IPP.";
     if (userData.role !== "BB") return "You are not BB.";
     if (userData.cooldowns.get("pseudocide")) return "Pseudocide on cooldown.";
-    if (userData.pseudocideCharges && userData.pseudocideCharges <= 0)
+    if (
+        userData.pseudocideCharges !== null &&
+        userData.pseudocideCharges !== undefined &&
+        userData.pseudocideCharges <= 0
+    )
         return "You are out of pseudocides.";
 
-    if (!userData.pseudocideCharges)
-        await Player.updateOne(
-            { _id: userData._id },
-            { $set: { pseudocideCharges: clamp(season.day, 1, 2) - 1 } }
-        );
-
-    if (userData.pseudocideCharges)
+    if (userData.pseudocideCharges !== null)
         await Player.updateOne(
             { _id: userData._id },
             { $inc: { pseudocideCharges: -1 } }
+        );
+
+    if (userData.pseudocideCharges === null || userData.pseudocideCharges === undefined)
+        await Player.updateOne(
+            { _id: userData._id },
+            { $set: { pseudocideCharges: clamp(season.day, 1, 2) - 1 } }
         );
 
     await killUser(interaction.client, target, null, true);
@@ -1415,19 +1419,23 @@ async function ipp(interaction) {
     if (!targetData.alive) return "This user is dead.";
     if (userData.role !== "PI") return "You are not PI.";
     if (userData.cooldowns.get("ipp")) return "IPP on cooldown.";
-    if (userData.ippCharges && userData.ippCharges <= 0)
+    if (
+        userData.ippCharges !== null &&
+        userData.ippCharges !== undefined &&
+        userData.ippCharges <= 0
+    )
         return "You are out of IPP charges.";
 
-    if (!userData.ippCharges)
-        await Player.updateOne(
-            { _id: userData._id },
-            { $set: { ippCharges: clamp(season.day, 1, 2) - 1 } }
-        );
-
-    if (userData.ippCharges)
+    if (userData.ippCharges !== null)
         await Player.updateOne(
             { _id: userData._id },
             { $inc: { ippCharges: -1 } }
+        );
+
+    if (userData.ippCharges === null || userData.ippCharges === undefined)
+        await Player.updateOne(
+            { _id: userData._id },
+            { $set: { ippCharges: clamp(season.day, 1, 2) - 1 } }
         );
 
     await updatePlayerData(target, {
