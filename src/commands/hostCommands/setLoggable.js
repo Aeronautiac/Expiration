@@ -13,7 +13,7 @@ module.exports = {
             option
                 .setName("loggable")
                 .setDescription(
-                    "Turn logging on or off in this channel. True for on, false for off. It is only necessary to turn off logging if it was enabled in the first place."
+                    "Turn logging on or off in this channel. True for on, false for off."
                 )
                 .setRequired(true)
         ),
