@@ -834,7 +834,7 @@ async function prepareScheduledDeath(client, targetId) {
         setTimeout(async () => {
             const writtenBy = await client.users.fetch(delayedDeath.writtenBy);
 
-            await handlePlayerKill(client, writtenBy.id, targetId, message);
+            await handlePlayerKill(client, writtenBy.id, targetId, delayedDeath.deathMessage);
 
             await ScheduledDeath.deleteOne({ _id: delayedDeath._id });
         }, Math.max(0, delayedDeath.time - Date.now()));
@@ -944,7 +944,7 @@ async function writeName(interaction) {
         trueName: name,
     });
 
-    // handle kira restrictions
+    // handle kira restrictions (alumina)
     if (userData.role === "Kira" && notebookData.originalOwner === user.id) {
         // schedule ability
         if (delay && userData.kills < 2)

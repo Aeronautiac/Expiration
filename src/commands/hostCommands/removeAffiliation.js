@@ -27,7 +27,7 @@ module.exports = {
         const target = interaction.options.getUser("target");
         const affiliation = interaction.options.getString("affiliation");
 
-        const result = await game.removeAffiliationAffiliation(target, affiliation);
+        const result = await game.removeAffiliation(target, affiliation);
 
         if (result !== true) {
             await interaction.editReply({
