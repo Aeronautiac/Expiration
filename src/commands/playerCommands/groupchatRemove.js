@@ -12,16 +12,15 @@ module.exports = {
                 .setRequired(true)
         ),
     async execute(interaction) {
-        await interaction.deferReply({
+         await interaction.deferReply({
             ephemeral: true,
         });
-
+        
         const target = interaction.options.getUser("target");
-        const reply = await game.removeUserFromGroupChat(interaction.client, interaction.user, target, interaction.channel);
+        await game.removeUserFromGroupChat(interaction.client, interaction.user, target, interaction.channel);
 
         await interaction.editReply({
-            content: reply,
-            ephemeral: true,
+            content: "Success",
         });
     },
 };

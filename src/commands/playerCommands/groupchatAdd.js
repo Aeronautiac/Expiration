@@ -17,11 +17,10 @@ module.exports = {
         });
 
         const target = interaction.options.getUser("target");
-        const reply = await game.addUserToGroupChat(interaction.client, interaction.user, target, interaction.channel);
+        await game.addUserToGroupChat(interaction.client, interaction.user, target, interaction.channel);
 
         await interaction.editReply({
-            content: reply,
-            ephemeral: true,
+            content: "Success",
         });
     },
 };
