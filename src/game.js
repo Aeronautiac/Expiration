@@ -6,6 +6,7 @@ const Player = require("./models/player");
 const Lounge = require("./models/lounge");
 const Season = require("./models/season");
 const Notebook = require("./models/notebook");
+const Organisation = require("./models/organisation");
 const ScheduledDeath = require("./models/scheduledDeath");
 const Pseudocide = require("./models/pseudocide");
 const gameConfig = require("../gameconfig.json");
@@ -44,8 +45,20 @@ async function updatePlayerData(user, updates) {
     );
 }
 
+async function updateOrganisationData(organisationName, updates) {
+    return await Organisation.findOneAndUpdate(
+        { organisation: organisationName },
+        { $set: updates },
+        { new: true, upsert: false }
+    );
+}
+
 async function getPlayerData(user) {
     return await Player.findOne({ userId: user.id });
+}
+
+async function getOrganisationData(organisationName) {
+    return await Organisation.findOne({ name: organisationName });
 }
 
 function rawName(name) {
@@ -237,6 +250,16 @@ async function addCooldown(user, ability, cooldown) {
     const newCds = playerData.cooldowns;
     newCds.set(ability, cooldown);
     await updatePlayerData(user, {
+        cooldowns: newCds,
+    });
+}
+
+async function addOrganisationCooldown(organisationName, ability, cooldown) {
+    const orgData = await getOrganisationData(organisationName);
+
+    const newCds = orgData.cooldowns;
+    newCds.set(ability, cooldown);
+    await updateOrganisationData(organisationName, {
         cooldowns: newCds,
     });
 }
@@ -765,6 +788,8 @@ async function newSeason() {
         groupChats: [],
         day: 1,
     });
+
+    await Organisation.updateMany({}, { $set: { cooldowns: {} } });
 }
 
 // any of the killUser functions should only be killed after onPlayerKillPlayer is called. This is to prevent some fuckery with stuff like death note ownership.
@@ -1335,6 +1360,7 @@ async function utr(user) {
 // decreases all cooldown counters by 1
 async function progressCooldowns() {
     const players = await Player.find({});
+    const organisations = await Organisation.find({});
 
     for (const player of players) {
         for (const [ability, cooldown] of player.cooldowns) {
@@ -1343,6 +1369,15 @@ async function progressCooldowns() {
             player.cooldowns.set(ability, newCooldown);
         }
         await player.save();
+    }
+
+    for (const organisation of organisations) {
+        for (const [ability, cooldown] of organisation.cooldowns) {
+            // Ensure cooldown doesn't go below 0
+            const newCooldown = Math.max(0, cooldown - 1);
+            organisation.cooldowns.set(ability, newCooldown);
+        }
+        await organisation.save();
     }
 }
 
@@ -1818,7 +1853,9 @@ module.exports = {
     nextDay,
     utr,
     getPlayerData,
+    getOrganisationData,
     updatePlayerData,
+    updateOrganisationData,
     canGoUtr,
     newSeason,
     closeLounge,

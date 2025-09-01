@@ -21,6 +21,20 @@
         "notebook3": "1406302628450930708"
     },
 
+    "organisations": [ "Task Force", "Kira's Kingdom" ],
+    "abilities": {
+        "Blackout": { "cooldown": 999, "organisation": "Kira's Kingdom", "membersRequired": 5 },
+        "Public Kidnap": { "cooldown": 1, "organisation": "Kira's Kingdom", "membersRequired": 3 },
+        "Anonymous Kidnap": { "cooldown": 2, "organisation": "Kira's Kingdom", "membersRequired": 4 },
+        "2nd Kira+Kira Anonymous Kidnap": { "cooldown": 2, "organisation": "Kira's Kingdom", "rolesRequiredInOrganisation": ["2nd Kira", "Kira"] },
+        "Tap In": { "cooldown": 1, "organisation": "Kira's Kingdom", "membersRequired": 4 },
+
+        "Background Check": { "cooldown": 1, "organisation": "Task Force", "membersRequired": 3 },
+        "Civilian Arrest": { "cooldown": 1, "organisation": "Task Force", "membersRequired": 4 },
+        "Unlawful Arrest": { "cooldown": 1, "organisation": "Task Force", "membersRequired": 5 },
+        "PI+Watari Unlawful Arrest": { "cooldown": 1, "organisation": "Task Force", "rolesRequiredInOrganisation": ["PI", "Watari"] }
+    },
+
     "roleGuilds": {
         "Kira": ["kira"],
         "BB": ["bb"],
