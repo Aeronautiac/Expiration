@@ -215,7 +215,7 @@ async function deathMessage(
     const deathmessage =
         message ?? `${user} has died to a sudden heart attack.`;
 
-    let output = `@everyone ${deathmessage} [${user} (${readablename}) has died. Role: ${role}, Affiliations: ${
+    let output = `@ everyone ${deathmessage} [${user} (${readablename}) has died. Role: ${role}, Affiliations: ${
         affiliations.join(", ") || "none"
     }]`;
 
@@ -590,7 +590,8 @@ async function contact(client, user, target, anonymous) {
     return `Successfully created contact lounge: ${channelReturn}`;
 }
 
-async function createGroupChat(client, user, targets) {
+async function createGroupChat(client, user, passedTargets) {
+    const targets = passedTargets.filter(target => target !== null);
     const season = await Season.findById("season");
     if (!season) return "The season has not yet begun.";
 
@@ -598,13 +599,16 @@ async function createGroupChat(client, user, targets) {
 
     let playerData = await getPlayerData(user);
 
-    if (playerData.contactTokens < gameConfig.dailyTokens) {
-        return `You do not have enough contact tokens to create a group chat. You need all of your tokens.`;
+    for (const groupChat of season.groupChats) {
+        if (groupChat.owner === user.id) {
+            return `You already own a group chat. Don't be greedy.`;
+        }
     }
     if (NUMBER_OF_GROUP_CHATS >= gameConfig.maxGroupChats) {
         return `The maximum number of group chats (${gameConfig.maxGroupChats}) has been reached.`;
     }
     const duplicates = targets.filter((item, index) => targets.indexOf(item) !== index);
+    console.log(duplicates, targets);
     if (duplicates.length > 0) {
         return `You cannot create a group chat with duplicate members.`;
     }
@@ -612,7 +616,7 @@ async function createGroupChat(client, user, targets) {
         if (user.id == target.id) {
            return `You cannot create a group chat with yourself as one of the specified members.`;
         }
-        const denialReason = canContact(user, target, false)
+        const denialReason = await canContact(user, target, false)
         if (denialReason !== true) {
             return `You cannot create a group chat with ${target} because of the reason: (${denialReason})`;
         }
@@ -622,7 +626,9 @@ async function createGroupChat(client, user, targets) {
         owner: user.id,
         members: targets.map(target => target.id)
     });
+    await season.save();
 
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
     channelReturn = await createLoungeChannel(
             mainGuild,
             `group-chat-${NUMBER_OF_GROUP_CHATS + 1}`,
@@ -631,17 +637,15 @@ async function createGroupChat(client, user, targets) {
         );
     for (const target of targets) {
         const targetData = await getPlayerData(target);
-        targetLounges.push(channelReturn.id);
+        targetData.loungeChannelIds.push(channelReturn.id);
+        await updatePlayerData(target, targetData);
     }
-    playerData.loungeChannelIds.push(channelReturn.id);
 
-    loungeChannelIds.push(channelReturn.id);
+    playerData.loungeChannelIds.push(channelReturn.id);
+    playerData.contactTokens = Math.max(0, playerData.contactTokens - gameConfig.dailyTokens);
+    await updatePlayerData(user, playerData);
 
     await channelReturn.send(`This group chat has been created by ${user}. ${targets.join(" ")}`);
-
-    playerData = await updatePlayerData(user, {
-        contactTokens: Math.max(0, playerData.contactTokens - gameConfig.dailyTokens),
-    })
 
     await logGroupChat(client, season.id, user, targets);
 
@@ -654,30 +658,28 @@ async function addUserToGroupChat(client, user, target, channel) {
 
     const targetData = await getPlayerData(target);
 
-    if (!channel.name.find("group-chat-")) {
+    let groupChatTable = season.groupChats.find(chat => chat.channelId === channel.id);
+    if (!groupChatTable) {
         return "This channel is not a group chat.";
     }
-
-    const GROUP_CHAT_ID = Number(channel.name.replace("group-chat-", "")) - 1;
-
-    if (season.groupChats[GROUP_CHAT_ID].owner !== user.id) {
+    if (groupChatTable.owner !== user.id) {
         return "You are not the owner of this group chat.";
     }
-    const denialReason = canContact(user, target, false)
+    const denialReason = await canContact(user, target, false)
     if (denialReason !== true) {
-        return `You cannot create a group chat with ${target} because of the reason: (${denialReason})`;
+        return `You cannot add ${target} to the group chat because of the reason: (${denialReason})`;
     }
     if (target.id === user.id) {
         return "You cannot add yourself to the group chat.";
     }
-    if (season.groupChats[GROUP_CHAT_ID].members.includes(target.id)) {
+    if (groupChatTable.members.includes(target.id)) {
         return "This user is already a member of the group chat.";
     }
-    if (season.groupChats[GROUP_CHAT_ID].members.length >= gameConfig.maxGroupChatMembers) {
+    if (groupChatTable.members.length >= gameConfig.maxGroupChatMembers) {
         return "This group chat is full.";
     }
 
-    season.groupChats[GROUP_CHAT_ID].members.push(target.id);
+    groupChatTable.members.push(target.id);
     targetData.loungeChannelIds.push(channel.id);
 
     await channel.send(`${target} has been added to the group chat`);
@@ -691,28 +693,41 @@ async function removeUserFromGroupChat(client, user, target, channel) {
 
     const targetData = await getPlayerData(target);
 
-    if (!channel.name.find("group-chat-")) {
+    let groupChatTable = season.groupChats.find(chat => chat.channelId === channel.id);
+    if (!groupChatTable) {
         return "This channel is not a group chat.";
     }
-
-    const GROUP_CHAT_ID = Number(channel.name.replace("group-chat-", "")) - 1;
-
-    if (season.groupChats[GROUP_CHAT_ID].owner !== user.id) {
+    if (groupChatTable.owner !== user.id) {
         return "You are not the owner of this group chat.";
     }
     if (target.id === user.id) {
         return "You cannot remove yourself from the group chat.";
     }
-    if (!season.groupChats[GROUP_CHAT_ID].members.includes(target.id)) {
+    if (!groupChatTable.members.includes(target.id)) {
         return "This user is not a member of the group chat.";
     }
 
-    season.groupChats[GROUP_CHAT_ID].members = season.groupChats[GROUP_CHAT_ID].members.filter(id => id !== target.id);
+    groupChatTable.members = groupChatTable.members.filter(id => id !== target.id);
     targetData.loungeChannelIds = targetData.loungeChannelIds.filter(id => id !== channel.id);
+    await season.save();
+    await updatePlayerData(target, targetData);
 
     await channel.send(`${target} has been removed from the group chat`);
 
     return `Successfully removed ${targetData.displayName} from the group chat`;
+}
+
+async function changeGroupChatName(client, user, channel, newName) {
+    const season = await Season.findById("season");
+    if (!season) return "The season has not yet begun.";
+
+    const groupChatTable = season.groupChats.find(chat => chat.channelId === channel.id);
+    if (!groupChatTable) return "This channel is not a group chat.";
+
+    groupChatTable.name = newName;
+    await season.save();
+
+    return `Successfully changed the group chat name to ${newName}`;
 }
 
 // creates the data for the season
@@ -1765,6 +1780,9 @@ async function bug(interaction) {
 
 module.exports = {
     contact,
+    addUserToGroupChat,
+    removeUserFromGroupChat,
+    createGroupChat,
     role,
     kill,
     cleanSlate,

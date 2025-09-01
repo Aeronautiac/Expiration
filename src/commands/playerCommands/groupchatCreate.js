@@ -3,7 +3,7 @@ const game = require("../../game");
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName("groupchat create")
+        .setName("groupchatcreate")
         .setDescription("Create a group chat.")
         .addUserOption((option) =>
             option

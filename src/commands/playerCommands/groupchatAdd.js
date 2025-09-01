@@ -3,7 +3,7 @@ const game = require("../../game");
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName("groupchat add")
+        .setName("groupchatadd")
         .setDescription("Add a user to the group chat.")
         .addUserOption((option) =>
             option
@@ -17,7 +17,7 @@ module.exports = {
         });
 
         const target = interaction.options.getUser("target");
-        const reply = await game.addUserToGroupChat(interaction.client, target, interaction.channel);
+        const reply = await game.addUserToGroupChat(interaction.client, interaction.user, target, interaction.channel);
 
         await interaction.editReply({
             content: reply,

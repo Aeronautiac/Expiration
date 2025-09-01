@@ -3,12 +3,12 @@ const game = require("../../game");
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName("groupchatremove")
-        .setDescription("Remove a user from the group chat.")
-        .addUserOption((option) =>
+        .setName("groupchatNameChange")
+        .setDescription("Change the name of the group chat.")
+        .addStringOption((option) =>
             option
-                .setName("target")
-                .setDescription("The person you want to remove from the group chat")
+                .setName("newname")
+                .setDescription("The new name for the group chat")
                 .setRequired(true)
         ),
     async execute(interaction) {
@@ -16,8 +16,8 @@ module.exports = {
             ephemeral: true,
         });
 
-        const target = interaction.options.getUser("target");
-        const reply = await game.removeUserFromGroupChat(interaction.client, interaction.user, target, interaction.channel);
+        const newName = interaction.options.getString("newname");
+        const reply = await game.changeGroupChatName(interaction.client, interaction.user, interaction.channel, newName);
 
         await interaction.editReply({
             content: reply,
