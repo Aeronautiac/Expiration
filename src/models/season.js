@@ -5,6 +5,7 @@ const { mongoose } = require("../mongoose");
 const seasonSchema = new mongoose.Schema({
     _id: { type: String, default: "season" },
     temporaryChannels: { type: [String], required: true },
+    groupChats: { type: [{ owner: String, members: [String] }], required: true },
     messageLoggedChannels: { type: [String], required: true }, // an array of channel ids of which messages are relayed through abilities like bug and autopsy
     blackout: Boolean,
     day: { type: Number, required: true }, // starts day 1

@@ -1,8 +1,11 @@
 {
     "monologueCategoryPrefix": "Monologues ",
     "loungeCategoryPrefix": "Private Messages ",
+    "groupchatCategoryPrefix": "Group Chats ",
     "maxChannelsPerCategory": 50,
     "dailyTokens": 5,
+    "maxGroupChatMembers": 5,
+    "maxGroupChats": 3,
 
     "guildIds": {
         "main": "1406115825844359314",
