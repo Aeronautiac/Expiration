@@ -27,14 +27,11 @@ module.exports = {
         ),
 
     async execute(interaction) {
-        await interaction.deferReply({
-            ephemeral: true,
-        });
+        await interaction.deferReply({});
 
         if (!(await game.guildIsNotebook(interaction.guild))) {
             await interaction.editReply({
                 content: "You must use this command inside of a death note.",
-                ephemeral: true,
             });
             return;
         }
@@ -51,16 +48,10 @@ module.exports = {
 
         if (result === true) {
             await interaction.editReply({
-                content: "Success.",
-            });
-            await interaction.followUp({
                 content: relayed,
             });
         } else {
             await interaction.editReply({
-                content: `Failure.`,
-            });
-            await interaction.followUp({
                 content: `${result} [${relayed}]`,
             });
         }

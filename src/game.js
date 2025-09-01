@@ -168,11 +168,7 @@ async function hideLounges(client, user, reason) {
         const lounge = await client.channels.fetch(channelId);
         if (!lounge) continue;
 
-        await lounge.permissionOverwrites
-            .edit(user.id, {
-                ViewChannel: false,
-            })
-            .catch(console.error);
+        await lounge.permissionOverwrites.delete(user).catch(console.error);
     }
 
     await kickFromRoleGuilds(client, user);
@@ -834,7 +830,12 @@ async function prepareScheduledDeath(client, targetId) {
         setTimeout(async () => {
             const writtenBy = await client.users.fetch(delayedDeath.writtenBy);
 
-            await handlePlayerKill(client, writtenBy.id, targetId, delayedDeath.deathMessage);
+            await handlePlayerKill(
+                client,
+                writtenBy.id,
+                targetId,
+                delayedDeath.deathMessage
+            );
 
             await ScheduledDeath.deleteOne({ _id: delayedDeath._id });
         }, Math.max(0, delayedDeath.time - Date.now()));
@@ -1227,10 +1228,8 @@ async function applyPseudocideCooldowns(client) {
             await Player.updateOne(
                 { _id: player._id },
                 {
-                    $set: {
-                        pseudocideUsedToday: false,
-                        pseudocideCharges: null,
-                    },
+                    $set: { pseudocideUsedToday: false },
+                    $unset: { pseudocideCharges: "" },
                 }
             );
         } catch (err) {
@@ -1250,10 +1249,8 @@ async function applyIppCooldowns(client) {
             await Player.updateOne(
                 { _id: player._id },
                 {
-                    $set: {
-                        ippUsedToday: false,
-                        ippCharges: null,
-                    },
+                    $set: { ippUsedToday: false },
+                    $unset: { ippUsedToday: "" },
                 }
             );
         } catch (err) {
@@ -1380,7 +1377,10 @@ async function pseudocide(interaction) {
             { $inc: { pseudocideCharges: -1 } }
         );
 
-    if (userData.pseudocideCharges === null || userData.pseudocideCharges === undefined)
+    if (
+        userData.pseudocideCharges === null ||
+        userData.pseudocideCharges === undefined
+    )
         await Player.updateOne(
             { _id: userData._id },
             { $set: { pseudocideCharges: clamp(season.day, 1, 2) - 1 } }
@@ -1504,7 +1504,7 @@ async function incarcerate(client, user) {
 }
 
 async function release(client, user) {
-    await unhideLounges(client, user);
+    await unhideLounges(client, user, "incarcerated");
     await freeNotebook(user, "incarcerated");
 }
 
