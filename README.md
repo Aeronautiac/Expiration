@@ -1,15 +1,15 @@
-# Alumina Discord Bot
+# Expiration Discord Bot
 
 A Discord bot for managing and interacting with the Alumina: Elite community.
 
 ## Setup
 1. Clone the repository:
    ```bash
-   git clone https://github.com/Aeronautiac/AluminaJS
+   git clone https://github.com/Aeronautiac/ExpirationJS
    ```
 2. Navigate to the project directory:
    ```bash
-    cd AluminaJS
+    cd ExpirationJS
     ```
 3. Install dependencies:
    ```bash
