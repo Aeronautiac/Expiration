@@ -32,8 +32,8 @@
 
         "Background Check": { "cooldown": 1, "organisation": "Task Force", "membersRequired": 3 },
         "Civilian Arrest": { "cooldown": 1, "organisation": "Task Force", "membersRequired": 4 },
-        "Unlawful Arrest": { "cooldown": 1, "organisation": "Task Force", "membersRequired": 5 },
-        "PI+Watari Unlawful Arrest": { "cooldown": 1, "organisation": "Task Force", "rolesRequiredInOrganisation": ["PI", "Watari"] }
+        "Unlawful Arrest": { "cooldown": 2, "organisation": "Task Force", "membersRequired": 5 },
+        "PI+Watari Unlawful Arrest": { "cooldown": 2, "organisation": "Task Force", "rolesRequiredInOrganisation": ["PI", "Watari"] }
     },
 
     "roleGuilds": {

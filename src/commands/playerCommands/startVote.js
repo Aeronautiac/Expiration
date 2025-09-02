@@ -6,7 +6,10 @@ const game = require("../../game");
 const abilitiesThatRequireAUserTarget = [
     "Public Kidnap", "Anonymous Kidnap", "Background Check", "Civilian Arrest", "Unlawful Arrest"
 ]
-const abilitiesThatRequireAString = [
+const abilitiesThatRequireAKidnapper = [
+    "Public Kidnap"
+]
+const abilitiesThatRequireAChannel = [
     "Tap In"
 ]
 
@@ -41,6 +44,11 @@ module.exports = {
                 .setName("target")
                 .setDescription("The user to target with the action")
         )
+        .addUserOption((option) =>
+            option
+                .setName("kidnapper")
+                .setDescription("In a public kidnapping, this person will be revealed after the kidnapped victim has been released")
+        )
         .addStringOption((option) =>
             option
                 .setName("channel")
@@ -54,6 +62,21 @@ module.exports = {
         const action = interaction.options.getString("action");
         const playerData = await game.getPlayerData(interaction.user);
 
+        const client = interaction.client;
+        const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+        const guildId = interaction.guild.id
+        const guild = await client.guilds.cache.get(guildId);
+        const ourAffiliation = guildId === gameConfig.guildIds.tf ? "Task Force" : "Kira's Kingdom";
+
+        const abilityRequiresATarget = abilitiesThatRequireAUserTarget.includes(action)
+        const abilityRequiresAChannel = abilitiesThatRequireAChannel.includes(action)
+        const abilityRequiresAKidnapper = abilitiesThatRequireAKidnapper.includes(action)
+
+        const target = interaction.options.getUser("target");
+        const channel = interaction.options.getString("channel");
+        const kidnapper = interaction.options.getUser("kidnapper");
+
+        let tapInTargetChannel = null;
         // Check if player is alive
         if (!playerData.alive) {
             await interaction.editReply({
@@ -62,7 +85,6 @@ module.exports = {
             return;
         }
         // Check if player is part of organisation
-        const guildId = interaction.guild.id
         if (gameConfig.guildIds.tf !== guildId && gameConfig.guildIds.kk !== guildId) {
             await interaction.editReply({
                 content: "This can only be ran within an organisation.",
@@ -76,8 +98,6 @@ module.exports = {
             return;
         }
         // Check if vote is part of correct organisation (TF cant use KK ability)
-        const ourAffiliation = guildId === gameConfig.guildIds.tf ? "Task Force" : "Kira's Kingdom";
-
         if (gameConfig.abilities[action].organisation && gameConfig.abilities[action].organisation !== ourAffiliation) {
             await interaction.editReply({
                 content: "You are not allowed to start a vote for this action.",
@@ -93,14 +113,6 @@ module.exports = {
             return;
         }
         // If the ability requires a target and one is not provided, return
-        const client = interaction.client;
-        const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
-        const abilityRequiresATarget = abilitiesThatRequireAUserTarget.includes(action)
-        const abilityRequiresAChannel = abilitiesThatRequireAString.includes(action)
-        const target = interaction.options.getUser("target");
-        const channel = interaction.options.getString("channel");
-        let tapInTargetChannel = null;
-
         if (abilityRequiresATarget) {
             if (!target) {
                 await interaction.editReply({
@@ -141,9 +153,25 @@ module.exports = {
                 return;
             }
         }
+        if (abilityRequiresAKidnapper) {
+            if (!kidnapper) {
+                await interaction.editReply({
+                    content: "This ability requires a kidnapper input.",
+                });
+                return;
+            }
+            // Check if kidnapper is alive
+            const kidnapperData = await game.getPlayerData(kidnapper);
+            if (!kidnapperData || !kidnapperData.alive) {
+                await interaction.editReply({
+                    content: "The kidnapper must be alive.",
+                });
+                return;
+            }
+        }
+
         // Start a poll for the ability
         let requiredRoles = gameConfig.abilities[action].requiredRoles || [];
-        let guild = await client.guilds.cache.get(guildId);
         let membersInOrganisation = 0;
 
         for (const member of guild.members.cache.values()) {
@@ -200,7 +228,7 @@ module.exports = {
             },
             async (result) => {
                 if (result === "win") {
-                    pollMessage.reply(`The vote has passed! The **${action}** will be performed.`);
+                    pollMessage.reply(`The vote has passed! The **${action}** will be performed. This ability will now go on a cooldown of ${gameConfig.abilities[action].cooldown} day(s).`);
 
                     // Do another cooldown check here incase players stack polls.. Those cheeky players...
                     const orgData = await game.getOrganisationData(ourAffiliation);
@@ -270,8 +298,9 @@ module.exports = {
                     } else if (action === "Tap In") {
                         const kiraGuild = await client.guilds.fetch(gameConfig.guildIds.kk);
 
-                        const logChannel = await kiraGuild.channels.fetch("1412209917623799858");
-                        const pinMsg = await logChannel.send(`**Tap In Logs For Lounge ${channel}**`);
+                        const logChannel = await kiraGuild.channels.fetch("1412209917623799858"); // tap-in-logs channel id
+                        await new Promise(res => setTimeout(res, MS_TIME_BETWEEN_TAP_IN_CHUNKS));
+                        const pinMsg = await logChannel.send(`**<@&1410716175859453962> Tap In Logs For Lounge ${channel}**`); // KK role in KK server
                         await pinMsg.pin();
 
                         // Announce tap in the tapped channel
@@ -310,6 +339,8 @@ module.exports = {
                                 await new Promise(res => setTimeout(res, MS_TIME_BETWEEN_TAP_IN_CHUNKS));
                             }
                         }
+
+                        await new Promise(res => setTimeout(res, MS_TIME_BETWEEN_TAP_IN_CHUNKS));
 
                         for (const msg of ordered) {
                             if (msg.author.bot) continue;

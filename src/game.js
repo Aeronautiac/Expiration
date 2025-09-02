@@ -1975,7 +1975,7 @@ async function delayedRelease(client, targetId) {
     const newsChannel = await mainGuild.channels.fetch(gameConfig.channelIds.news);
     const target = await mainGuild.members.fetch(targetId);
     await newsChannel.send({
-        content: `@everyone It appears that the <@${gameConfig.roleIds["Task Force"]}> have finally released **${target.displayName}**. Lets hope they don't return to their old ways.`
+        content: `@everyone It appears that the <@&${gameConfig.roleIds["Task Force"]}> have finally released **${target.displayName}**. Lets hope they don't return to their old ways.`
     });
 
     await release(client, target);
@@ -2001,7 +2001,27 @@ async function createGenericPoll(message, duration, majorityToWin, participation
     const votedUsers = new Set();
 
     collector.on("collect", (reaction, user) => {
-        if (votedUsers.has(user.id)) return;
+        if (votedUsers.has(user.id)) {
+            // Prevent double voting for different options
+            const userReactions = message.reactions.cache.filter(r => r.users.cache.has(user.id));
+            // If user already voted for 👍 and now tries 👎, deny 👎
+            if (
+            reaction.emoji.name === "👎" &&
+            userReactions.some(r => r.emoji.name === "👍")
+            ) {
+            reaction.users.remove(user.id);
+            return;
+            }
+            // If user already voted for 👎 and now tries 👍, deny 👍
+            if (
+            reaction.emoji.name === "👍" &&
+            userReactions.some(r => r.emoji.name === "👎")
+            ) {
+            reaction.users.remove(user.id);
+            return;
+            }
+            return;
+        }
         if (!participationRequirementCallback(user)) {
             reaction.users.remove(user.id);
             return;
