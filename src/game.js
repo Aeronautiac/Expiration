@@ -575,7 +575,7 @@ async function contact(client, user, target, anonymous) {
     const playerLounges = playerData.loungeChannelIds;
     const targetLounges = targetData.loungeChannelIds;
     if (anonymous) {
-        await addCooldown(user, "anonymousContact", 1);
+        // await addCooldown(user, "anonymousContact", 1);
 
         channelReturn = await createLoungeChannel(
             mainGuild,
