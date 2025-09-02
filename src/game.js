@@ -6,6 +6,7 @@ const Player = require("./models/player");
 const Lounge = require("./models/lounge");
 const Season = require("./models/season");
 const Notebook = require("./models/notebook");
+const Organisation = require("./models/organisation");
 const ScheduledDeath = require("./models/scheduledDeath");
 const Pseudocide = require("./models/pseudocide");
 const gameConfig = require("../gameconfig.json");
@@ -44,8 +45,20 @@ async function updatePlayerData(user, updates) {
     );
 }
 
+async function updateOrganisationData(organisationName, updates) {
+    return await Organisation.findOneAndUpdate(
+        { organisation: organisationName },
+        { $set: updates },
+        { new: true, upsert: false }
+    );
+}
+
 async function getPlayerData(user) {
     return await Player.findOne({ userId: user.id });
+}
+
+async function getOrganisationData(organisationName) {
+    return await Organisation.findOne({ name: organisationName });
 }
 
 function rawName(name) {
@@ -215,7 +228,7 @@ async function deathMessage(
     const deathmessage =
         message ?? `${user} has died to a sudden heart attack.`;
 
-    let output = `@everyone ${deathmessage} [${user} (${readablename}) has died. Role: ${role}, Affiliations: ${
+    let output = `@ everyone ${deathmessage} [${user} (${readablename}) has died. Role: ${role}, Affiliations: ${
         affiliations.join(", ") || "none"
     }]`;
 
@@ -241,19 +254,48 @@ async function addCooldown(user, ability, cooldown) {
     });
 }
 
+async function addOrganisationCooldown(organisationName, ability, cooldown) {
+    const orgData = await getOrganisationData(organisationName);
+
+    const newCds = orgData.cooldowns;
+    newCds.set(ability, cooldown);
+    await updateOrganisationData(organisationName, {
+        cooldowns: newCds,
+    });
+}
+
 // returns true if there is at least one player alive with the role supplied
 async function isRoleAlive(role) {
     const playersAliveWithRole = await Player.find({ role: role, alive: true });
     return playersAliveWithRole.length > 0;
 }
 
+async function addUsersToChannel(users, channel) {
+    for (const user of users) {
+        await channel.permissionOverwrites.create(user.id, {
+            ViewChannel: true,
+        });
+    }
+}
+
+async function removeUsersFromChannel(users, channel) {
+    for (const user of users) {
+        await channel.permissionOverwrites.delete(user.id);
+    }
+}
+
 // returns the channel created and adds the channel id to the game's temporary channel array
-async function createLoungeChannel(guild, channelName, monologue, users) {
+async function createLoungeChannel(guild, channelName, loungeType, users) {
     const allChannels = await guild.channels.fetch();
 
-    let categoryPrefix = monologue
-        ? gameConfig.monologueCategoryPrefix
-        : gameConfig.loungeCategoryPrefix;
+    let categoryPrefix = null;
+    if (loungeType ===  "monologue") {
+        categoryPrefix = gameConfig.monologueCategoryPrefix;
+    } else if (loungeType === "lounge") {
+        categoryPrefix = gameConfig.loungeCategoryPrefix;
+    } else if (loungeType === "groupchat") {
+        categoryPrefix = gameConfig.groupchatCategoryPrefix;
+    }
 
     // get all channel categories with category prefix and sort them based on their number
     const categories = allChannels
@@ -335,7 +377,7 @@ async function createLoungeChannel(guild, channelName, monologue, users) {
         },
     });
 
-    if (!monologue) await setChannelLoggable(newChannel.id, true);
+    if (loungeType !== "monologue") await setChannelLoggable(newChannel.id, true);
 
     return newChannel;
 }
@@ -344,6 +386,40 @@ async function createLoungeChannel(guild, channelName, monologue, users) {
 async function getNextLoungeId() {
     const count = await Lounge.countDocuments({});
     return count + 1;
+}
+
+// creates a group chat log
+async function logGroupChat(client, loungeId, user, members) {
+    const time = Math.floor(Date.now() / 1000);
+    const channels = client.channels;
+
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+    const userMember = await mainGuild.members.fetch(user.id);
+    const playerData = await getPlayerData(user);
+
+    let logMessage = `Group chat created at <t:${time}> by ${userMember.displayName} with members:`;
+
+    for (const member of members) {
+        const memberUser = await mainGuild.members.fetch(member.id);
+        logMessage += `\n${memberUser.displayName}`;
+    }
+
+    // regular logs
+    if (!playerData.underTheRadar) {
+       // watari's logs
+        if (await isRoleAlive("Watari")) {
+            const watariContactLogs = await channels.fetch(
+                gameConfig.channelIds.watariContactLogs
+            );
+            await watariContactLogs.send(logMessage);
+        }
+    }
+
+    // host logs
+    const hostContactLogs = await channels.fetch(
+        gameConfig.channelIds.hostContactLogs
+    );
+    await hostContactLogs.send(logMessage);
 }
 
 // creates contact logs for a contact
@@ -405,7 +481,7 @@ async function canAnonContact(user) {
 }
 
 // returns true if can contact, or a string (the contact rejected reason)
-async function canContact(user, target, anonymous) {
+async function canContact(user, target, anonymous, groupChat) {
     const playerData = await getPlayerData(user);
     const targetData = await getPlayerData(target);
     const season = await Season.findById("season");
@@ -434,7 +510,7 @@ async function canContact(user, target, anonymous) {
     if (anonymous && monologue)
         return "Why would you want to anonymously contact yourself???";
 
-    if (!(playerData.contactTokens > 0) && !monologue)
+    if (!(playerData.contactTokens > 0) && !monologue && !groupChat)
         return "You're broke buddy.. 0 CONTACT TOKENS!!!";
 
     return true;
@@ -465,7 +541,7 @@ async function contact(client, user, target, anonymous) {
         const monologueChannel = await createLoungeChannel(
             mainGuild,
             `${user.username}-monologue`,
-            true,
+            "monologue",
             [user]
         );
 
@@ -490,7 +566,7 @@ async function contact(client, user, target, anonymous) {
         channelReturn = await createLoungeChannel(
             mainGuild,
             `lounge-${loungeId}`,
-            false,
+            "lounge",
             [user]
         );
         playerLounges.push(channelReturn.id);
@@ -498,7 +574,7 @@ async function contact(client, user, target, anonymous) {
         const channel2 = await createLoungeChannel(
             mainGuild,
             `lounge-${loungeId}`,
-            false,
+            "lounge",
             [target]
         );
         targetLounges.push(channel2.id);
@@ -514,7 +590,7 @@ async function contact(client, user, target, anonymous) {
         channelReturn = await createLoungeChannel(
             mainGuild,
             `lounge-${loungeId}`,
-            false,
+            "lounge",
             [user, target]
         );
         playerLounges.push(channelReturn.id);
@@ -551,12 +627,169 @@ async function contact(client, user, target, anonymous) {
     return `Successfully created contact lounge: ${channelReturn}`;
 }
 
+async function createGroupChat(client, user, passedTargets) {
+    const targets = passedTargets.filter(target => target !== null);
+    const season = await Season.findById("season");
+    if (!season) return "The season has not yet begun.";
+
+    const NUMBER_OF_GROUP_CHATS = season.groupChats.length;
+
+    let playerData = await getPlayerData(user);
+
+    for (const groupChat of season.groupChats) {
+        if (groupChat.owner === user.id) {
+            return `You already own a group chat. Don't be greedy.`;
+        }
+    }
+    if (NUMBER_OF_GROUP_CHATS >= gameConfig.maxGroupChats) {
+        return `The maximum number of group chats (${gameConfig.maxGroupChats}) has been reached.`;
+    }
+    const duplicates = targets.filter((item, index) => targets.indexOf(item) !== index);
+    if (duplicates.length > 0) {
+        return `You cannot create a group chat with duplicate members.`;
+    }
+    for (const target of targets) {
+        if (user.id == target.id) {
+           return `You cannot create a group chat with yourself as one of the specified members.`;
+        }
+        const denialReason = await canContact(user, target, false, true)
+        if (denialReason !== true) {
+            return `You cannot create a group chat with ${target} because of the reason: (${denialReason})`;
+        }
+    }
+
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+    channelReturn = await createLoungeChannel(
+            mainGuild,
+            `group-chat-${NUMBER_OF_GROUP_CHATS + 1}`,
+            "groupchat",
+            [user, ...targets]
+        );
+    for (const target of targets) {
+        const targetData = await getPlayerData(target);
+        targetData.loungeChannelIds.push(channelReturn.id);
+        await updatePlayerData(target, targetData);
+    }
+
+    season.groupChats.push({
+        owner: user.id,
+        members: targets.map(target => target.id),
+        channelId: channelReturn.id
+    });
+    await season.save();
+
+    playerData.loungeChannelIds.push(channelReturn.id);
+    playerData.contactTokens = Math.max(0, playerData.contactTokens - gameConfig.dailyTokens);
+    await updatePlayerData(user, playerData);
+
+    await channelReturn.send(`This group chat has been created by ${user}. ${targets.join(" ")}`);
+
+    await logGroupChat(client, season.id, user, targets);
+
+    return `Successfully created group chat.`;
+}
+
+async function addUserToGroupChat(client, user, target, channel) {
+    const season = await Season.findById("season");
+    if (!season) return "The season has not yet begun.";
+
+    const targetData = await getPlayerData(target);
+
+    let groupChatTable = season.groupChats.find(chat => chat.channelId === channel.id);
+    if (!groupChatTable) {
+        return "This channel is not a group chat.";
+    }
+    if (groupChatTable.owner !== user.id) {
+        return "You are not the owner of this group chat.";
+    }
+    const denialReason = await canContact(user, target, false, true)
+    if (denialReason !== true) {
+        return `You cannot add ${target} to the group chat because of the reason: (${denialReason})`;
+    }
+    if (target.id === user.id) {
+        return "You cannot add yourself to the group chat.";
+    }
+    if (groupChatTable.members.includes(target.id)) {
+        return "This user is already a member of the group chat.";
+    }
+    if (groupChatTable.members.length >= gameConfig.maxGroupChatMembers) {
+        return "This group chat is full.";
+    }
+
+    groupChatTable.members.push(target.id);
+    targetData.loungeChannelIds.push(channel.id);
+
+    addUsersToChannel([target], channel);
+
+    await season.save();
+    await channel.send(`${target} has been added to the group chat`);
+
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+    const targetMember = await mainGuild.members.fetch(target.id);
+    return `Successfully added ${targetMember.displayName} to the group chat`;
+}
+
+async function removeUserFromGroupChat(client, user, target, channel) {
+    const season = await Season.findById("season");
+    if (!season) return "The season has not yet begun.";
+
+    const targetData = await getPlayerData(target);
+
+    let groupChatTable = season.groupChats.find(chat => chat.channelId === channel.id);
+    if (!groupChatTable) {
+        return "This channel is not a group chat.";
+    }
+    if (groupChatTable.owner !== user.id) {
+        return "You are not the owner of this group chat.";
+    }
+    if (target.id === user.id) {
+        return "You cannot remove yourself from the group chat.";
+    }
+    if (!groupChatTable.members.includes(target.id)) {
+        return "This user is not a member of the group chat.";
+    }
+
+    groupChatTable.members = groupChatTable.members.filter(id => id !== target.id);
+    targetData.loungeChannelIds = targetData.loungeChannelIds.filter(id => id !== channel.id);
+
+    removeUsersFromChannel([target], channel); 
+
+    await season.save();
+    await updatePlayerData(target, targetData);
+
+    await channel.send(`${target} has been removed from the group chat`);
+
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+    const targetMember = await mainGuild.members.fetch(target.id)
+    return `Successfully removed ${targetMember.displayName} from the group chat`;
+}
+
+async function changeGroupChatName(client, user, channel, newName) {
+    const season = await Season.findById("season");
+    if (!season) return "The season has not yet begun.";
+
+    const groupChatTable = season.groupChats.find(chat => chat.channelId === channel.id);
+    if (!groupChatTable) {
+        return "This channel is not a group chat.";
+    }
+    if (groupChatTable.owner !== user.id) {
+        return "You are not the owner of this group chat.";
+    }
+
+    await channel.setName(newName);
+
+    return `Successfully changed the group chat name to ${newName}`;
+}
+
 // creates the data for the season
 async function newSeason() {
     await Season.create({
         temporaryChannels: [],
+        groupChats: [],
         day: 1,
     });
+
+    await Organisation.updateMany({}, { $set: { cooldowns: {} } });
 }
 
 // any of the killUser functions should only be killed after onPlayerKillPlayer is called. This is to prevent some fuckery with stuff like death note ownership.
@@ -1127,6 +1360,7 @@ async function utr(user) {
 // decreases all cooldown counters by 1
 async function progressCooldowns() {
     const players = await Player.find({});
+    const organisations = await Organisation.find({});
 
     for (const player of players) {
         for (const [ability, cooldown] of player.cooldowns) {
@@ -1135,6 +1369,15 @@ async function progressCooldowns() {
             player.cooldowns.set(ability, newCooldown);
         }
         await player.save();
+    }
+
+    for (const organisation of organisations) {
+        for (const [ability, cooldown] of organisation.cooldowns) {
+            // Ensure cooldown doesn't go below 0
+            const newCooldown = Math.max(0, cooldown - 1);
+            organisation.cooldowns.set(ability, newCooldown);
+        }
+        await organisation.save();
     }
 }
 
@@ -1600,13 +1843,19 @@ async function bug(interaction) {
 
 module.exports = {
     contact,
+    addUserToGroupChat,
+    removeUserFromGroupChat,
+    createGroupChat,
+    changeGroupChatName,
     role,
     kill,
     cleanSlate,
     nextDay,
     utr,
     getPlayerData,
+    getOrganisationData,
     updatePlayerData,
+    updateOrganisationData,
     canGoUtr,
     newSeason,
     closeLounge,
