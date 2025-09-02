@@ -8,7 +8,7 @@ const Season = require("./models/season");
 const Notebook = require("./models/notebook");
 const Organisation = require("./models/organisation");
 const ScheduledDeath = require("./models/scheduledDeath");
-const Pseudocide = require("./models/pseudocide");
+const DelayedAction = require("./models/delayedAction");
 const gameConfig = require("../gameconfig.json");
 const first_names = fs
     .readFileSync("./first_names.txt", "utf-8")
@@ -80,6 +80,14 @@ function readableName(name) {
 
 function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
+}
+
+function hrsToMs(hrs) {
+    return 1000 * 60 * 60 * hrs;
+}
+
+function minToMs(min) {
+    return 1000 * 60 * min;
 }
 
 // creates a player's data if there is none, gives the player the role specified, and revives them if they were dead
@@ -178,10 +186,14 @@ async function hideLounges(client, user, reason) {
     });
 
     for (const channelId of playerData.loungeChannelIds) {
-        const lounge = await client.channels.fetch(channelId);
-        if (!lounge) continue;
+        try {
+            const lounge = await client.channels.fetch(channelId);
+            if (!lounge) continue;
 
-        await lounge.permissionOverwrites.delete(user).catch(console.error);
+            await lounge.permissionOverwrites.delete(user).catch(console.error);
+        } catch (err) {
+            console.log("Failed to remove channel perms:", err);
+        }
     }
 
     await kickFromRoleGuilds(client, user);
@@ -289,7 +301,7 @@ async function createLoungeChannel(guild, channelName, loungeType, users) {
     const allChannels = await guild.channels.fetch();
 
     let categoryPrefix = null;
-    if (loungeType ===  "monologue") {
+    if (loungeType === "monologue") {
         categoryPrefix = gameConfig.monologueCategoryPrefix;
     } else if (loungeType === "lounge") {
         categoryPrefix = gameConfig.loungeCategoryPrefix;
@@ -377,7 +389,8 @@ async function createLoungeChannel(guild, channelName, loungeType, users) {
         },
     });
 
-    if (loungeType !== "monologue") await setChannelLoggable(newChannel.id, true);
+    if (loungeType !== "monologue")
+        await setChannelLoggable(newChannel.id, true);
 
     return newChannel;
 }
@@ -406,7 +419,7 @@ async function logGroupChat(client, loungeId, user, members) {
 
     // regular logs
     if (!playerData.underTheRadar) {
-       // watari's logs
+        // watari's logs
         if (await isRoleAlive("Watari")) {
             const watariContactLogs = await channels.fetch(
                 gameConfig.channelIds.watariContactLogs
@@ -628,7 +641,7 @@ async function contact(client, user, target, anonymous) {
 }
 
 async function createGroupChat(client, user, passedTargets) {
-    const targets = passedTargets.filter(target => target !== null);
+    const targets = passedTargets.filter((target) => target !== null);
     const season = await Season.findById("season");
     if (!season) return "The season has not yet begun.";
 
@@ -644,15 +657,17 @@ async function createGroupChat(client, user, passedTargets) {
     if (NUMBER_OF_GROUP_CHATS >= gameConfig.maxGroupChats) {
         return `The maximum number of group chats (${gameConfig.maxGroupChats}) has been reached.`;
     }
-    const duplicates = targets.filter((item, index) => targets.indexOf(item) !== index);
+    const duplicates = targets.filter(
+        (item, index) => targets.indexOf(item) !== index
+    );
     if (duplicates.length > 0) {
         return `You cannot create a group chat with duplicate members.`;
     }
     for (const target of targets) {
         if (user.id == target.id) {
-           return `You cannot create a group chat with yourself as one of the specified members.`;
+            return `You cannot create a group chat with yourself as one of the specified members.`;
         }
-        const denialReason = await canContact(user, target, false, true)
+        const denialReason = await canContact(user, target, false, true);
         if (denialReason !== true) {
             return `You cannot create a group chat with ${target} because of the reason: (${denialReason})`;
         }
@@ -660,11 +675,11 @@ async function createGroupChat(client, user, passedTargets) {
 
     const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
     channelReturn = await createLoungeChannel(
-            mainGuild,
-            `group-chat-${NUMBER_OF_GROUP_CHATS + 1}`,
-            "groupchat",
-            [user, ...targets]
-        );
+        mainGuild,
+        `group-chat-${NUMBER_OF_GROUP_CHATS + 1}`,
+        "groupchat",
+        [user, ...targets]
+    );
     for (const target of targets) {
         const targetData = await getPlayerData(target);
         targetData.loungeChannelIds.push(channelReturn.id);
@@ -673,16 +688,21 @@ async function createGroupChat(client, user, passedTargets) {
 
     season.groupChats.push({
         owner: user.id,
-        members: targets.map(target => target.id),
-        channelId: channelReturn.id
+        members: targets.map((target) => target.id),
+        channelId: channelReturn.id,
     });
     await season.save();
 
     playerData.loungeChannelIds.push(channelReturn.id);
-    playerData.contactTokens = Math.max(0, playerData.contactTokens - gameConfig.dailyTokens);
+    playerData.contactTokens = Math.max(
+        0,
+        playerData.contactTokens - gameConfig.dailyTokens
+    );
     await updatePlayerData(user, playerData);
 
-    await channelReturn.send(`This group chat has been created by ${user}. ${targets.join(" ")}`);
+    await channelReturn.send(
+        `This group chat has been created by ${user}. ${targets.join(" ")}`
+    );
 
     await logGroupChat(client, season.id, user, targets);
 
@@ -695,14 +715,16 @@ async function addUserToGroupChat(client, user, target, channel) {
 
     const targetData = await getPlayerData(target);
 
-    let groupChatTable = season.groupChats.find(chat => chat.channelId === channel.id);
+    let groupChatTable = season.groupChats.find(
+        (chat) => chat.channelId === channel.id
+    );
     if (!groupChatTable) {
         return "This channel is not a group chat.";
     }
     if (groupChatTable.owner !== user.id) {
         return "You are not the owner of this group chat.";
     }
-    const denialReason = await canContact(user, target, false, true)
+    const denialReason = await canContact(user, target, false, true);
     if (denialReason !== true) {
         return `You cannot add ${target} to the group chat because of the reason: (${denialReason})`;
     }
@@ -735,7 +757,9 @@ async function removeUserFromGroupChat(client, user, target, channel) {
 
     const targetData = await getPlayerData(target);
 
-    let groupChatTable = season.groupChats.find(chat => chat.channelId === channel.id);
+    let groupChatTable = season.groupChats.find(
+        (chat) => chat.channelId === channel.id
+    );
     if (!groupChatTable) {
         return "This channel is not a group chat.";
     }
@@ -749,10 +773,14 @@ async function removeUserFromGroupChat(client, user, target, channel) {
         return "This user is not a member of the group chat.";
     }
 
-    groupChatTable.members = groupChatTable.members.filter(id => id !== target.id);
-    targetData.loungeChannelIds = targetData.loungeChannelIds.filter(id => id !== channel.id);
+    groupChatTable.members = groupChatTable.members.filter(
+        (id) => id !== target.id
+    );
+    targetData.loungeChannelIds = targetData.loungeChannelIds.filter(
+        (id) => id !== channel.id
+    );
 
-    removeUsersFromChannel([target], channel); 
+    removeUsersFromChannel([target], channel);
 
     await season.save();
     await updatePlayerData(target, targetData);
@@ -760,7 +788,7 @@ async function removeUserFromGroupChat(client, user, target, channel) {
     await channel.send(`${target} has been removed from the group chat`);
 
     const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
-    const targetMember = await mainGuild.members.fetch(target.id)
+    const targetMember = await mainGuild.members.fetch(target.id);
     return `Successfully removed ${targetMember.displayName} from the group chat`;
 }
 
@@ -768,7 +796,9 @@ async function changeGroupChatName(client, user, channel, newName) {
     const season = await Season.findById("season");
     if (!season) return "The season has not yet begun.";
 
-    const groupChatTable = season.groupChats.find(chat => chat.channelId === channel.id);
+    const groupChatTable = season.groupChats.find(
+        (chat) => chat.channelId === channel.id
+    );
     if (!groupChatTable) {
         return "This channel is not a group chat.";
     }
@@ -796,7 +826,7 @@ async function newSeason() {
 async function killUser(client, user, message, messageOverride, hadNotebook) {
     const userData = await getPlayerData(user);
 
-    await updatePlayerData(user, { alive: false });
+    await updatePlayerData(user, { alive: false, timeOfDeath: Date.now() });
     await hideLounges(client, user, "dead");
 
     if (!messageOverride)
@@ -1054,6 +1084,8 @@ async function handlePlayerKill(client, killerId, targetId, message) {
     }
 }
 
+async function onScheduledKill(client, delayedAction) {}
+
 async function prepareScheduledDeath(client, targetId) {
     try {
         const delayedDeath = await ScheduledDeath.findOne({
@@ -1077,51 +1109,16 @@ async function prepareScheduledDeath(client, targetId) {
     }
 }
 
-async function schedulePseudocideRevival(client, targetId) {
-    const targetUser = await client.users.fetch(targetId);
-    const targetData = await getPlayerData(targetUser);
+async function onPseudocideRevival(client, delayedAction) {
+    const news = await client.channels.fetch(gameConfig.channelIds.news);
+    const targetUser = await client.users.fetch(delayedAction.targetId);
 
-    await Pseudocide.create({
-        time: Date.now(),
-        target: targetId,
-        role: targetData.role,
+    await news.send({
+        content: `@everyone It appears that ${targetUser} never actually died! Their death was orchestrated using an ultra-realistic doll.`,
+        allowedMentions: { parse: ["everyone"] },
     });
 
-    await preparePseudocideRevival(client, targetId);
-}
-
-async function preparePseudocideRevival(client, targetId) {
-    try {
-        const revival = await Pseudocide.findOne({
-            target: targetId,
-        });
-
-        const timeRemaining = Math.max(
-            0,
-            revival.time + 1000 * 60 * 60 * 24 - Date.now()
-        );
-
-        setTimeout(async () => {
-            const news = await client.channels.fetch(
-                gameConfig.channelIds.news
-            );
-
-            const targetUser = await client.users.fetch(targetId);
-
-            await news.send({
-                content: `@everyone It appears that ${targetUser} never actually died! Their death was orchestrated using an ultra-realistic doll.`,
-                allowedMentions: { parse: ["everyone"] },
-            });
-
-            await role(client, targetUser, revival.role);
-
-            await Pseudocide.deleteOne({
-                target: targetId,
-            });
-        }, timeRemaining);
-    } catch (err) {
-        console.log(`Scheduled revival for ${targetId} failed. Reason: ${err}`);
-    }
+    await role(client, targetUser, delayedAction.role);
 }
 
 async function scheduleDeath(client, fromId, targetId, delay, message) {
@@ -1179,15 +1176,15 @@ async function writeName(interaction) {
     });
 
     // handle kira restrictions (alumina)
-    if (userData.role === "Kira" && notebookData.originalOwner === user.id) {
-        // schedule ability
-        if (delay && userData.kills < 2)
-            return "You have not unlocked the schedule ability yet. You need to have killed at least 2 people.";
+    // if (userData.role === "Kira" && notebookData.originalOwner === user.id) {
+    //     // schedule ability
+    //     if (delay && userData.kills < 2)
+    //         return "You have not unlocked the schedule ability yet. You need to have killed at least 2 people.";
 
-        // creative deaths ability
-        if (message && userData.kills < 1)
-            return "You have not unlocked the creative deaths ability yet. You need to have killed at least 1 person.";
-    }
+    //     // creative deaths ability
+    //     if (message && userData.kills < 1)
+    //         return "You have not unlocked the creative deaths ability yet. You need to have killed at least 1 person.";
+    // }
 
     // 2nd kira restrictions
     if (
@@ -1258,16 +1255,6 @@ async function loadScheduledDeaths(client) {
     await Promise.all(
         allScheduledDeaths.map((death) =>
             prepareScheduledDeath(client, death.target)
-        )
-    );
-}
-
-async function loadScheduledRevivals(client) {
-    const allRevivals = await Pseudocide.find({});
-
-    await Promise.all(
-        allRevivals.map((revival) =>
-            preparePseudocideRevival(client, revival.target)
         )
     );
 }
@@ -1468,13 +1455,9 @@ async function applyPseudocideCooldowns(client) {
         try {
             const user = await client.users.fetch(player.userId);
             await addCooldown(user, "pseudocide", 1);
-            await Player.updateOne(
-                { _id: player._id },
-                {
-                    $set: { pseudocideUsedToday: false },
-                    $unset: { pseudocideCharges: "" },
-                }
-            );
+            player.pseudocideUsedToday = false;
+            player.pseudocideCharges = undefined;
+            await player.save();
         } catch (err) {
             console.log("Failed to update pseudocide cooldown:", err);
         }
@@ -1489,13 +1472,9 @@ async function applyIppCooldowns(client) {
         try {
             const user = await client.users.fetch(player.userId);
             await addCooldown(user, "ipp", 1);
-            await Player.updateOne(
-                { _id: player._id },
-                {
-                    $set: { ippUsedToday: false },
-                    $unset: { ippUsedToday: "" },
-                }
-            );
+            player.ippUsedToday = false;
+            player.ippCharges = undefined;
+            await player.save();
         } catch (err) {
             console.log("Failed to update ipp cooldown:", err);
         }
@@ -1639,7 +1618,21 @@ async function pseudocide(interaction) {
         hasNotebook,
         affiliations
     );
-    await schedulePseudocideRevival(interaction.client, target.id);
+
+    await createDelayedAction(
+        interaction.client,
+        "pseudocideRevival",
+        /*hrsToMs(24)*/ minToMs(3),
+        {
+            role: targetData.role,
+            targetId: target.id,
+        }
+    );
+
+    await Player.updateOne(
+        { _id: userData._id },
+        { $set: { pseudocideUsedToday: true } }
+    );
 
     return true;
 }
@@ -1685,6 +1678,11 @@ async function ipp(interaction) {
         ipp: true,
     });
     await targetMember.setNickname(`${targetMember.displayName} (IPP)`);
+
+    await Player.updateOne(
+        { _id: userData._id },
+        { $set: { ippUsedToday: true } }
+    );
 
     return true;
 }
@@ -1841,6 +1839,169 @@ async function bug(interaction) {
     return true;
 }
 
+async function fetchAllMessages(channel, predicate = () => true) {
+    let allMessages = [];
+    let lastId;
+
+    while (true) {
+        const options = { limit: 100 };
+        if (lastId) {
+            options.before = lastId;
+        }
+
+        const messages = await channel.messages.fetch(options);
+
+        if (messages.size === 0) {
+            break; // no more messages
+        }
+
+        for (const msg of messages.values()) {
+            if (predicate(msg)) allMessages.push(msg);
+        }
+
+        lastId = messages.last().id; // move the cursor back
+    }
+
+    return allMessages;
+}
+
+// just search through all loggable channels and then order based on time from oldest to newest
+// then, send the messages to autopsy logs
+async function autopsy(interaction) {
+    const season = await Season.findOne({});
+    const user = interaction.user;
+    const target = interaction.options.getUser("target");
+    const userData = await getPlayerData(user);
+    const targetData = await getPlayerData(target);
+
+    if (!season) return "The season has not yet begun.";
+    if (!userData) return "You have no data.";
+    if (!userData.alive) return "You are dead.";
+    if (!targetData) return "This user has no data.";
+    if (targetData.alive) return "This user is not dead.";
+    if (userData.role !== "PI") return "You are not the PI.";
+    if (userData.cooldowns.get("autopsy")) return "Autopsy on cooldown.";
+
+    await addCooldown(user, "autopsy", 1);
+
+    const timeOfDeath = targetData.timeOfDeath;
+    const hrs3 = hrsToMs(3);
+    const autopsyLogs = await interaction.client.channels.fetch(
+        gameConfig.channelIds.autopsyLogs
+    );
+
+    let allMessages = [];
+    for (const channelId of season.messageLoggedChannels) {
+        const channel = await interaction.client.channels
+            .fetch(channelId)
+            .catch(() => null);
+        if (!channel) continue;
+        const channelMessages = await fetchAllMessages(channel, (msg) => {
+            const timeSinceSent = Math.max(
+                0,
+                timeOfDeath - msg.createdTimestamp
+            );
+            return timeSinceSent <= hrs3;
+        });
+        allMessages.push(...channelMessages);
+    }
+
+    // remove messages that are not sent by the person being autopsied
+    allMessages = allMessages.filter(
+        (message) => message.author.id === target.id
+    );
+
+    // sort in ascending order based on timestamp
+    allMessages.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+
+    // send autopsy notifier
+    await autopsyLogs.send({
+        content: `=====================================\nAutopsy logs for ${target}:`,
+    });
+
+    // send all messages in autopsy logs
+    for (const message of allMessages) {
+        try {
+            await autopsyLogs.send({
+                content: `[<t:${Math.floor(
+                    message.createdTimestamp / 1000
+                )}>] ${message.content}`,
+                files: [...message.attachments.values()],
+            });
+        } catch (err) {
+            console.log("Failed to send message in autopsy logs", err);
+        }
+    }
+
+    await autopsyLogs.send({
+        content: "=====================================",
+    });
+
+    return true;
+}
+
+const namesToCallbacks = {
+    pseudocideRevival: onPseudocideRevival,
+    scheduledDeath: onScheduledKill,
+};
+
+// initializes all delayed actions. call on bot start.
+async function initializeDelayedActions(client) {
+    const delayedActions = await DelayedAction.find({});
+    await Promise.all(
+        delayedActions.map((action) => initializeDelayedAction(client, action))
+    );
+}
+
+// starts the timer for the delayed action in the current session
+async function initializeDelayedAction(client, delayedAction) {
+    const endTime = delayedAction.timeBegan + delayedAction.delay;
+    const remaining = Math.max(0, endTime - Date.now());
+
+    setTimeout(async () => {
+        const callback = namesToCallbacks[delayedAction.actionName];
+        if (typeof callback !== "function") {
+            console.error(
+                "Delayed action callback not found:",
+                delayedAction.actionName
+            );
+            return;
+        }
+        try {
+            await callback(client, delayedAction);
+            await DelayedAction.deleteOne({ _id: delayedAction._id });
+        } catch (err) {
+            console.error(
+                "Failed executing delayed action:",
+                delayedAction,
+                err
+            );
+        }
+    }, remaining);
+}
+
+// creates a delayed action in a db and starts its timer in the current session
+// the timer will persist throughout sessions using the db entry
+async function createDelayedAction(
+    client,
+    actionName,
+    delayTime,
+    actionData = {}
+) {
+    try {
+        const delayedAction = await DelayedAction.create({
+            timeBegan: Date.now(),
+            delay: delayTime,
+            actionName,
+            ...actionData,
+        });
+        console.log("Delayed action created:", delayedAction);
+        await initializeDelayedAction(client, delayedAction);
+    } catch (err) {
+        console.error("Failed to create delayed action:", err);
+    }
+}
+
 module.exports = {
     contact,
     addUserToGroupChat,
@@ -1866,7 +2027,6 @@ module.exports = {
     setNotebook,
     loadScheduledDeaths,
     pseudocide,
-    loadScheduledRevivals,
     ipp,
     passNotebook,
     unlock2ndKira,
@@ -1879,4 +2039,6 @@ module.exports = {
     announce,
     setChannelLoggable,
     bug,
+    autopsy,
+    initializeDelayedActions,
 };

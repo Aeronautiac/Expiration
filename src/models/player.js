@@ -20,6 +20,7 @@ const playerSchema = new mongoose.Schema({
     affiliations: { type: [String], required: true },
     notebookRestrictReasons: { type: [String], required: true },
     bugged: Boolean,
+    timeOfDeath: Number,
 
     // death protection
     ipp: Boolean,

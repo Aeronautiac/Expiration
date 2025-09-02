@@ -23,13 +23,14 @@ module.exports = {
                 .setDescription("The role to give the player")
                 .addChoices(
                     choice("Civilian"),
+                    choice("Rogue Civilian"),
                     choice("Watari"),
                     choice("L"),
                     choice("Kira"),
                     choice("2nd Kira"),
                     choice("BB"),
-                    choice("Near"),
-                    choice("Mello"),
+                    // choice("Near"),
+                    // choice("Mello"),
                     choice("PI"),
                     choice("News Anchor")
                 )
@@ -45,7 +46,7 @@ module.exports = {
         game.role(
             interaction.client,
             interaction.options.getUser("target"),
-            interaction.options.getString("role"),
+            interaction.options.getString("role")
         );
 
         interaction.editReply({

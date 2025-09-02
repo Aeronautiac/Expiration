@@ -171,7 +171,7 @@ module.exports = {
             messageContent += `This will target lounge **${channel}**. `;
         }
 
-        messageContent += `React with 👍 to approve or 👎 to deny. Once a vote majority is reached (${majority} votes), the decision will be made.`;
+        messageContent += `React with 👍 to approve or 👎 to deny. Once a vote majority is reached (${majority+1} votes), the decision will be made.`;
 
         const pollMessage = await loungeChannel.send({
             content: messageContent,

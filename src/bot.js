@@ -72,4 +72,4 @@ for (const file of eventFiles) {
 client.login(token);
 
 game.loadScheduledDeaths(client);
-game.loadScheduledRevivals(client);
+game.initializeDelayedActions(client);

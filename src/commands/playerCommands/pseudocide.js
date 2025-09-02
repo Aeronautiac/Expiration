@@ -27,13 +27,14 @@ module.exports = {
                 .setDescription("The role to be displayed.")
                 .addChoices(
                     choice("Civilian"),
+                    choice("Rogue Civilian"),
                     choice("Watari"),
                     choice("L"),
                     choice("Kira"),
                     choice("2nd Kira"),
                     choice("BB"),
-                    choice("Near"),
-                    choice("Mello"),
+                    // choice("Near"),
+                    // choice("Mello"),
                     choice("PI"),
                     choice("News Anchor")
                 )
@@ -76,8 +77,7 @@ module.exports = {
             });
         } else {
             await interaction.editReply({
-                content:
-                    "Success. You will be able to use pseudocide again in 2 days.",
+                content: "Success.",
                 ephemeral: true,
             });
         }

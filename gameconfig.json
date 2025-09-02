@@ -22,6 +22,7 @@
     },
 
     "organisations": [ "Task Force", "Kira's Kingdom" ],
+
     "abilities": {
         "Blackout": { "cooldown": 999, "organisation": "Kira's Kingdom", "membersRequired": 5 },
         "Public Kidnap": { "cooldown": 1, "organisation": "Kira's Kingdom", "membersRequired": 3 },
@@ -45,11 +46,16 @@
         "Extra": ["tf", "kk"]
     },
 
+    "roleAbilities": {
+        
+    },
+
     "channelIds": {
         "hostContactLogs": "1406169333280804885",
         "watariContactLogs": "1406120605001973862",
         "news": "1406115827274612755",
-        "bugLogs": "1411117992204570664"
+        "bugLogs": "1411117992204570664",
+        "autopsyLogs": "1410422544028274788"
     },
 
     "roleIds": {
