@@ -2,10 +2,13 @@
     "monologueCategoryPrefix": "Monologues ",
     "loungeCategoryPrefix": "Private Messages ",
     "groupchatCategoryPrefix": "Group Chats ",
+    "kidnapCategoryPrefix": "Kidnapped ",
     "maxChannelsPerCategory": 50,
     "dailyTokens": 5,
     "maxGroupChatMembers": 5,
     "maxGroupChats": 3,
+    "defaultKidnapDuration": 24,
+    "underTheRadarCharges": 1,
 
     "guildIds": {
         "main": "1406115825844359314",
@@ -25,10 +28,10 @@
 
     "abilities": {
         "Blackout": { "cooldown": 999, "organisation": "Kira's Kingdom", "membersRequired": 5 },
-        "Public Kidnap": { "cooldown": 1, "organisation": "Kira's Kingdom", "membersRequired": 1 },
+        "Public Kidnap": { "cooldown": 1, "organisation": "Kira's Kingdom", "membersRequired": 3 },
         "Anonymous Kidnap": { "cooldown": 2, "organisation": "Kira's Kingdom", "membersRequired": 4 },
         "2nd Kira+Kira Anonymous Kidnap": { "cooldown": 2, "organisation": "Kira's Kingdom", "rolesRequiredInOrganisation": ["2nd Kira", "Kira"] },
-        "Tap In": { "cooldown": 1, "organisation": "Kira's Kingdom", "membersRequired": 1 },
+        "Tap In": { "cooldown": 1, "organisation": "Kira's Kingdom", "membersRequired": 3 },
 
         "Background Check": { "cooldown": 1, "organisation": "Task Force", "membersRequired": 3 },
         "Civilian Arrest": { "cooldown": 1, "organisation": "Task Force", "membersRequired": 4 },
@@ -69,6 +72,7 @@
         "Task Force": "1406115825928376367",
         "Arrested": "1412394267556446228",
         "Prosecutor": "1406115825928376361",
-        "Custody": "1406115825907269651"
+        "Custody": "1406115825907269651",
+        "Kidnapped": "1412394267556446229"
     }
 }

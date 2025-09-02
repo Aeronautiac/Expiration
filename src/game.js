@@ -8,6 +8,7 @@ const Season = require("./models/season");
 const Notebook = require("./models/notebook");
 const Organisation = require("./models/organisation");
 const ScheduledDeath = require("./models/scheduledDeath");
+const KidnapLounge = require("./models/kidnaplounge");
 const DelayedAction = require("./models/delayedAction");
 const gameConfig = require("../gameconfig.json");
 const first_names = fs
@@ -307,6 +308,8 @@ async function createLoungeChannel(guild, channelName, loungeType, users) {
         categoryPrefix = gameConfig.loungeCategoryPrefix;
     } else if (loungeType === "groupchat") {
         categoryPrefix = gameConfig.groupchatCategoryPrefix;
+    } else if (loungeType === "kidnap") {
+        categoryPrefix = gameConfig.kidnapCategoryPrefix;
     }
 
     // get all channel categories with category prefix and sort them based on their number
@@ -347,32 +350,41 @@ async function createLoungeChannel(guild, channelName, loungeType, users) {
     }
 
     // create the channel and add every member to it
-    const permissionOverwrites = [
-        {
-            id: guild.roles.everyone.id,
-            deny: [PermissionsBitField.Flags.ViewChannel],
-        },
-    ];
+    const permissionOverwrites = [];
 
-    for (const user of users) {
+    if (users === "everyone") {
         permissionOverwrites.push({
-            id: user.id,
-            allow: [PermissionsBitField.Flags.ViewChannel],
+            id: guild.roles.everyone.id,
+            allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.AttachFiles,
+                PermissionsBitField.Flags.EmbedLinks,
+            ],
         });
+    } else {
+        permissionOverwrites.push({
+            id: guild.roles.everyone.id,
+            deny: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+            ],
+        });
+
+        for (const user of users) {
+            permissionOverwrites.push({
+                id: user.id,
+                allow: [
+                    PermissionsBitField.Flags.ViewChannel,
+                    PermissionsBitField.Flags.AttachFiles,
+                    PermissionsBitField.Flags.EmbedLinks,
+                ],
+            });
+        }
     }
 
     permissionOverwrites.push({
         id: gameConfig.roleIds.spec,
         allow: [PermissionsBitField.Flags.ViewChannel],
-    });
-
-    // need to do this for all members of the lounge, not just civ role. this causes issues for things like custody as it is currently.
-    permissionOverwrites.push({
-        id: gameConfig.roleIds.civ,
-        allow: [
-            PermissionsBitField.Flags.AttachFiles,
-            PermissionsBitField.Flags.EmbedLinks,
-        ],
     });
 
     const newChannel = await guild.channels.create({
@@ -395,6 +407,19 @@ async function createLoungeChannel(guild, channelName, loungeType, users) {
     return newChannel;
 }
 
+async function deleteTemporaryChannel(client, channelId) {
+    const channel = await client.channels.fetch(channelId);
+    if (!channel) return;
+
+    await channel.delete();
+
+    const season = await Season.findById("season");
+    season.temporaryChannels = season.temporaryChannels.filter(
+        (id) => id !== channelId
+    );
+    await season.save();
+}
+
 // returns the number of lounges + 1
 async function getNextLoungeId() {
     const count = await Lounge.countDocuments({});
@@ -410,11 +435,13 @@ async function logGroupChat(client, loungeId, user, members) {
     const userMember = await mainGuild.members.fetch(user.id);
     const playerData = await getPlayerData(user);
 
-    let logMessage = `Group chat created at <t:${time}> by ${userMember.displayName} with members:`;
+    let logMessage = `Group chat created at <t:${time}> by ${strippedName(
+        userMember.displayName
+    )} with members:`;
 
     for (const member of members) {
         const memberUser = await mainGuild.members.fetch(member.id);
-        logMessage += `\n${memberUser.displayName}`;
+        logMessage += `\n${strippedName(memberUser.displayName)}`;
     }
 
     // regular logs
@@ -629,7 +656,10 @@ async function contact(client, user, target, anonymous) {
 
     // consume a token
     playerData = await updatePlayerData(user, {
-        contactTokens: Math.max(0, playerData.contactTokens - 1 - (anonymous ? 1 : 0)),
+        contactTokens: Math.max(
+            0,
+            playerData.contactTokens - 1 - (anonymous ? 1 : 0)
+        ),
     });
 
     // log the contact
@@ -729,7 +759,7 @@ async function changeGroupChatOwner(client, user, channel, newOwner) {
     if (!groupChatTable.members.includes(newOwner.id)) {
         return "You can't transfer ownership to somebody not in the group chat.";
     }
-    if (season.groupChats.some(chat => chat.owner === newOwner.id)) {
+    if (season.groupChats.some((chat) => chat.owner === newOwner.id)) {
         return "This user already owns a group chat. You can only own one group chat at a time.";
     }
     const newOwnerData = await getPlayerData(newOwner);
@@ -739,13 +769,17 @@ async function changeGroupChatOwner(client, user, channel, newOwner) {
 
     const oldOwnerId = groupChatTable.owner;
     groupChatTable.owner = newOwner.id;
-    groupChatTable.members = groupChatTable.members.filter(id => id !== newOwner.id);
+    groupChatTable.members = groupChatTable.members.filter(
+        (id) => id !== newOwner.id
+    );
     if (!groupChatTable.members.includes(oldOwnerId)) {
         groupChatTable.members.push(oldOwnerId);
     }
 
     await season.save();
-    await channel.send(`The ownership of this group chat has been transferred to ${newOwner}.`);
+    await channel.send(
+        `The ownership of this group chat has been transferred to ${newOwner}.`
+    );
 
     return `Successfully transferred ownership of the group chat to ${newOwner}.`;
 }
@@ -1377,7 +1411,10 @@ async function utr(user) {
     }
 
     const userData = await getPlayerData(user);
-    const charges = Math.max((userData.underTheRadarCharges ?? 2) - 1, 0);
+    const charges = Math.max(
+        (userData.underTheRadarCharges ?? gameConfig.underTheRadarCharges) - 1,
+        0
+    );
 
     await updatePlayerData(user, {
         usedUnderTheRadar: true,
@@ -1794,7 +1831,7 @@ async function release(client, user) {
     if (member) {
         await member.roles.remove(gameConfig.roleIds.Arrested);
     }
-    
+
     await unhideLounges(client, user, "incarcerated");
     await freeNotebook(user, "incarcerated");
 }
@@ -1991,7 +2028,9 @@ async function autopsy(interaction) {
 
 async function startBlackout(client) {
     const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
-    const newsChannel = await mainGuild.channels.fetch(gameConfig.channelIds.news);
+    const newsChannel = await mainGuild.channels.fetch(
+        gameConfig.channelIds.news
+    );
     await newsChannel.permissionOverwrites.edit(gameConfig.roleIds.civ, {
         ViewChannel: false,
     });
@@ -1999,34 +2038,41 @@ async function startBlackout(client) {
 
 async function stopBlackout(client) {
     const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
-    const newsChannel = await mainGuild.channels.fetch(gameConfig.channelIds.news);
+    const newsChannel = await mainGuild.channels.fetch(
+        gameConfig.channelIds.news
+    );
     await newsChannel.permissionOverwrites.edit(gameConfig.roleIds.civ, {
         ViewChannel: true,
     });
 
     await newsChannel.send({
-        content: `@everyone The local network seems to be back up... The blackout has ended!`
+        content: `@everyone The local network seems to be back up... The blackout has ended!`,
     });
 }
 
 async function delayedRelease(client, targetId) {
     const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
-    const newsChannel = await mainGuild.channels.fetch(gameConfig.channelIds.news);
+    const newsChannel = await mainGuild.channels.fetch(
+        gameConfig.channelIds.news
+    );
     const target = await mainGuild.members.fetch(targetId);
     await newsChannel.send({
-        content: `@everyone It appears that the <@&${gameConfig.roleIds["Task Force"]}> have finally released **${target.displayName}**. Lets hope they don't return to their old ways.`
+        content: `@everyone It appears that the <@&${gameConfig.roleIds["Task Force"]}> have finally released **${target.displayName}**. Lets hope they don't return to their old ways.`,
     });
 
     await release(client, target);
 }
 
 const filter = (reaction, user) => {
-    return (
-        ["👍", "👎"].includes(reaction.emoji.name) &&
-        !user.bot
-    );
+    return ["👍", "👎"].includes(reaction.emoji.name) && !user.bot;
 };
-async function createGenericPoll(message, duration, majorityToWin, participationRequirementCallback, callback) {
+async function createGenericPoll(
+    message,
+    duration,
+    majorityToWin,
+    participationRequirementCallback,
+    callback
+) {
     const collector = message.createReactionCollector({
         filter,
         time: duration,
@@ -2042,22 +2088,24 @@ async function createGenericPoll(message, duration, majorityToWin, participation
     collector.on("collect", (reaction, user) => {
         if (votedUsers.has(user.id)) {
             // Prevent double voting for different options
-            const userReactions = message.reactions.cache.filter(r => r.users.cache.has(user.id));
+            const userReactions = message.reactions.cache.filter((r) =>
+                r.users.cache.has(user.id)
+            );
             // If user already voted for 👍 and now tries 👎, deny 👎
             if (
-            reaction.emoji.name === "👎" &&
-            userReactions.some(r => r.emoji.name === "👍")
+                reaction.emoji.name === "👎" &&
+                userReactions.some((r) => r.emoji.name === "👍")
             ) {
-            reaction.users.remove(user.id);
-            return;
+                reaction.users.remove(user.id);
+                return;
             }
             // If user already voted for 👎 and now tries 👍, deny 👍
             if (
-            reaction.emoji.name === "👍" &&
-            userReactions.some(r => r.emoji.name === "👎")
+                reaction.emoji.name === "👍" &&
+                userReactions.some((r) => r.emoji.name === "👎")
             ) {
-            reaction.users.remove(user.id);
-            return;
+                reaction.users.remove(user.id);
+                return;
             }
             return;
         }
@@ -2091,11 +2139,110 @@ async function createGenericPoll(message, duration, majorityToWin, participation
     });
 }
 
+// removes ipp and bug tag (* and (IPP))
+function strippedName(name) {
+    return name.replace(/\*/g, "").replace(/\s*\(IPP\)$/, "");
+}
+
+// if no kidnapper id, then it was an anonymous kidnapping
+// when kidnap is over, delete the kidnap channel using deleteTemporaryChannel as well as the kidnap db entry.
+async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+    const victimUser = await client.users.fetch(targetId).catch(() => null);
+    const victimMember = await mainGuild.members
+        .fetch(targetId)
+        .catch(() => null);
+    if (!victimMember || !victimUser) return;
+
+    const victimName = strippedName(victimMember.displayName);
+
+    const kidnapVictimChannel = await createLoungeChannel(
+        mainGuild,
+        `kidnapped-${victimName}`,
+        "kidnap",
+        [targetId]
+    );
+    const kidnapperChannel = await createLoungeChannel(
+        kidnapperGuild,
+        `kidnapped-${victimName}`,
+        "kidnap",
+        "everyone"
+    );
+
+    const kidnapDoc = await KidnapLounge.create({
+        victimId: targetId,
+        kidnapperId: kidnapperId,
+        channelIds: [kidnapVictimChannel.id, kidnapperChannel.id],
+    });
+
+    // kidnap effects
+    await hideLounges(client, victimUser, "kidnapped");
+    await restrictNotebook(victimUser, "kidnapped");
+    // Add kidnapped role and remove civ role
+    try {
+        await victimMember.roles.add(gameConfig.roleIds.Kidnapped);
+        await victimMember.roles.remove(gameConfig.roleIds.civ);
+    } catch (err) {
+        console.log("Failed to update roles for kidnapped member:", err);
+    }
+
+    await createDelayedAction(
+        client,
+        "kidnapRelease",
+        hrsToMs(gameConfig.defaultKidnapDuration),
+        [kidnapDoc._id]
+    );
+}
+
+async function kidnapRelease(client, kidnapDocId) {
+    const kidnapDoc = await KidnapLounge.findById(kidnapDocId);
+    if (!kidnapDoc) return;
+
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+    const news = await mainGuild.channels.fetch(gameConfig.channelIds.news);
+    const kidnappedUser = await client.users
+        .fetch(kidnapDoc.victimId)
+        .catch(() => null);
+    const kidnappedMember = await mainGuild.members
+        .fetch(kidnapDoc.victimId)
+        .catch(() => null);
+
+    // Delete the kidnap channels
+    for (const channelId of kidnapDoc.channelIds) {
+        await deleteTemporaryChannel(client, channelId);
+    }
+
+    // Remove kidnapped effects
+    await unhideLounges(client, kidnappedUser, "kidnapped");
+    await freeNotebook(kidnappedUser, "kidnapped");
+    // Add civ role and remove kidnapped role
+    try {
+        await kidnappedMember.roles.add(gameConfig.roleIds.civ);
+        await kidnappedMember.roles.remove(gameConfig.roleIds.Kidnapped);
+    } catch (err) {
+        console.log("Failed to update roles for kidnapped member:", err);
+    }
+
+    // Delete the kidnap document
+    await KidnapLounge.deleteOne({ _id: kidnapDocId });
+
+    // Send notifiers
+    const revealString = kidnapDoc.kidnapperId
+        ? `When questioned by authorities, ${kidnappedUser} recalled the identity of their kidnapper: ${await client.users.fetch(
+              kidnapDoc.kidnapperId
+          )}`
+        : "";
+    await news.send(
+        `@everyone ${kidnappedUser} has been released from captivity. They have now returned to normal life.\n${revealString}`
+    );
+}
+
 const namesToCallbacks = {
     onPseudocideRevival: onPseudocideRevival,
     scheduledDeath: onScheduledKill,
     stopBlackout: stopBlackout,
     delayedRelease: delayedRelease,
+    kidnapRelease: kidnapRelease,
 };
 
 // initializes all delayed actions. call on bot start.
@@ -2199,4 +2346,6 @@ module.exports = {
     bug,
     autopsy,
     initializeDelayedActions,
+    strippedName,
+    kidnap,
 };
