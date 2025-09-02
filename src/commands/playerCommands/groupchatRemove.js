@@ -17,10 +17,11 @@ module.exports = {
         });
         
         const target = interaction.options.getUser("target");
-        await game.removeUserFromGroupChat(interaction.client, interaction.user, target, interaction.channel);
+        const reply = await game.removeUserFromGroupChat(interaction.client, interaction.user, target, interaction.channel);
 
         await interaction.editReply({
-            content: "Success",
+            content: reply,
+            ephemeral: true,
         });
     },
 };

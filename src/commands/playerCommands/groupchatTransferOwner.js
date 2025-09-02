@@ -3,12 +3,12 @@ const game = require("../../game");
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName("groupchatadd")
-        .setDescription("Add a user to the group chat.")
+        .setName("groupchattransferowner")
+        .setDescription("Transfer ownership of the group chat.")
         .addUserOption((option) =>
             option
-                .setName("target")
-                .setDescription("The person you want to add to the group chat")
+                .setName("newowner")
+                .setDescription("The new owner of the group chat")
                 .setRequired(true)
         ),
     async execute(interaction) {
@@ -16,8 +16,8 @@ module.exports = {
             ephemeral: true,
         });
 
-        const target = interaction.options.getUser("target");
-        const reply = await game.addUserToGroupChat(interaction.client, interaction.user, target, interaction.channel);
+        const newOwner = interaction.options.getUser("newowner");
+        const reply = await game.changeGroupChatOwner(interaction.client, interaction.user, interaction.channel, newOwner);
 
         await interaction.editReply({
             content: reply,

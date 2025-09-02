@@ -240,7 +240,7 @@ async function deathMessage(
     const deathmessage =
         message ?? `${user} has died to a sudden heart attack.`;
 
-    let output = `@ everyone ${deathmessage} [${user} (${readablename}) has died. Role: ${role}, Affiliations: ${
+    let output = `@everyone ${deathmessage} [${user} (${readablename}) has died. Role: ${role}, Affiliations: ${
         affiliations.join(", ") || "none"
     }]`;
 
@@ -708,6 +708,46 @@ async function createGroupChat(client, user, passedTargets) {
     await logGroupChat(client, season.id, user, targets);
 
     return `Successfully created group chat.`;
+}
+
+async function changeGroupChatOwner(client, user, channel, newOwner) {
+    const season = await Season.findById("season");
+    if (!season) return "The season has not yet begun.";
+
+    let groupChatTable = season.groupChats.find(
+        (chat) => chat.channelId === channel.id
+    );
+    if (!groupChatTable) {
+        return "This channel is not a group chat.";
+    }
+    if (groupChatTable.owner !== user.id) {
+        return "You are not the owner of this group chat.";
+    }
+    if (groupChatTable.owner === newOwner.id) {
+        return "You are already the owner of this group chat.";
+    }
+    if (!groupChatTable.members.includes(newOwner.id)) {
+        return "You can't transfer ownership to somebody not in the group chat.";
+    }
+    if (season.groupChats.some(chat => chat.owner === newOwner.id)) {
+        return "This user already owns a group chat. You can only own one group chat at a time.";
+    }
+    const newOwnerData = await getPlayerData(newOwner);
+    if (!newOwnerData || !newOwnerData.alive) {
+        return "The new owner has to be alive.";
+    }
+
+    const oldOwnerId = groupChatTable.owner;
+    groupChatTable.owner = newOwner.id;
+    groupChatTable.members = groupChatTable.members.filter(id => id !== newOwner.id);
+    if (!groupChatTable.members.includes(oldOwnerId)) {
+        groupChatTable.members.push(oldOwnerId);
+    }
+
+    await season.save();
+    await channel.send(`The ownership of this group chat has been transferred to ${newOwner}.`);
+
+    return `Successfully transferred ownership of the group chat to ${newOwner}.`;
 }
 
 async function addUserToGroupChat(client, user, target, channel) {
@@ -2121,6 +2161,7 @@ module.exports = {
     createDelayedAction,
     contact,
     addUserToGroupChat,
+    changeGroupChatOwner,
     removeUserFromGroupChat,
     createGroupChat,
     changeGroupChatName,

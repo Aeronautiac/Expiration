@@ -66,7 +66,7 @@ module.exports = {
         }
 
         await courtroomChannel.send({
-            content: `@ everyone Court will be in session...\n\n${defendant} is being charged for **${charges}**.\n\nOur prosecutor tonight is ${prosecutor}.\n\nIf you wish to speak or object, please mention <@291616614347177984> and refer to them as 'your honor'... Disrespect will be punished...\n\nMay ${prosecutor} start us off.`,
+            content: `@everyone Court will be in session...\n\n${defendant} is being charged for **${charges}**.\n\nOur prosecutor tonight is ${prosecutor}.\n\nIf you wish to speak or object, please mention <@291616614347177984> and refer to them as 'your honor'... Disrespect will be punished...\n\nMay ${prosecutor} start us off.`,
         });
 
         await interaction.editReply({

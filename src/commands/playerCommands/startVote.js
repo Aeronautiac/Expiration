@@ -39,10 +39,10 @@ module.exports = {
                 )
                 .setRequired(true)
         )
-        .addUserOption((option) =>
+        .addStringOption((option) =>
             option
                 .setName("target")
-                .setDescription("The user to target with the action")
+                .setDescription("The USER ID of the target the action should affect")
         )
         .addUserOption((option) =>
             option
@@ -72,7 +72,8 @@ module.exports = {
         const abilityRequiresAChannel = abilitiesThatRequireAChannel.includes(action)
         const abilityRequiresAKidnapper = abilitiesThatRequireAKidnapper.includes(action)
 
-        const target = interaction.options.getUser("target");
+        const targetId = interaction.options.getString("target");
+        const target = await mainGuild.members.fetch(targetId);
         const channel = interaction.options.getString("channel");
         const kidnapper = interaction.options.getUser("kidnapper");
 
@@ -114,13 +115,18 @@ module.exports = {
         }
         // If the ability requires a target and one is not provided, return
         if (abilityRequiresATarget) {
-            if (!target) {
+            if (!targetId) {
                 await interaction.editReply({
                     content: "This ability requires a target input.",
                 });
                 return;
             }
-            // Check if target is alive
+            if (!target) {
+                await interaction.editReply({
+                    content: "The target must be a valid USER ID of a player. If you are confused, @coolman.",
+                });
+                return;
+            }
             const targetData = await game.getPlayerData(target);
             if (!targetData || !targetData.alive) {
                 await interaction.editReply({
@@ -206,10 +212,8 @@ module.exports = {
         const majority = Math.ceil(membersInOrganisation * 0.5);
         const loungeChannel = await client.channels.fetch(interaction.channel.id);
         let messageContent = `@everyone A vote has been started for a **${action}**. `;
-        let targetMember = null;
         if (abilityRequiresATarget) {
-            targetMember = await mainGuild.members.fetch(target.id);
-            messageContent += `This will target **${targetMember.displayName}**. `;
+            messageContent += `This will target **${target.displayName}**. `;
         }
         if (abilityRequiresAChannel) {
             messageContent += `This will target lounge **${channel}**. `;
@@ -248,14 +252,14 @@ module.exports = {
                     const affiliationMention = `<@&${gameConfig.roleIds[ourAffiliation]}>`;
 
                     if (action === "Background Check") {
-                        const targetPlayerData = await game.getPlayerData(target);
+                        const targetPlayerData = await game.getPlayerData(targetId);
                         if (targetPlayerData) {
-                            const msg = await pollMessage.reply(`The true name of **${targetMember.displayName}** is **${targetPlayerData.trueName}**.`);
+                            const msg = await pollMessage.reply(`The true name of **${target.displayName}** is **${targetPlayerData.trueName}**.`);
                             msg.pin();
                         }
                     } else if (action === "Civilian Arrest") {
                         const civArrestMsg = await news.send({
-                            content: `@everyone The ${affiliationMention} has started a civilian arrest on **${targetMember.displayName}**. Vote 👍 if you would like this person to be arrested for 1 day. Vote 👎 if you do not want this person to be arrested. This vote will last for ${HOURS_FOR_CIVILIAN_ARREST_VOTE} hours, then the verdict will be announced.`
+                            content: `@everyone The ${affiliationMention} has started a civilian arrest on **${target.displayName}**. Vote 👍 if you would like this person to be arrested for 1 day. Vote 👎 if you do not want this person to be arrested. This vote will last for ${HOURS_FOR_CIVILIAN_ARREST_VOTE} hours, then the verdict will be announced.`
                         });
 
                         game.createGenericPoll(civArrestMsg, hrsToMs(HOURS_FOR_CIVILIAN_ARREST_VOTE), null,
@@ -266,7 +270,7 @@ module.exports = {
                             async (result) => {
                                 if (result === "win") {
                                     civArrestMsg.reply("The vote has passed. The **Civilian Arrest** will be carried out.");
-                                    game.incarcerate(client, target);
+                                    game.incarcerate(client, targetId);
                                 } else if (result === "lose") {
                                     civArrestMsg.reply("The vote has failed. The **Civilian Arrest** has been cancelled.");
                                 } else {
@@ -275,10 +279,10 @@ module.exports = {
                             });
                     } else if (action === "Unlawful Arrest" || action === "PI+Watari Unlawful Arrest") {
                         news.send({
-                            content: `@ everyone The ${affiliationMention} have performed an unlawful arrest on **${targetMember.displayName}**. They will return from their sentence in ${HOURS_ARRESTED_FOR} hours.`
+                            content: `@everyone The ${affiliationMention} have performed an unlawful arrest on **${target.displayName}**. They will return from their sentence in ${HOURS_ARRESTED_FOR} hours.`
                         });
-                        game.incarcerate(client, target);
-                        game.createDelayedAction(client, "delayedRelease", hrsToMs(HOURS_ARRESTED_FOR), [target.id]);
+                        game.incarcerate(client, targetId);
+                        game.createDelayedAction(client, "delayedRelease", hrsToMs(HOURS_ARRESTED_FOR), [targetId.id]);
                     } else if (action === "Blackout") {
                         news.send({
                             content: `@everyone The ${affiliationMention} have performed a blackout on the local network! All trials will cancel and news will stop in 1 minute for ${HOURS_BLACKOUT_DURATION} hours.`
@@ -289,11 +293,11 @@ module.exports = {
                         }, 60 * 1000);
                     } else if (action === "Public Kidnap") {
                         news.send({
-                            content: `@everyone The ${affiliationMention} have performed a kidnapping on **${targetMember.displayName}**. They will return in 24 hours, or less - if they are charming, and the kidnapper will be announced upon their return.`
+                            content: `@everyone The ${affiliationMention} have performed a kidnapping on **${target.displayName}**. They will return in 24 hours, or less - if they are charming. The kidnapper will be announced upon their return.`
                         });
                     } else if (action === "Anonymous Kidnap" || action === "2nd Kira+Kira Anonymous Kidnap") {
                         news.send({
-                            content: `@everyone The ${affiliationMention} have performed an anonymous kidnapping on **${targetMember.displayName}**. They will return in 24 hours, or less - if they are charming.`
+                            content: `@everyone The ${affiliationMention} have performed an anonymous kidnapping on **${target.displayName}**. They will return in 24 hours, or less - if they are charming.`
                         });
                     } else if (action === "Tap In") {
                         const kiraGuild = await client.guilds.fetch(gameConfig.guildIds.kk);
