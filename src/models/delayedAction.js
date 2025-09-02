@@ -6,16 +6,9 @@ const delayedActionSchema = new mongoose.Schema({
     delay: { type: Number, required: true },
     actionName: { type: String, required: true },
 
-    // ability stuff
-    targetId: { type: String },
-
-    // pseudocide
-    role: String,
-
-    // scheduled deaths
-    deathMessage: String,
-    writtenBy: String,
+    arguments: { type: [mongoose.Schema.Types.Mixed] }
 });
 
 const DelayedAction = mongoose.model("delayedAction", delayedActionSchema);
 module.exports = DelayedAction;
+    

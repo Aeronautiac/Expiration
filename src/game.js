@@ -1110,16 +1110,16 @@ async function prepareScheduledDeath(client, targetId) {
     }
 }
 
-async function onPseudocideRevival(client, delayedAction) {
+async function onPseudocideRevival(client, targetId, role) {
     const news = await client.channels.fetch(gameConfig.channelIds.news);
-    const targetUser = await client.users.fetch(delayedAction.targetId);
+    const targetUser = await client.users.fetch(targetId);
 
     await news.send({
         content: `@everyone It appears that ${targetUser} never actually died! Their death was orchestrated using an ultra-realistic doll.`,
         allowedMentions: { parse: ["everyone"] },
     });
 
-    await role(client, targetUser, delayedAction.role);
+    await role(client, targetUser, role);
 }
 
 async function scheduleDeath(client, fromId, targetId, delay, message) {
@@ -1622,12 +1622,9 @@ async function pseudocide(interaction) {
 
     await createDelayedAction(
         interaction.client,
-        "pseudocideRevival",
+        "onPseudocideRevival",
         hrsToMs(24),
-        {
-            role: targetData.role,
-            targetId: target.id,
-        }
+        [target.id, targetData.role]
     );
 
     await Player.updateOne(
@@ -1741,11 +1738,23 @@ async function freeNotebook(user, reason) {
 }
 
 async function incarcerate(client, user) {
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+    const member = await mainGuild.members.fetch(user.id).catch(() => null);
+    if (member) {
+        await member.roles.add(gameConfig.roleIds.Arrested);
+    }
+
     await hideLounges(client, user, "incarcerated");
     await restrictNotebook(user, "incarcerated");
 }
 
 async function release(client, user) {
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+    const member = await mainGuild.members.fetch(user.id).catch(() => null);
+    if (member) {
+        await member.roles.remove(gameConfig.roleIds.Arrested);
+    }
+    
     await unhideLounges(client, user, "incarcerated");
     await freeNotebook(user, "incarcerated");
 }
@@ -1941,9 +1950,93 @@ async function autopsy(interaction) {
     return true;
 }
 
+async function startBlackout(client) {
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+    const newsChannel = await mainGuild.channels.fetch(gameConfig.channelIds.news);
+    await newsChannel.permissionOverwrites.edit(gameConfig.roleIds.civ, {
+        ViewChannel: false,
+    });
+}
+
+async function stopBlackout(client) {
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+    const newsChannel = await mainGuild.channels.fetch(gameConfig.channelIds.news);
+    await newsChannel.permissionOverwrites.edit(gameConfig.roleIds.civ, {
+        ViewChannel: true,
+    });
+
+    await newsChannel.send({
+        content: `@everyone The local network seems to be back up... The blackout has ended!`
+    });
+}
+
+async function delayedRelease(client, targetId) {
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+    const newsChannel = await mainGuild.channels.fetch(gameConfig.channelIds.news);
+    const target = await mainGuild.members.fetch(targetId);
+    await newsChannel.send({
+        content: `@everyone It appears that the <@${gameConfig.roleIds["Task Force"]}> have finally released **${target.displayName}**. Lets hope they don't return to their old ways.`
+    });
+
+    await release(client, target);
+}
+
+const filter = (reaction, user) => {
+    return (
+        ["👍", "👎"].includes(reaction.emoji.name) &&
+        !user.bot
+    );
+};
+async function createGenericPoll(message, duration, majorityToWin, participationRequirementCallback, callback) {
+    const collector = message.createReactionCollector({
+        filter,
+        time: duration,
+    });
+
+    await message.react("👍");
+    await message.react("👎");
+
+    let upvotes = 0;
+    let downvotes = 0;
+    const votedUsers = new Set();
+
+    collector.on("collect", (reaction, user) => {
+        if (votedUsers.has(user.id)) return;
+        if (!participationRequirementCallback(user)) {
+            reaction.users.remove(user.id);
+            return;
+        }
+        votedUsers.add(user.id);
+
+        if (reaction.emoji.name === "👍") upvotes++;
+        if (reaction.emoji.name === "👎") downvotes++;
+
+        if (
+            typeof majorityToWin === "number" &&
+            (upvotes >= majorityToWin || downvotes >= majorityToWin)
+        ) {
+            collector.stop();
+        }
+    });
+
+    collector.on("end", () => {
+        let result;
+        if (upvotes > downvotes) {
+            result = "win";
+        } else if (downvotes > upvotes) {
+            result = "loss";
+        } else {
+            result = "tie";
+        }
+        callback(result);
+    });
+}
+
 const namesToCallbacks = {
-    pseudocideRevival: onPseudocideRevival,
+    onPseudocideRevival: onPseudocideRevival,
     scheduledDeath: onScheduledKill,
+    stopBlackout: stopBlackout,
+    delayedRelease: delayedRelease,
 };
 
 // initializes all delayed actions. call on bot start.
@@ -1969,7 +2062,7 @@ async function initializeDelayedAction(client, delayedAction) {
             return;
         }
         try {
-            await callback(client, delayedAction);
+            await callback(client, ...delayedAction.arguments);
             await DelayedAction.deleteOne({ _id: delayedAction._id });
         } catch (err) {
             console.error(
@@ -1987,14 +2080,14 @@ async function createDelayedAction(
     client,
     actionName,
     delayTime,
-    actionData = {}
+    arguments = []
 ) {
     try {
         const delayedAction = await DelayedAction.create({
             timeBegan: Date.now(),
             delay: delayTime,
-            actionName,
-            ...actionData,
+            actionName: actionName,
+            arguments: arguments,
         });
         console.log("Delayed action created:", delayedAction);
         await initializeDelayedAction(client, delayedAction);
@@ -2004,6 +2097,8 @@ async function createDelayedAction(
 }
 
 module.exports = {
+    createGenericPoll,
+    createDelayedAction,
     contact,
     addUserToGroupChat,
     removeUserFromGroupChat,
@@ -2013,6 +2108,8 @@ module.exports = {
     kill,
     cleanSlate,
     nextDay,
+    startBlackout,
+    stopBlackout,
     utr,
     getPlayerData,
     getOrganisationData,

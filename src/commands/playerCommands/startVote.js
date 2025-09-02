@@ -14,6 +14,15 @@ function choice(name) {
     return { name: name, value: name };
 }
 
+function hrsToMs(hrs) {
+    return 1000 * 60 * 60 * hrs;
+}
+
+const HOURS_FOR_CIVILIAN_ARREST_VOTE = 6;
+const HOURS_ARRESTED_FOR = 24;
+const HOURS_BLACKOUT_DURATION = 24;
+const MS_TIME_BETWEEN_TAP_IN_CHUNKS = 6000;
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("startvote")
@@ -32,7 +41,7 @@ module.exports = {
                 .setName("target")
                 .setDescription("The user to target with the action")
         )
-         .addStringOption((option) =>
+        .addStringOption((option) =>
             option
                 .setName("channel")
                 .setDescription("The channel to use for the action")
@@ -84,10 +93,13 @@ module.exports = {
             return;
         }
         // If the ability requires a target and one is not provided, return
+        const client = interaction.client;
+        const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
         const abilityRequiresATarget = abilitiesThatRequireAUserTarget.includes(action)
         const abilityRequiresAChannel = abilitiesThatRequireAString.includes(action)
         const target = interaction.options.getUser("target");
         const channel = interaction.options.getString("channel");
+        let tapInTargetChannel = null;
 
         if (abilityRequiresATarget) {
             if (!target) {
@@ -118,17 +130,22 @@ module.exports = {
                 });
                 return;
             }
+
+            const loungeChannelName = `lounge-${channel}`;
+            const loungeChannels = await mainGuild.channels.fetch();
+            tapInTargetChannel = loungeChannels.find(c => c.name === loungeChannelName && c.type === 0); // type 0 = GUILD_TEXT
+            if (!tapInTargetChannel) {
+                await interaction.editReply({
+                    content: `Could not find channel named ${loungeChannelName}.`,
+                });
+                return;
+            }
         }
-        // Add cooldown to the organisation for the ability
-        // await game.updateOrganisationData(ourAffiliation, {
-        //     [`cooldowns.${action}`]: gameConfig.cooldowns[action],
-        // });
         // Start a poll for the ability
-        const client = interaction.client
         let requiredRoles = gameConfig.abilities[action].requiredRoles || [];
         let guild = await client.guilds.cache.get(guildId);
         let membersInOrganisation = 0;
-        
+
         for (const member of guild.members.cache.values()) {
             if (member.user.bot) continue;
             const playerData = await game.getPlayerData(member.user);
@@ -158,8 +175,7 @@ module.exports = {
             return;
         }
 
-        const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
-        const majority = Math.ceil(membersInOrganisation * 0.5);    
+        const majority = Math.ceil(membersInOrganisation * 0.5);
         const loungeChannel = await client.channels.fetch(interaction.channel.id);
         let messageContent = `@everyone A vote has been started for a **${action}**. `;
         let targetMember = null;
@@ -171,138 +187,184 @@ module.exports = {
             messageContent += `This will target lounge **${channel}**. `;
         }
 
-        messageContent += `React with 👍 to approve or 👎 to deny. Once a vote majority is reached (${majority+1} votes), the decision will be made.`;
+        messageContent += `React with 👍 to approve or 👎 to deny. Once a vote majority is reached (${majority + 1} votes), the decision will be made.`;
 
         const pollMessage = await loungeChannel.send({
             content: messageContent,
         });
-        
-        pollMessage.react("👍");
-        pollMessage.react("👎");
 
-        const filter = (reaction, user) => {
-            return (
-                ["👍", "👎"].includes(reaction.emoji.name) &&
-                !user.bot &&
-                guild.members.cache.has(user.id)
-            );
-        };
+        game.createGenericPoll(pollMessage, 60 * 1000 * 60, majority,
+            async (user) => {
+                const playerData = await game.getPlayerData(user);
+                return playerData && playerData.alive;
+            },
+            async (result) => {
+                if (result === "win") {
+                    pollMessage.reply(`The vote has passed! The **${action}** will be performed.`);
 
-        const collector = pollMessage.createReactionCollector({ filter, time: 60 * 1000 * 60 }); // 1 hour timeout
-
-        let upvotes = 0;
-        let downvotes = 0;
-        const votedUsers = new Set();
-
-        collector.on("collect", async (reaction, user) => {
-            if (votedUsers.has(user.id)) {
-                return;
-            };
-            const voterData = await game.getPlayerData(user);
-            if (!voterData || !voterData.alive) {
-                console.log(voterData)
-                return;
-            }
-
-            votedUsers.add(user.id);
-
-            if (reaction.emoji.name === "👍") {
-                upvotes++;
-            }
-            if (reaction.emoji.name === "👎") {
-                downvotes++;
-            }
-
-            if (upvotes >= majority) {
-                collector.stop("approved");
-            } else if (downvotes >= majority) {
-                collector.stop("denied");
-            }   
-        });
-
-        collector.on("end", async (_, reason) => {
-            if (reason === "approved") {
-                pollMessage.reply(`The vote has passed! The **${action}** will be performed.`);
-                
-                const news = await client.channels.fetch(gameConfig.channelIds.news);
-
-                if (action === "Background Check") {
-                    const targetPlayerData = await game.getPlayerData(target);
-                    if (targetPlayerData) {
-                        const msg = await pollMessage.reply(`The true name of **${targetMember.displayName}** is **${targetPlayerData.trueName}**.`);
-                        msg.pin();
+                    // Do another cooldown check here incase players stack polls.. Those cheeky players...
+                    const orgData = await game.getOrganisationData(ourAffiliation);
+                    if (orgData.cooldowns[action]) {
+                        await interaction.editReply({
+                            content: `The ${action} ability is on cooldown.`,
+                        });
+                        return;
                     }
-                } else if (action === "Civilian Arrest") {
-                    const civArrestMsg = await news.send({
-                        content: `@ everyone The @Task Force has started a civilian arrest on **${targetMember.displayName}**. Vote 👍 if you would like this person to be arrested for 1 day. Vote 👎 if you do not want this person to be arrested. This vote will last for 6 hours, then the verdict will be announced.`
+
+                    // Add cooldown to the organisation for the ability
+                    await game.updateOrganisationData(ourAffiliation, {
+                        [`cooldowns.${action}`]: gameConfig.abilities[action].cooldown,
                     });
-                    civArrestMsg.react("👍");
-                    civArrestMsg.react("👎");
 
-                    const collector = civArrestMsg.createReactionCollector({ filter, time: 5000 }); // 5 sec timeout
-                    // const collector = civArrestMsg.createReactionCollector({ filter, time: 60 * 1000 * 60 * 5 }); // 5 hour timeout
+                    const news = await client.channels.fetch(gameConfig.channelIds.news);
+                    const affiliationMention = `<@&${gameConfig.roleIds[ourAffiliation]}>`;
 
-                    let upvotes = 0;
-                    let downvotes = 0;
-                    const votedUsers = new Set();
+                    if (action === "Background Check") {
+                        const targetPlayerData = await game.getPlayerData(target);
+                        if (targetPlayerData) {
+                            const msg = await pollMessage.reply(`The true name of **${targetMember.displayName}** is **${targetPlayerData.trueName}**.`);
+                            msg.pin();
+                        }
+                    } else if (action === "Civilian Arrest") {
+                        const civArrestMsg = await news.send({
+                            content: `@everyone The ${affiliationMention} has started a civilian arrest on **${targetMember.displayName}**. Vote 👍 if you would like this person to be arrested for 1 day. Vote 👎 if you do not want this person to be arrested. This vote will last for ${HOURS_FOR_CIVILIAN_ARREST_VOTE} hours, then the verdict will be announced.`
+                        });
 
-                    collector.on("collect", async (reaction, user) => {
-                        if (votedUsers.has(user.id)) {
-                            return;
-                        };
-                        const voterData = await game.getPlayerData(user);
-                        if (!voterData || !voterData.alive) {
-                            console.log(voterData)
-                            return;
+                        game.createGenericPoll(civArrestMsg, hrsToMs(HOURS_FOR_CIVILIAN_ARREST_VOTE), null,
+                            async (user) => {
+                                const playerData = await game.getPlayerData(user);
+                                return playerData && playerData.alive;
+                            },
+                            async (result) => {
+                                if (result === "win") {
+                                    civArrestMsg.reply("The vote has passed. The **Civilian Arrest** will be carried out.");
+                                    game.incarcerate(client, target);
+                                } else if (result === "lose") {
+                                    civArrestMsg.reply("The vote has failed. The **Civilian Arrest** has been cancelled.");
+                                } else {
+                                    civArrestMsg.reply("The vote has ended with a tie! Nothing will happen.");
+                                }
+                            });
+                    } else if (action === "Unlawful Arrest" || action === "PI+Watari Unlawful Arrest") {
+                        news.send({
+                            content: `@ everyone The ${affiliationMention} have performed an unlawful arrest on **${targetMember.displayName}**. They will return from their sentence in ${HOURS_ARRESTED_FOR} hours.`
+                        });
+                        game.incarcerate(client, target);
+                        game.createDelayedAction(client, "delayedRelease", hrsToMs(HOURS_ARRESTED_FOR), [target.id]);
+                    } else if (action === "Blackout") {
+                        news.send({
+                            content: `@everyone The ${affiliationMention} have performed a blackout on the local network! All trials will cancel and news will stop in 1 minute for ${HOURS_BLACKOUT_DURATION} hours.`
+                        });
+                        setTimeout(() => {
+                            game.startBlackout(client);
+                            game.createDelayedAction(client, "stopBlackout", hrsToMs(HOURS_BLACKOUT_DURATION));
+                        }, 60 * 1000);
+                    } else if (action === "Public Kidnap") {
+                        news.send({
+                            content: `@everyone The ${affiliationMention} have performed a kidnapping on **${targetMember.displayName}**. They will return in 24 hours, or less - if they are charming, and the kidnapper will be announced upon their return.`
+                        });
+                    } else if (action === "Anonymous Kidnap" || action === "2nd Kira+Kira Anonymous Kidnap") {
+                        news.send({
+                            content: `@everyone The ${affiliationMention} have performed an anonymous kidnapping on **${targetMember.displayName}**. They will return in 24 hours, or less - if they are charming.`
+                        });
+                    } else if (action === "Tap In") {
+                        const kiraGuild = await client.guilds.fetch(gameConfig.guildIds.kk);
+
+                        const logChannel = await kiraGuild.channels.fetch("1412209917623799858");
+                        const pinMsg = await logChannel.send(`**Tap In Logs For Lounge ${channel}**`);
+                        await pinMsg.pin();
+
+                        // Announce tap in the tapped channel
+                        await tapInTargetChannel.send(`**The <@&${gameConfig.roleIds["Kira's Kingdom"]}> have tapped into this channel. All messages before this one have been logged.**`);
+
+                        const messages = await tapInTargetChannel.messages.fetch({ limit: 100 });
+                        const ordered = Array.from(messages.values()).reverse();
+
+                        let lastSpeakerId = null;
+                        let currentBlock = [];
+                        let currentBlockName = "";
+                        let blockText = "";
+                        let chunks = [];
+                        const CHUNK_LIMIT = 2000;
+
+                        // Send a block as chunks, ensuring no message is split
+                        async function sendBlock(blockName, blockLines) {
+                            if (blockLines.length === 0) return;
+                            let prefix = `\`\`\`${blockName}:\`\`\`\n`;
+                            let chunk = prefix;
+                            for (let i = 0; i < blockLines.length; i++) {
+                                let line = blockLines[i];
+                                // If adding this line would exceed the limit, send the chunk and start a new one (fixes timestamp being cut off and looking very bad lol)
+                                if ((chunk.length + line.length) > CHUNK_LIMIT) {
+                                    await logChannel.send(chunk);
+                                    await new Promise(res => setTimeout(res, MS_TIME_BETWEEN_TAP_IN_CHUNKS));
+                                    // Start new chunk with prefix and current line
+                                    chunk = prefix + line;
+                                } else {
+                                    chunk += (chunk === prefix ? "" : "\n") + line;
+                                }
+                            }
+                            // Send any remaining chunk
+                            if (chunk.length > prefix.length) {
+                                await logChannel.send(chunk);
+                                await new Promise(res => setTimeout(res, MS_TIME_BETWEEN_TAP_IN_CHUNKS));
+                            }
                         }
 
-                        votedUsers.add(user.id);
+                        for (const msg of ordered) {
+                            if (msg.author.bot) continue;
+                            // Get display name from mainGuild. This should probably be stored as a table outside this scope but apparently fetch isn't expensive? IDK LOL!
+                            let mainMember;
+                            try {
+                                mainMember = await mainGuild.members.fetch(msg.author.id);
+                            } catch {
+                                mainMember = null;
+                            }
+                            const displayName = mainMember ? mainMember.displayName : msg.author.username;
 
-                        if (reaction.emoji.name === "👍") {
-                            upvotes++;
-                        }
-                        if (reaction.emoji.name === "👎") {
-                            downvotes++;
-                        }
-                    });
+                            // Check for image attachments without links (if an img is sent without a link, the bot sends an empty string as a log)
+                            let imageLinks = [];
+                            if (msg.attachments && msg.attachments.size > 0) {
+                                msg.attachments.forEach(att => {
+                                    if (att.contentType && att.contentType.startsWith('image/') && att.url) {
+                                        imageLinks.push(att.url);
+                                    }
+                                });
+                            }
 
-                    collector.on("end", async () => {
-                        if (upvotes > downvotes) {
-                            civArrestMsg.reply("The vote has passed. The **Civilian Arrest** will be carried out.");
-                            game.incarceratePlayer(client, target);
-                        } else if (upvotes < downvotes) {
-                            civArrestMsg.reply("The vote has failed. The **Civilian Arrest** has been cancelled.");
-                        } else {
-                            civArrestMsg.reply("The vote has ended with a tie! Nothing will happen.");
-                        }
-                    });
-                } else if (action === "Unlawful Arrest" || action === "PI+Watari Unlawful Arrest") {
-                    news.send({
-                        content: `@everyone The @Task Force have performed an unlawful arrest on **${targetMember.displayName}**. They will return from their sentence in 24 hours.`
-                    });
-                    game.incarceratePlayer(client, target);
-                } else if (action === "Blackout") {
-                    news.send({
-                        content: `@everyone The @Kira's Kingdom have performed a blackout on the local network! All trials and news will cancel in 1 minute for 24 hours.`
-                    });
-                } else if (action === "Public Kidnap") {
-                    news.send({
-                        content: `@everyone The @Kira's Kingdom have performed a kidnapping on **${targetMember.displayName}**. They will return in 24 hours, or less - if they are charming, and the kidnapper will be announced upon their return.`
-                    });
-                } else if (action === "Anonymous Kidnap" || action === "2nd Kira+Kira Anonymous Kidnap") {
-                    news.send({
-                        content: `@everyone The @Kira's Kingdom have performed an anonymous kidnapping on **${targetMember.displayName}**. They will return in 24 hours, or less - if they are charming.`
-                    });
-                } else if (action === "Tap In") {
+                            let msgContent = msg.content;
+                            if (imageLinks.length > 0) {
+                                msgContent += (msgContent ? "\n" : "") + imageLinks.join("\n");
+                            }
 
+                            // Format line with timestamp
+                            const timestamp = `<t:${Math.floor(msg.createdTimestamp / 1000)}>`;
+                            const line = `"${msgContent}" ${timestamp}`;
+
+                            if (msg.author.id !== lastSpeakerId) {
+                                // Send previous block if exists
+                                await sendBlock(currentBlockName, currentBlock);
+                                // Start new block
+                                currentBlock = [line];
+                                currentBlockName = displayName;
+                                lastSpeakerId = msg.author.id;
+                            } else {
+                                currentBlock.push(line);
+                            }
+                        }
+                        // Send last block
+                        await sendBlock(currentBlockName, currentBlock);
+
+                        await new Promise(res => setTimeout(res, MS_TIME_BETWEEN_TAP_IN_CHUNKS));
+                        await logChannel.send(`**End of Tap In Logs For Lounge ${channel}**`);
+                    }
+                } else if (result === "loss") {
+                    pollMessage.reply(`The vote has failed. The **${action}** has been cancelled.`);
+                } else {
+                    pollMessage.reply(`No majority was reached so no decision could be made. The **${action}** has been cancelled.`);
                 }
-            } else if (reason === "denied") {
-                pollMessage.reply(`The vote has failed. The **${action}** has been cancelled.`);
-            } else {
-                pollMessage.reply("The vote has ended without reaching a majority.");
             }
-        });
-
+        );
         await interaction.editReply({
             content: "Success!",
             ephemeral: true,

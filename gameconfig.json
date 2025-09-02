@@ -28,7 +28,7 @@
         "Public Kidnap": { "cooldown": 1, "organisation": "Kira's Kingdom", "membersRequired": 3 },
         "Anonymous Kidnap": { "cooldown": 2, "organisation": "Kira's Kingdom", "membersRequired": 4 },
         "2nd Kira+Kira Anonymous Kidnap": { "cooldown": 2, "organisation": "Kira's Kingdom", "rolesRequiredInOrganisation": ["2nd Kira", "Kira"] },
-        "Tap In": { "cooldown": 1, "organisation": "Kira's Kingdom", "membersRequired": 4 },
+        "Tap In": { "cooldown": 1, "organisation": "Kira's Kingdom", "membersRequired": 1 },
 
         "Background Check": { "cooldown": 1, "organisation": "Task Force", "membersRequired": 3 },
         "Civilian Arrest": { "cooldown": 1, "organisation": "Task Force", "membersRequired": 4 },
@@ -55,7 +55,8 @@
         "watariContactLogs": "1406120605001973862",
         "news": "1406115827274612755",
         "bugLogs": "1411117992204570664",
-        "autopsyLogs": "1410422544028274788"
+        "autopsyLogs": "1410422544028274788",
+        "courtroom": "1406115827274612756"
     },
 
     "roleIds": {
@@ -63,6 +64,11 @@
         "pi": "1406115825957732546",
         "watari": "1406115825957732548",
         "civ": "1406115825886167047",
-        "shinigami": "1406115825886167046"
+        "shinigami": "1406115825886167046",
+        "Kira's Kingdom": "1406115825928376368",
+        "Task Force": "1406115825928376367",
+        "Arrested": "1412394267556446228",
+        "Prosecutor": "1406115825928376361",
+        "Custody": "1406115825907269651"
     }
 }
