@@ -629,7 +629,7 @@ async function contact(client, user, target, anonymous) {
 
     // consume a token
     playerData = await updatePlayerData(user, {
-        contactTokens: Math.max(0, playerData.contactTokens - 1),
+        contactTokens: Math.max(0, playerData.contactTokens - 1 - (anonymous ? 1 : 0)),
     });
 
     // log the contact
@@ -1811,7 +1811,6 @@ async function bug(interaction) {
     const targetMember = await mainGuild.members.fetch(target.id);
 
     if (!season) return "The season has not yet begun.";
-    if (user.id === target.id) return "Cannot bug yourself";
     if (!userData) return "You have no data.";
     if (!userData.alive) return "You are dead.";
     if (!targetData) return "This user has no data.";
