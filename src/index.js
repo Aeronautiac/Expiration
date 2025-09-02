@@ -81,7 +81,7 @@ function showSystemStats() {
 function printHeader() {
     console.clear();
     console.log(header('┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓'));
-    console.log(header('┃           AluminaJS Discord Bot Watchdog             ┃'));
+    console.log(header('┃          ExpirationTS Discord Bot Watchdog           ┃'));
     console.log(header('┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛'));
     showSystemStats();
     console.log(info('Type a command below. Available: reload, stop, status, sys, git'));
