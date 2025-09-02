@@ -1623,7 +1623,7 @@ async function pseudocide(interaction) {
     await createDelayedAction(
         interaction.client,
         "pseudocideRevival",
-        /*hrsToMs(24)*/ minToMs(3),
+        hrsToMs(24),
         {
             role: targetData.role,
             targetId: target.id,
