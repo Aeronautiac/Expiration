@@ -489,7 +489,8 @@ async function canAnonContact(user) {
 
     return (
         (playerData.role === "Watari" || playerData.role === "PI") &&
-        !playerData.cooldowns.get("anonymousContact")
+        // !playerData.cooldowns.get("anonymousContact") &&
+        playerData.contactTokens >= 2
     );
 }
 
