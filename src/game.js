@@ -2459,7 +2459,7 @@ async function civilianArrest(interaction) {
     if (!targetData || !targetData.alive) {
         return "The target must be alive.";
     }
-    if (targetMember.roles.cache.some(r => r.id === gameConfig.roleIds.Arrested || r.id === gameConfig.roleIds.Custody || r.id === gameConfig.roleIds.Kidnapped)) {
+    if (targetMember.roles.cache.some(r => r.id === gameConfig.roleIds.Arrested || r.id === gameConfig.roleIds.Kidnapped)) {
         return "You cannot start a civilian arrest on someone that is already locked up.";
     }
 

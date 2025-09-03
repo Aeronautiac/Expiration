@@ -231,7 +231,7 @@ module.exports = {
             return;
         }
         if (action.includes("Arrest") || action.includes("Kidnap")) {
-            if (target.roles.cache.some(r => r.id === gameConfig.roleIds.Arrested || r.id === gameConfig.roleIds.Custody || r.id === gameConfig.roleIds.Kidnapped)) {
+            if (target.roles.cache.some(r => r.id === gameConfig.roleIds.Arrested || r.id === gameConfig.roleIds.Kidnapped)) {
                 return "You cannot start a lock up on someone that is already locked up.";
             }
         }
