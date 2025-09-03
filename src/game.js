@@ -1,6 +1,10 @@
 require("dotenv").config();
 const fs = require("fs");
-const { ChannelType, PermissionsBitField } = require("discord.js");
+const {
+    ChannelType,
+    PermissionsBitField,
+    PermissionFlagsBits,
+} = require("discord.js");
 const { mongoose } = require("./mongoose");
 const Player = require("./models/player");
 const Lounge = require("./models/lounge");
@@ -59,7 +63,7 @@ async function getPlayerData(user) {
 }
 
 async function getOrganisationData(organisationName) {
-    return await Organisation.findOne({ name: organisationName });
+    return await Organisation.findOne({ organisation: organisationName });
 }
 
 function rawName(name) {
@@ -72,11 +76,13 @@ function rawName(name) {
 
 function readableName(name) {
     return name
-        .split(" ") // split into words
+        .toLowerCase()
+        .trim() // remove leading/trailing spaces and newlines
+        .split(/\s+/) // split on any whitespace (spaces, tabs, newlines)
         .map(
             (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-        ) // capitalize first letter, rest lowercase
-        .join(" "); // join back with spaces
+        )
+        .join(" "); // join with single space
 }
 
 function clamp(value, min, max) {
@@ -112,7 +118,7 @@ async function role(client, targetUser, role) {
             notebookRestrictReasons: [],
         });
 
-        targetUser.send(`Your true name is ${name}`);
+        targetUser.send(`Your true name is ${readableName(name)}`);
     } else {
         playerData = await updatePlayerData(targetUser, {
             role: role,
@@ -372,8 +378,10 @@ async function createLoungeChannel(guild, channelName, loungeType, users) {
 
         for (const user of users) {
             permissionOverwrites.push({
-                id: user.id,
+                id: typeof user === "string" ? user : user.id,
                 allow: [
+                    PermissionsBitField.Flags.SendMessages,
+                    PermissionsBitField.Flags.ReadMessageHistory,
                     PermissionsBitField.Flags.ViewChannel,
                     PermissionsBitField.Flags.AttachFiles,
                     PermissionsBitField.Flags.EmbedLinks,
@@ -382,10 +390,12 @@ async function createLoungeChannel(guild, channelName, loungeType, users) {
         }
     }
 
-    permissionOverwrites.push({
-        id: gameConfig.roleIds.spec,
-        allow: [PermissionsBitField.Flags.ViewChannel],
-    });
+    if (guild.id === gameConfig.guildIds.main) {
+        permissionOverwrites.push({
+            id: gameConfig.roleIds.spec,
+            allow: [PermissionsBitField.Flags.ViewChannel],
+        });
+    }
 
     const newChannel = await guild.channels.create({
         name: channelName,
@@ -886,15 +896,28 @@ async function changeGroupChatName(client, user, channel, newName) {
     return `Successfully changed the group chat name to ${newName}`;
 }
 
+async function createKirasKingdom() {
+    await Organisation.create({
+        organisation: "Kira's Kingdom",
+    });
+}
+
+async function createTaskForce() {
+    await Organisation.create({
+        organisation: "Task Force",
+    });
+}
+
 // creates the data for the season
 async function newSeason() {
     await Season.create({
         temporaryChannels: [],
+        messageLoggedChannels: [],
         groupChats: [],
         day: 1,
     });
-
-    await Organisation.updateMany({}, { $set: { cooldowns: {} } });
+    await createKirasKingdom();
+    await createTaskForce();
 }
 
 // any of the killUser functions should only be killed after onPlayerKillPlayer is called. This is to prevent some fuckery with stuff like death note ownership.
@@ -1620,16 +1643,29 @@ async function closeLounge(user, loungeChannel) {
 
 async function clearChannel(channel) {
     let fetched;
+
     do {
         fetched = await channel.messages.fetch({ limit: 100 });
+
         for (const message of fetched.values()) {
             try {
                 await message.delete();
             } catch (err) {
-                console.error(`Failed to delete message ${message.id}:`, err);
+                if (err.code === 10008) {
+                    continue;
+                } else {
+                    console.error(
+                        `Failed to delete message ${message.id}:`,
+                        err
+                    );
+                }
             }
         }
+
+        await new Promise((res) => setTimeout(res, 200));
     } while (fetched.size > 0);
+
+    console.log(`Channel ${channel.name} cleared!`);
 }
 
 async function clearContactLogs(channels) {
@@ -2155,6 +2191,7 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
     if (!victimMember || !victimUser) return;
 
     const victimName = strippedName(victimMember.displayName);
+    const typeString = kidnapperId ? "public" : "anonymous";
 
     const kidnapVictimChannel = await createLoungeChannel(
         mainGuild,
@@ -2164,7 +2201,7 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
     );
     const kidnapperChannel = await createLoungeChannel(
         kidnapperGuild,
-        `kidnapped-${victimName}`,
+        `${victimName}-${typeString}`,
         "kidnap",
         "everyone"
     );
@@ -2172,7 +2209,8 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
     const kidnapDoc = await KidnapLounge.create({
         victimId: targetId,
         kidnapperId: kidnapperId,
-        channelIds: [kidnapVictimChannel.id, kidnapperChannel.id],
+        kidnapperChannelId: kidnapperChannel.id,
+        kidnappedChannelId: kidnapVictimChannel.id,
     });
 
     // kidnap effects
@@ -2192,6 +2230,13 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
         hrsToMs(gameConfig.defaultKidnapDuration),
         [kidnapDoc._id]
     );
+
+    await kidnapperChannel.send({
+        content: `Here you can talk to your captive. All messages sent here will be relayed to them in another channel. @everyone`,
+    });
+    await kidnapVictimChannel.send({
+        content: `Here you can talk to your kidnappers. All messages sent here will be relayed to them in another channel. @everyone`,
+    });
 }
 
 async function kidnapRelease(client, kidnapDocId) {
@@ -2207,11 +2252,6 @@ async function kidnapRelease(client, kidnapDocId) {
         .fetch(kidnapDoc.victimId)
         .catch(() => null);
 
-    // Delete the kidnap channels
-    for (const channelId of kidnapDoc.channelIds) {
-        await deleteTemporaryChannel(client, channelId);
-    }
-
     // Remove kidnapped effects
     await unhideLounges(client, kidnappedUser, "kidnapped");
     await freeNotebook(kidnappedUser, "kidnapped");
@@ -2223,9 +2263,6 @@ async function kidnapRelease(client, kidnapDocId) {
         console.log("Failed to update roles for kidnapped member:", err);
     }
 
-    // Delete the kidnap document
-    await KidnapLounge.deleteOne({ _id: kidnapDocId });
-
     // Send notifiers
     const revealString = kidnapDoc.kidnapperId
         ? `When questioned by authorities, ${kidnappedUser} recalled the identity of their kidnapper: ${await client.users.fetch(
@@ -2233,8 +2270,17 @@ async function kidnapRelease(client, kidnapDocId) {
           )}`
         : "";
     await news.send(
-        `@everyone ${kidnappedUser} has been released from captivity. They have now returned to normal life.\n${revealString}`
+        `@everyone ${kidnappedUser} has been released from captivity. They have now returned to their normal life.\n${revealString}`
     );
+
+    // Remove perms from kidnapped channel
+    const kidnapVictimChannel = await client.channels.fetch(
+        kidnapDoc.kidnappedChannelId
+    );
+    await kidnapVictimChannel.permissionOverwrites.delete(kidnappedUser);
+
+    // Delete the kidnap document
+    await KidnapLounge.deleteOne({ _id: kidnapDocId });
 }
 
 const namesToCallbacks = {

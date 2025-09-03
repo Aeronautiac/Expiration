@@ -15,12 +15,6 @@ module.exports = {
             .fetch(message.author.id)
             .catch(() => null);
         if (!authorMember) return;
-        if (
-            authorMember.permissions.has(
-                PermissionsBitField.Flags.Administrator
-            )
-        )
-            return;
         if (message.author.bot) return;
 
         // multi-channel lounges
@@ -49,18 +43,35 @@ module.exports = {
         }
 
         // kidnap lounges
-        const kidnapLounge = await KidnapLounge.findOne({
-            channelIds: message.channel.id,
-        }).catch(() => null);
-        const otherChannel = kidnapLounge?.channelIds.find(
-            (id) => id !== message.channel.id
-        );
+        let kidnapLounge =
+            (await KidnapLounge.findOne({
+                kidnappedChannelId: message.channel.id,
+            }).catch(() => null)) ||
+            (await KidnapLounge.findOne({
+                kidnapperChannelId: message.channel.id,
+            }).catch(() => null));
 
-        if (otherChannel) {
-            const sentByText = kidnapLounge.kidnapperId
-                ? "???"
-                : game.strippedName(authorMember.displayName);
-            let sendText = `${sentByText}: ${message.content}`;
+        if (kidnapLounge) {
+            const otherChannel =
+                message.channel.id === kidnapLounge.kidnappedChannelId
+                    ? kidnapLounge.kidnapperChannelId
+                    : kidnapLounge.kidnappedChannelId;
+
+            const authorName = game.strippedName(authorMember.displayName);
+            let sentByText;
+            if (kidnapLounge.kidnapperId) {
+                sentByText = authorName;
+            } else {
+                if (message.author.id === kidnapLounge.victimId)
+                    sentByText = authorName;
+                else {
+                    if (message.channel.id === kidnapLounge.kidnapperChannelId)
+                        sentByText = `???`;
+                    else sentByText = authorName;
+                }
+            }
+
+            let sendText = `**${sentByText}:** ${message.content}`;
             try {
                 const targetChannel = await message.client.channels.fetch(
                     otherChannel

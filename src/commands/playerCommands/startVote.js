@@ -123,7 +123,7 @@ module.exports = {
         }
         // Check if organisation ability is on cooldown
         const orgData = await game.getOrganisationData(ourAffiliation);
-        if (orgData.cooldowns[action]) {
+        if (orgData.cooldowns.get(action)) {
             await interaction.editReply({
                 content: `The ${action} ability is on cooldown.`,
             });
@@ -271,7 +271,7 @@ module.exports = {
                     const orgData = await game.getOrganisationData(
                         ourAffiliation
                     );
-                    if (orgData.cooldowns[action]) {
+                    if (orgData.cooldowns.get(action)) {
                         await interaction.editReply({
                             content: `The ${action} ability is on cooldown.`,
                         });
@@ -385,7 +385,7 @@ module.exports = {
                         );
 
                         const logChannel = await kiraGuild.channels.fetch(
-                            "1412209917623799858"
+                            gameConfig.channelIds.tapinLogs
                         ); // tap-in-logs channel id
                         await new Promise((res) =>
                             setTimeout(res, MS_TIME_BETWEEN_TAP_IN_CHUNKS)
