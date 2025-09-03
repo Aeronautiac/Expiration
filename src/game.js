@@ -2206,13 +2206,6 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
         "everyone"
     );
 
-    const kidnapDoc = await KidnapLounge.create({
-        victimId: targetId,
-        kidnapperId: kidnapperId,
-        kidnapperChannelId: kidnapperChannel.id,
-        kidnappedChannelId: kidnapVictimChannel.id,
-    });
-
     // kidnap effects
     await hideLounges(client, victimUser, "kidnapped");
     await restrictNotebook(victimUser, "kidnapped");
@@ -2224,12 +2217,22 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
         console.log("Failed to update roles for kidnapped member:", err);
     }
 
-    await createDelayedAction(
+    const kidnapDoc = await KidnapLounge.create({
+        victimId: targetId,
+        kidnapperId: kidnapperId,
+        kidnapperChannelId: kidnapperChannel.id,
+        kidnappedChannelId: kidnapVictimChannel.id,
+    });
+
+    const actionId = await createDelayedAction(
         client,
         "kidnapRelease",
-        hrsToMs(gameConfig.defaultKidnapDuration),
+        /*hrsToMs(gameConfig.defaultKidnapDuration)*/ minToMs(3),
         [kidnapDoc._id]
     );
+
+    kidnapDoc.actionId = actionId;
+    await kidnapDoc.save();
 
     await kidnapperChannel.send({
         content: `Here you can talk to your captive. All messages sent here will be relayed to them in another channel. @everyone`,
@@ -2237,6 +2240,10 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
     await kidnapVictimChannel.send({
         content: `Here you can talk to your kidnappers. All messages sent here will be relayed to them in another channel. @everyone`,
     });
+}
+
+async function earlyKidnapRelease(client, kidnapDoc) {
+    await executeDelayedActionEarly(client, kidnapDoc.actionId);
 }
 
 async function kidnapRelease(client, kidnapDocId) {
@@ -2291,6 +2298,20 @@ const namesToCallbacks = {
     kidnapRelease: kidnapRelease,
 };
 
+async function executeDelayedActionEarly(client, actionId) {
+    const actionDoc = await DelayedAction.findById(actionId);
+    if (!actionDoc) return;
+    const callback = namesToCallbacks[actionDoc.actionName];
+    if (!callback)
+        return console.error("Callback not found", actionDoc.actionName);
+    try {
+        await callback(client, ...actionDoc.arguments);
+        await DelayedAction.deleteOne({ _id: actionId });
+    } catch (err) {
+        console.error("Failed executing early delayed action:", err);
+    }
+}
+
 // initializes all delayed actions. call on bot start.
 async function initializeDelayedActions(client) {
     const delayedActions = await DelayedAction.find({});
@@ -2305,6 +2326,10 @@ async function initializeDelayedAction(client, delayedAction) {
     const remaining = Math.max(0, endTime - Date.now());
 
     setTimeout(async () => {
+        const delayedActionDoc = await DelayedAction.findById(
+            delayedAction._id
+        );
+        if (!delayedActionDoc) return;
         const callback = namesToCallbacks[delayedAction.actionName];
         if (typeof callback !== "function") {
             console.error(
@@ -2343,6 +2368,7 @@ async function createDelayedAction(
         });
         console.log("Delayed action created:", delayedAction);
         await initializeDelayedAction(client, delayedAction);
+        return delayedAction._id;
     } catch (err) {
         console.error("Failed to create delayed action:", err);
     }
@@ -2394,4 +2420,5 @@ module.exports = {
     initializeDelayedActions,
     strippedName,
     kidnap,
+    earlyKidnapRelease,
 };

@@ -7,6 +7,7 @@ const kidnapLoungeSchema = new mongoose.Schema({
     kidnapperChannelId: { type: String, required: true },
     kidnappedChannelId: { type: String, required: true },
     channelIds: { type: [String], required: true },
+    actionId: mongoose.Schema.Types.ObjectId,
 });
 
 const KidnapLounge = mongoose.model("kidnaplounge", kidnapLoungeSchema);
