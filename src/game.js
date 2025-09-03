@@ -2227,7 +2227,7 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
     const actionId = await createDelayedAction(
         client,
         "kidnapRelease",
-        /*hrsToMs(gameConfig.defaultKidnapDuration)*/ minToMs(3),
+        hrsToMs(gameConfig.defaultKidnapDuration),
         [kidnapDoc._id]
     );
 
