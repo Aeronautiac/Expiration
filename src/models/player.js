@@ -24,7 +24,7 @@ const playerSchema = new mongoose.Schema({
     abilitiesUsedToday: { type: [String], required: true, default: [] },
     abilityCharges: { type: Map, of: Number, default: {}, required: true },
 
-    bugged: Boolean,
+    // for autopsy
     timeOfDeath: Number,
 
     // death protection

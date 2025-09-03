@@ -3,6 +3,7 @@
     "loungeCategoryPrefix": "Private Messages ",
     "groupchatCategoryPrefix": "Group Chats ",
     "kidnapCategoryPrefix": "Kidnapped ",
+    "bugLogCategoryPrefix": "Bug & Custody Logs ",
     "maxChannelsPerCategory": 50,
     "dailyTokens": 5,
     "maxGroupChatMembers": 5,
@@ -112,7 +113,7 @@
         },
         "nameReveal": {
             "useableBy": ["2nd Kira", "BB"],
-            "charges": 1,
+            "charges": [1, 2],
             "cooldown": 0
         },
         "notebookDetect": {
@@ -143,12 +144,12 @@
         "civilianArrest": {
             "useableBy": ["News Anchor"],
             "charges": 1,
-            "cooldown": 1
+            "cooldown": 0
         }
     },
 
     "channelIds": {
-        "hostContactLogs": "1406169333280804885",
+        "hostLogs": "1406169333280804885",
         "watariContactLogs": "1406120605001973862",
         "news": "1412595133756608644",
         "bugLogs": "1411117992204570664",

@@ -3,7 +3,7 @@ const game = require("../../game");
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName("restrictnotebook")
+        .setName("restrictnotebooks")
         .setDescription("Prevent a user from interacting with notebooks.")
         .addUserOption((option) =>
             option
@@ -27,7 +27,7 @@ module.exports = {
         const target = interaction.options.getUser("target");
         const reason = interaction.options.getString("reason");
 
-        await game.restrictNotebook(target, reason);
+        await game.restrictNotebooks(target, reason);
 
         await interaction.editReply({
             content: `Successfully added notebook blocker \"${reason}\" for ${target}.`,

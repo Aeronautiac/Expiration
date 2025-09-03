@@ -27,7 +27,7 @@ module.exports = {
         const target = interaction.options.getUser("target");
         const reason = interaction.options.getString("reason");
 
-        await game.freeNotebook(target, reason);
+        await game.freeNotebooks(target, reason);
 
         await interaction.editReply({
             content: `Successfully removed notebook blocker \"${reason}\" for ${target}.`,

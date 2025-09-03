@@ -9,6 +9,7 @@ const { mongoose } = require("./mongoose");
 const Player = require("./models/player");
 const Lounge = require("./models/lounge");
 const Season = require("./models/season");
+const BugLog = require("./models/bugLog");
 const Notebook = require("./models/notebook");
 const Organisation = require("./models/organisation");
 const ScheduledDeath = require("./models/scheduledDeath");
@@ -66,7 +67,7 @@ async function getOrganisationData(organisationName) {
     return await Organisation.findOne({ organisation: organisationName });
 }
 
-async function genericUseRoleAbility(userId, abilityName) {
+async function genericUseRoleAbility(client, userId, abilityName) {
     const playerData = await Player.findOne({ userId });
     const season = await Season.findOne({});
 
@@ -93,6 +94,28 @@ async function genericUseRoleAbility(userId, abilityName) {
     // check if the ability is on cooldown
     const cooldown = playerData.cooldowns.get(abilityName) || 0;
     if (cooldown > 0) return "Ability is on cooldown.";
+
+    // log
+    try {
+        if (client) {
+            const mainGuild = await client.guilds.fetch(
+                gameConfig.guildIds.main
+            );
+            const hostLogs = await mainGuild.channels.fetch(
+                gameConfig.channelIds.hostLogs
+            );
+            const userMember = await mainGuild.members.fetch(userId);
+            await hostLogs.send(
+                `**${strippedName(
+                    userMember.displayName
+                )}** used **${abilityName}** at <t:${Math.floor(
+                    Date.now() / 1000
+                )}:F>`
+            );
+        }
+    } catch (err) {
+        console.log("Failed to log ability use:", err);
+    }
 
     // charges
     // find default ability number based on the current day
@@ -440,20 +463,51 @@ async function removeUsersFromChannel(users, channel) {
     }
 }
 
-// returns the channel created and adds the channel id to the game's temporary channel array
-async function createLoungeChannel(guild, channelName, loungeType, users) {
-    const allChannels = await guild.channels.fetch();
+// places a user into custody
+// custody restricts notebook usage and bugs the player with source "custody"
+// this function will also remove their civilian role and give them the custody role
+async function custody(client, user) {
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+    const member = await mainGuild.members.fetch(user.id).catch(() => null);
 
-    let categoryPrefix = null;
-    if (loungeType === "monologue") {
-        categoryPrefix = gameConfig.monologueCategoryPrefix;
-    } else if (loungeType === "lounge") {
-        categoryPrefix = gameConfig.loungeCategoryPrefix;
-    } else if (loungeType === "groupchat") {
-        categoryPrefix = gameConfig.groupchatCategoryPrefix;
-    } else if (loungeType === "kidnap") {
-        categoryPrefix = gameConfig.kidnapCategoryPrefix;
+    // restrict notebook usage
+    await restrictNotebooks(user, "custody");
+
+    // bug the player with the custody source
+    await bugUser(client, user, "custody");
+
+    // add roles
+    if (member) {
+        await member.roles.remove(gameConfig.roleIds.civ);
+        await member.roles.add(gameConfig.roleIds.Custody);
     }
+}
+
+// removes custody effects from a user
+async function removeCustody(client, user) {
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+    const member = await mainGuild.members.fetch(user.id).catch(() => null);
+
+    // free notebook usage
+    await freeNotebooks(user, "custody");
+
+    // remove the custody bug
+    await BugLog.deleteMany({ targetId: user.id, source: "custody" });
+
+    // add roles
+    if (member) {
+        await member.roles.add(gameConfig.roleIds.civ);
+        await member.roles.remove(gameConfig.roleIds.Custody);
+    }
+}
+
+async function createTemporaryChannel(
+    guild,
+    channelName,
+    categoryPrefix,
+    users
+) {
+    const allChannels = await guild.channels.fetch();
 
     // get all channel categories with category prefix and sort them based on their number
     const categories = allChannels
@@ -548,23 +602,36 @@ async function createLoungeChannel(guild, channelName, loungeType, users) {
         },
     });
 
-    if (loungeType !== "monologue")
-        await setChannelLoggable(newChannel.id, true);
-
     return newChannel;
 }
 
-async function deleteTemporaryChannel(client, channelId) {
-    const channel = await client.channels.fetch(channelId);
-    if (!channel) return;
+// returns the channel created and adds the channel id to the game's temporary channel array
+async function createLoungeChannel(guild, channelName, loungeType, users) {
+    // const allChannels = await guild.channels.fetch();
 
-    await channel.delete();
+    let categoryPrefix = null;
+    if (loungeType === "monologue") {
+        categoryPrefix = gameConfig.monologueCategoryPrefix;
+    } else if (loungeType === "lounge") {
+        categoryPrefix = gameConfig.loungeCategoryPrefix;
+    } else if (loungeType === "groupchat") {
+        categoryPrefix = gameConfig.groupchatCategoryPrefix;
+    } else if (loungeType === "kidnap") {
+        categoryPrefix = gameConfig.kidnapCategoryPrefix;
+    }
 
-    const season = await Season.findById("season");
-    season.temporaryChannels = season.temporaryChannels.filter(
-        (id) => id !== channelId
+    const newChannel = await createTemporaryChannel(
+        guild,
+        channelName,
+        categoryPrefix,
+        users
     );
-    await season.save();
+
+    if (loungeType !== "monologue" && loungeType !== "kidnap") {
+        await setChannelLoggable(newChannel.id, true);
+    }
+
+    return newChannel;
 }
 
 // returns the number of lounges + 1
@@ -603,10 +670,8 @@ async function logGroupChat(client, loungeId, user, members) {
     }
 
     // host logs
-    const hostContactLogs = await channels.fetch(
-        gameConfig.channelIds.hostContactLogs
-    );
-    await hostContactLogs.send(logMessage);
+    const hostLogs = await channels.fetch(gameConfig.channelIds.hostLogs);
+    await hostLogs.send(logMessage);
 }
 
 // creates contact logs for a contact
@@ -622,8 +687,8 @@ async function logContact(client, loungeId, user, target, anonymous) {
     let playerData = await getPlayerData(user);
 
     // handle watari and PI anonymous contact log message
-    let userDisplay = strippedName(userMember.displayName);
-    let targetDisplay = strippedName(targetMember.displayName);
+    let userDisplay = `**${strippedName(userMember.displayName)}**`;
+    let targetDisplay = `**${strippedName(targetMember.displayName)}**`;
 
     if (playerData.role === "Watari" && anonymous) userDisplay = `@Watari`;
 
@@ -643,9 +708,7 @@ async function logContact(client, loungeId, user, target, anonymous) {
     }
 
     // host logs
-    const hostContactLogs = await channels.fetch(
-        gameConfig.channelIds.hostContactLogs
-    );
+    const hostLogs = await channels.fetch(gameConfig.channelIds.hostLogs);
     const loungeData = await Lounge.findOne({ loungeId: loungeId });
 
     const loungeChannels = await Promise.all(
@@ -654,7 +717,7 @@ async function logContact(client, loungeId, user, target, anonymous) {
     for (const loungeChannel of loungeChannels)
         logMessage += ` ${loungeChannel.toString()}`;
 
-    await hostContactLogs.send(logMessage);
+    await hostLogs.send(logMessage);
 }
 
 // returns a boolean stating whether or not the player can use the anonymous contact ability
@@ -1095,13 +1158,19 @@ async function killUser(client, user, message, messageOverride, hadNotebook) {
         }
     }
 
-    // roles
     const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+
+    // remove bugs
+    if (userData.role === "Watari") await removeWatariBugs(mainGuild);
+    await BugLog.deleteMany({ targetId: user.id });
+
+    // roles and nickname
     const member = await mainGuild.members.fetch(user.id).catch(() => null);
     if (member) {
         // no need to await here
         member.roles.add(gameConfig.roleIds.shinigami);
         member.roles.remove(gameConfig.roleIds.civ);
+        member.setNickname(strippedName(member.displayName));
     }
 }
 
@@ -1496,7 +1565,7 @@ async function loadScheduledDeaths(client) {
 
 // later, remove the channel ids from player data and such
 async function clearTemporaryChannels(client) {
-    const season = await Season.findById("season");
+    const season = await Season.findOne({});
     if (!season) return;
 
     for (const channelId of season.temporaryChannels) {
@@ -1558,6 +1627,7 @@ async function underTheRadar(interaction) {
     const user = interaction.user;
 
     const genericUseResult = await genericUseRoleAbility(
+        interaction.client,
         user.id,
         "underTheRadar"
     );
@@ -1674,10 +1744,19 @@ async function disableIPPs(mainGuild) {
     }
 }
 
-async function removeBugs(guild) {
-    const buggedPlayers = await Player.find({ bugged: true });
+async function removeWatariBugs(guild) {
+    const bugLogs = await BugLog.find({
+        source: "bug",
+    });
+    const buggedPlayers = [];
 
-    await Player.updateMany({ bugged: true }, { bugged: false });
+    for (const log of bugLogs) {
+        const player = await Player.findOne({ userId: log.targetId });
+        if (player && !buggedPlayers.find((p) => p.userId === player.userId))
+            buggedPlayers.push(player);
+    }
+
+    await BugLog.deleteMany({ source: "bug" });
 
     // remove asterisks
     for (const player of buggedPlayers) {
@@ -1713,7 +1792,7 @@ async function nextDay(client) {
     await progressCooldowns();
     await applyRoleAbilityCooldowns();
     await Player.updateMany({ underTheRadar: true }, { underTheRadar: false });
-    await removeBugs(mainGuild);
+    await removeWatariBugs(mainGuild);
     await disableIPPs(mainGuild);
     await resetNotebookCooldowns();
     await Season.updateOne(
@@ -1770,9 +1849,7 @@ async function clearContactLogs(channels) {
     await clearChannel(
         await channels.fetch(gameConfig.channelIds.watariContactLogs)
     );
-    await clearChannel(
-        await channels.fetch(gameConfig.channelIds.hostContactLogs)
-    );
+    await clearChannel(await channels.fetch(gameConfig.channelIds.hostLogs));
 }
 
 async function pseudocide(interaction) {
@@ -1794,7 +1871,11 @@ async function pseudocide(interaction) {
     if (targetData.ipp) return "This user is under IPP.";
 
     // generic role ability checks + usage
-    const genericUseResult = await genericUseRoleAbility(user.id, "pseudocide");
+    const genericUseResult = await genericUseRoleAbility(
+        interaction.client,
+        user.id,
+        "pseudocide"
+    );
     if (genericUseResult !== true) return genericUseResult;
 
     // continue with pseudocide specific logic
@@ -1836,7 +1917,11 @@ async function ipp(interaction) {
         .catch(() => null);
     if (!targetMember) return "Target is not in the main Discord server.";
 
-    const result = await genericUseRoleAbility(user.id, "ipp");
+    const result = await genericUseRoleAbility(
+        interaction.client,
+        user.id,
+        "ipp"
+    );
     if (result !== true) return result;
 
     await updatePlayerData(target, {
@@ -1873,7 +1958,7 @@ async function removeAffiliation(user, affiliation) {
     return true;
 }
 
-async function restrictNotebook(user, reason) {
+async function restrictNotebooks(user, reason) {
     const userData = await getPlayerData(user);
 
     if (!userData) return "This user has no data.";
@@ -1886,7 +1971,7 @@ async function restrictNotebook(user, reason) {
     return true;
 }
 
-async function freeNotebook(user, reason) {
+async function freeNotebooks(user, reason) {
     const userData = await getPlayerData(user);
 
     if (!userData) return "This user has no data.";
@@ -1904,11 +1989,11 @@ async function incarcerate(client, user) {
     const member = await mainGuild.members.fetch(user.id).catch(() => null);
     if (member) {
         await member.roles.add(gameConfig.roleIds.Arrested);
-        await member.roles.remove(gameConfig.roleIds.civ)
+        await member.roles.remove(gameConfig.roleIds.civ);
     }
 
     await hideLounges(client, user, "incarcerated");
-    await restrictNotebook(user, "incarcerated");
+    await restrictNotebooks(user, "incarcerated");
 }
 
 async function release(client, user) {
@@ -1916,11 +2001,11 @@ async function release(client, user) {
     const member = await mainGuild.members.fetch(user.id).catch(() => null);
     if (member) {
         await member.roles.remove(gameConfig.roleIds.Arrested);
-        await member.roles.add(gameConfig.roleIds.civ)
+        await member.roles.add(gameConfig.roleIds.civ);
     }
 
     await unhideLounges(client, user, "incarcerated");
-    await freeNotebook(user, "incarcerated");
+    await freeNotebooks(user, "incarcerated");
 }
 
 async function announce(client, message) {
@@ -1963,6 +2048,42 @@ async function resetDatabase() {
     }
 }
 
+async function bugUser(client, user, source) {
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
+    const lwatariGuild = await client.guilds.fetch(gameConfig.guildIds.lwatari);
+    const member = await mainGuild.members.fetch(user.id).catch(() => null);
+
+    const channelName = `${source}-${strippedName(
+        member ? strippedName(member.displayName) : user.username
+    )}`;
+
+    const logChannel = await createTemporaryChannel(
+        lwatariGuild,
+        channelName,
+        gameConfig.bugLogCategoryPrefix,
+        "everyone"
+    );
+
+    await BugLog.create({
+        channelId: logChannel.id,
+        source: source,
+        targetId: user.id,
+    });
+
+    let notifierMessage = (() => {
+        if (source === "bug") return `You have been bugged by Watari.`;
+        if (source === "custody") return `You have been placed into custody.`;
+        return "";
+    })();
+    notifierMessage += `\nAs a result, anything you send in shared channels will be viewable by L and Watari.\nA shared channel is any channel which is not solely visible to you at all times.`;
+
+    try {
+        await user.send(notifierMessage);
+    } catch (err) {
+        console.log("Failed to notify user of bug.", err);
+    }
+}
+
 async function bug(interaction) {
     const user = interaction.user;
     const target = interaction.options.getUser("target");
@@ -1971,7 +2092,11 @@ async function bug(interaction) {
     if (!targetData) return "This user has no data.";
     if (!targetData.alive) return "This user is dead.";
 
-    const genericUseResult = await genericUseRoleAbility(user.id, "bug");
+    const genericUseResult = await genericUseRoleAbility(
+        interaction.client,
+        user.id,
+        "bug"
+    );
     if (genericUseResult !== true) return genericUseResult;
 
     const mainGuild = await interaction.client.guilds.fetch(
@@ -1981,17 +2106,7 @@ async function bug(interaction) {
         .fetch(target.id)
         .catch(() => null);
 
-    // notify user that they have been bugged
-    try {
-        await target.send("You have been bugged by Watari.");
-    } catch (err) {
-        console.log("Failed to notify user of bug.", err);
-    }
-
-    await Player.findOneAndUpdate(
-        { userId: target.id },
-        { $set: { bugged: true } }
-    );
+    await bugUser(interaction.client, target, "bug");
 
     // function to insert '*' before any parenthetical suffix (chatgpt generated)
     function addBugAsterisk(displayName) {
@@ -2055,7 +2170,11 @@ async function autopsy(interaction) {
     if (!targetData) return "This user has no data.";
     if (targetData.alive) return "This user is not dead.";
 
-    const genericUseResult = await genericUseRoleAbility(user.id, "autopsy");
+    const genericUseResult = await genericUseRoleAbility(
+        interaction.client,
+        user.id,
+        "autopsy"
+    );
     if (genericUseResult !== true) return genericUseResult;
 
     const timeOfDeath = targetData.timeOfDeath;
@@ -2116,12 +2235,13 @@ async function anonymousAnnouncement(interaction) {
     const message = interaction.options.getString("message");
 
     const genericUseResult = await genericUseRoleAbility(
+        interaction.client,
         interaction.user.id,
         "anonymousMessage"
     );
     if (genericUseResult !== true) return genericUseResult;
 
-    await announce(interaction.client, `@everyone "${message}"`);
+    await announce(interaction.client, `@everyone **???:** "${message}"`);
 
     return true;
 }
@@ -2272,7 +2392,7 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
 
     // kidnap effects
     await hideLounges(client, victimUser, "kidnapped");
-    await restrictNotebook(victimUser, "kidnapped");
+    await restrictNotebooks(victimUser, "kidnapped");
     // Add kidnapped role and remove civ role
     try {
         await victimMember.roles.add(gameConfig.roleIds.Kidnapped);
@@ -2325,7 +2445,7 @@ async function kidnapRelease(client, kidnapDocId) {
 
     // Remove kidnapped effects
     await unhideLounges(client, kidnappedUser, "kidnapped");
-    await freeNotebook(kidnappedUser, "kidnapped");
+    await freeNotebooks(kidnappedUser, "kidnapped");
     // Add civ role and remove kidnapped role
     try {
         await kidnappedMember.roles.add(gameConfig.roleIds.civ);
@@ -2366,10 +2486,14 @@ async function nameReveal(interaction) {
         return "You no longer possess shinigami eyes.";
 
     const genericUseResult = await genericUseRoleAbility(
+        interaction.client,
         interaction.user.id,
         "nameReveal"
     );
     if (genericUseResult !== true) return genericUseResult;
+
+    // apply cooldowns for the other ability
+    await genericUseRoleAbility(null, user.id, "notebookDetect");
 
     await interaction.user.send(
         `The true name of ${target} is **${targetData.trueName}**.`
@@ -2390,10 +2514,15 @@ async function notebookReveal(interaction) {
         return "You no longer possess shinigami eyes.";
 
     const genericUseResult = await genericUseRoleAbility(
+        interaction.client,
         user.id,
         "notebookDetect"
     );
     if (genericUseResult !== true) return genericUseResult;
+
+    // apply cooldowns for the other ability
+    await genericUseRoleAbility(null, user.id, "nameReveal");
+    await genericUseRoleAbility(null, user.id, "nameReveal");
 
     // need to check if the target is currently holding a notebook. for all notebooks which they are the currentOwner of,
     // check if there is a temporary owner. if there is a temporary owner, they do not hold that notebook.
@@ -2443,34 +2572,51 @@ async function eyes(interaction) {
 
 // Used by News Anchor
 async function civilianArrest(interaction) {
-    const target = interaction.options.getUser("target")
+    const target = interaction.options.getUser("target");
 
-    const mainGuild = await interaction.client.guilds.fetch(gameConfig.guildIds.main);
+    const mainGuild = await interaction.client.guilds.fetch(
+        gameConfig.guildIds.main
+    );
     const news = await mainGuild.channels.fetch(gameConfig.channelIds.news);
     const member = await mainGuild.members.fetch(interaction.user.id);
     const targetMember = await mainGuild.members.fetch(target.id);
 
-    const playerData = await getPlayerData(interaction.user)
-    const targetData = await getPlayerData(target)
-   
+    const playerData = await getPlayerData(interaction.user);
+    const targetData = await getPlayerData(target);
+
     if (interaction.channel.name !== "news") {
         return "You can only start a civilian arrest in the news channel.";
     }
     if (!targetData || !targetData.alive) {
         return "The target must be alive.";
     }
-    if (targetMember.roles.cache.some(r => r.id === gameConfig.roleIds.Arrested || r.id === gameConfig.roleIds.Kidnapped)) {
+    if (
+        targetMember.roles.cache.some(
+            (r) =>
+                r.id === gameConfig.roleIds.Arrested ||
+                r.id === gameConfig.roleIds.Kidnapped
+        )
+    ) {
         return "You cannot start a civilian arrest on someone that is already locked up.";
     }
 
     const genericUseResult = await genericUseRoleAbility(
+        interaction.client,
         interaction.user.id,
         "civilianArrest"
     );
     if (genericUseResult !== true) return genericUseResult;
 
     const civArrestMsg = await news.send({
-        content: `@everyone The <@&${gameConfig.roleIds["News Anchor"]}> has started a civilian arrest on **${strippedName(target.displayName)}**. Vote 👍 if you would like this person to be arrested for ${gameConfig.HRS_ARREST_DURATION} hours. Vote 👎 if you do not want this person to be arrested. This vote will last for ${gameConfig.HRS_CIVILIAN_ARREST_VOTE_DURATION} hours, then the verdict will be announced.`,
+        content: `@everyone The <@&${
+            gameConfig.roleIds["News Anchor"]
+        }> has started a civilian arrest on **${strippedName(
+            target.displayName
+        )}**. Vote 👍 if you would like this person to be arrested for ${
+            gameConfig.HRS_ARREST_DURATION
+        } hours. Vote 👎 if you do not want this person to be arrested. This vote will last for ${
+            gameConfig.HRS_CIVILIAN_ARREST_VOTE_DURATION
+        } hours, then the verdict will be announced.`,
     });
     createGenericPoll(
         civArrestMsg,
@@ -2484,7 +2630,7 @@ async function civilianArrest(interaction) {
             if (result === "win") {
                 civArrestMsg.reply(
                     `The vote has passed! **${target.displayName}** will be arrested for ${gameConfig.HRS_ARREST_DURATION} hours.`
-                )
+                );
                 incarcerate(interaction.client, target);
                 createDelayedAction(
                     interaction.client,
@@ -2495,11 +2641,11 @@ async function civilianArrest(interaction) {
             } else if (result === "loss") {
                 civArrestMsg.reply(
                     `The vote has failed! **${target.displayName}** will not be arrested.`
-                )
+                );
             } else {
                 civArrestMsg.reply(
                     `The vote has been tied! **${target.displayName}** will not be arrested.`
-                )
+                );
             }
         }
     );
@@ -2626,8 +2772,8 @@ module.exports = {
     unlock2ndKira,
     addAffiliation,
     removeAffiliation,
-    restrictNotebook,
-    freeNotebook,
+    restrictNotebooks,
+    freeNotebooks,
     incarcerate,
     release,
     announce,
@@ -2640,4 +2786,6 @@ module.exports = {
     earlyKidnapRelease,
     anonymousAnnouncement,
     eyes,
+    custody,
+    removeCustody,
 };

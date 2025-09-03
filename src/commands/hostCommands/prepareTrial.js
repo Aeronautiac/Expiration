@@ -61,8 +61,7 @@ module.exports = {
             .fetch(defendant.id)
             .catch(() => null);
         if (defendantMember) {
-            await defendantMember.roles.add(gameConfig.roleIds.Custody);
-            await defendantMember.roles.remove(gameConfig.roleIds.civ);
+            await game.custody(interaction.client, defendant);
         }
 
         await courtroomChannel.send({
