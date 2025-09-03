@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
+const gameConfig = require("../../../gameconfig.json");
 const game = require("../../game");
 
 module.exports = {
@@ -15,6 +16,12 @@ module.exports = {
             option
                 .setName("affiliation")
                 .setDescription("the affiliation to remove")
+                .addChoices(
+                    ...gameConfig.possibleAffiliations.map((aff) => ({
+                        name: aff,
+                        value: aff,
+                    }))
+                )
                 .setRequired(true)
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),

@@ -256,8 +256,8 @@ async function role(client, targetUser, role) {
         .catch(() => null);
     if (member) {
         // no need to await here
-        member.roles.add(gameConfig.roleIds.civ);
-        member.roles.remove(gameConfig.roleIds.shinigami);
+        member.roles.add(gameConfig.roleIds.Civilian);
+        member.roles.remove(gameConfig.roleIds.Shinigami);
     }
 }
 
@@ -400,26 +400,95 @@ async function deathMessage(
     affiliatiated
 ) {
     const readablename = readableName(trueName);
-    const affiliations = affiliatiated ?? [];
-
+    const targetData = await getPlayerData(user);
+    const affiliations = affiliatiated ?? targetData.affiliations;
+    
     const news = await client.channels.fetch(gameConfig.channelIds.news);
 
-    const deathmessage =
-        message ?? `${user} has died to a sudden heart attack.`;
+    const deathReason = message ?? `They died from a sudden heart attack`;
 
-    let output = `@everyone ${deathmessage} [${user} (${readablename}) has died. Role: ${role}, Affiliations: ${
-        affiliations.join(", ") || "none"
-    }]`;
+    // Compose the base death message
+    let output = `@everyone ${user} (${readableName(trueName)}) has died. ${deathReason}.`;
 
-    if (hasNotebook)
-        output = output.concat(
-            `\nWhoever is responsible has now gained possession of their death note(s).`
-        );
-
-    news.send({
+    // Send the initial death message
+    const deathMsg = await news.send({
         content: output,
         allowedMentions: { parse: ["everyone"] },
     });
+
+    // Wait 5 seconds before replying with the role/affiliation reveal
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
+    // Determine the role/affiliation reveal message
+    let revealMsg = "";
+    const roleName = String(role).trim();
+    const affils = Array.isArray(affiliatiated) ? affiliatiated : [];
+
+    // Helpers for mention formatting
+    const roleMention = (r) => {
+        // Try to find role id from config, fallback to plain text
+        const id = gameConfig.roleIds[r];
+        return id ? `<@&${id}>` : r;
+    };
+    const orgMention = (org) => {
+        const id = gameConfig.roleIds[org];
+        return id ? `<@&${id}>` : org;
+    };
+
+    if (roleName === "Civilian") {
+        revealMsg = `They were just a `;
+    } else if (roleName === "Kira") {
+        revealMsg = `They were the mass murderer known as `;
+    } else if (roleName === "L") {
+        revealMsg = `They were the world's greatest detective known as `;
+    } else if (roleName === "Rogue Civilian") {
+        revealMsg = `They were the chaotic `;
+    } else if (["PI", "News Anchor"].includes(roleName)) {
+        revealMsg = `They were the `;
+    } else {
+        revealMsg = `They were `;
+    }
+    revealMsg += roleMention(roleName);
+
+    const chiefs = affiliations.filter(a => a.endsWith("Chief"));
+    const orgs = affiliations.filter(a => !a.endsWith("Chief"));
+
+    if (orgs.length === 1 && chiefs.length === 0) {
+        // Single org, not chief
+        revealMsg += ` and member of the ${orgMention(orgs[0])}.`;
+    } else if (orgs.length > 1 && chiefs.length === 0) {
+        // Multiple orgs, not chief
+        const mentions = orgs.map(orgMention);
+        revealMsg += ` and members of the ${mentions.slice(0, -1).join(", ")} and ${mentions.slice(-1)}.`;
+    } else if (orgs.length === 1 && chiefs.length === 1 && chiefs[0].startsWith(orgs[0])) {
+        // Chief of their only org
+        const chiefOrg = orgs[0];
+        revealMsg += ` and the chief of the ${orgMention(chiefOrg)}. Now no new members may join the ${orgMention(chiefOrg)}.`;
+    } else if (orgs.length > 0 && chiefs.length > 0) {
+        // Member of orgs and also chief(s)
+        const mentions = orgs.map(orgMention);
+        let msg = ` and members of the ${mentions.slice(0, -1).join(", ")}${orgs.length > 1 ? " and " : ""}${mentions.slice(-1)}.`;
+        // List all chief roles
+        for (const chief of chiefs) {
+            const chiefOrg = chief.replace(/ Chief$/, "");
+            msg += ` They were also the chief of the ${orgMention(chiefOrg)}. Now no new members may join the ${orgMention(chiefOrg)}.`;
+        }
+        revealMsg += msg;
+    }
+
+    // Reply to the death message with the reveal
+    await deathMsg.reply({
+        content: revealMsg,
+        allowedMentions: { parse: ["roles"] },
+    });
+
+    // If they had a notebook, announce it
+    if (hasNotebook) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        await deathMsg.reply({
+            content: `Whoever is responsible has gained possession of their death note(s).`
+        });
+    }
 }
 
 // adds a cooldown to a player's data
@@ -465,7 +534,7 @@ async function removeUsersFromChannel(users, channel) {
 
 // places a user into custody
 // custody restricts notebook usage and bugs the player with source "custody"
-// this function will also remove their civilian role and give them the custody role
+// this function will give them the custody role
 async function custody(client, user) {
     const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
     const member = await mainGuild.members.fetch(user.id).catch(() => null);
@@ -478,7 +547,6 @@ async function custody(client, user) {
 
     // add roles
     if (member) {
-        await member.roles.remove(gameConfig.roleIds.civ);
         await member.roles.add(gameConfig.roleIds.Custody);
     }
 }
@@ -496,7 +564,7 @@ async function removeCustody(client, user) {
 
     // add roles
     if (member) {
-        await member.roles.add(gameConfig.roleIds.civ);
+        await member.roles.add(gameConfig.roleIds.Civilian);
         await member.roles.remove(gameConfig.roleIds.Custody);
     }
 }
@@ -1168,8 +1236,8 @@ async function killUser(client, user, message, messageOverride, hadNotebook) {
     const member = await mainGuild.members.fetch(user.id).catch(() => null);
     if (member) {
         // no need to await here
-        member.roles.add(gameConfig.roleIds.shinigami);
-        member.roles.remove(gameConfig.roleIds.civ);
+        member.roles.add(gameConfig.roleIds.Shinigami);
+        member.roles.remove(gameConfig.roleIds.Civilian);
         member.setNickname(strippedName(member.displayName));
     }
 }
@@ -1952,7 +2020,7 @@ async function removeAffiliation(user, affiliation) {
     if (!userData.affiliations.includes(affiliation))
         return "User does not have this affiliation.";
 
-    userData.affiliations.filter((aff) => aff !== affiliation);
+    userData.affiliations = userData.affiliations.filter((aff) => aff !== affiliation);
     await userData.save();
 
     return true;
@@ -1989,7 +2057,7 @@ async function incarcerate(client, user) {
     const member = await mainGuild.members.fetch(user.id).catch(() => null);
     if (member) {
         await member.roles.add(gameConfig.roleIds.Arrested);
-        await member.roles.remove(gameConfig.roleIds.civ);
+        await member.roles.remove(gameConfig.roleIds.Civilian);
     }
 
     await hideLounges(client, user, "incarcerated");
@@ -2001,7 +2069,7 @@ async function release(client, user) {
     const member = await mainGuild.members.fetch(user.id).catch(() => null);
     if (member) {
         await member.roles.remove(gameConfig.roleIds.Arrested);
-        await member.roles.add(gameConfig.roleIds.civ);
+        await member.roles.add(gameConfig.roleIds.Civilian);
     }
 
     await unhideLounges(client, user, "incarcerated");
@@ -2157,10 +2225,9 @@ async function fetchAllMessages(
     return allMessages;
 }
 
-// later, optimize by combining all messages that can be safely combined into once and separating with newline.
-// if a message contains an embed or attachment, then it cannot be combined.
-// currently there is a bug where if the message is too long, then it will not be sent. (fix by designing the system mentioned above)
-// [LET ME DO THIS KINDER. IT IS A SLIGHTLY FUN PUZZLE!!! I DO NOT WANT TO USE AI FOR IT.]
+// ILL SAVE THE DAY ALBINOHORROR! Now: combines msgs into blocks to save api calls
+// Fixed embed stuff
+// Fixed cut off stuff
 async function autopsy(interaction) {
     const user = interaction.user;
     const target = interaction.options.getUser("target");
@@ -2168,7 +2235,7 @@ async function autopsy(interaction) {
     const season = await Season.findOne({});
 
     if (!targetData) return "This user has no data.";
-    if (targetData.alive) return "This user is not dead.";
+    // if (targetData.alive) return "This user is not dead.";
 
     const genericUseResult = await genericUseRoleAbility(
         interaction.client,
@@ -2197,30 +2264,83 @@ async function autopsy(interaction) {
             );
         })
     );
-    const allMessages = allMessagesArrays.flat();
 
     // sort in ascending order based on timestamp
-    allMessages.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+    const allMessages = allMessagesArrays.flat().sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+
+    let currentBlock = [];
+    const CHUNK_LIMIT = 2000;
 
     // send autopsy notifier
     const beginMessage = await autopsyLogs.send({
         content: `Autopsy logs for ${target}:`,
     });
     await beginMessage.pin().catch(console.error);
+    await autopsyLogs.send({
+        content:
+            "==========================<START OF AUTOPSY>==========================",
+    });
 
-    // send all messages in autopsy logs
-    for (const message of allMessages) {
-        try {
-            await autopsyLogs.send({
-                content: `[<t:${Math.floor(
-                    message.createdTimestamp / 1000
-                )}>] ${message.content}`,
-                files: [...message.attachments.values()],
-            });
-        } catch (err) {
-            console.log("Failed to send message in autopsy logs", err);
+    await new Promise((res) => setTimeout(res, 5000));
+
+    // Send a block as chunks, ensuring no message is split
+    async function sendBlock(blockLines) {
+        console.log(blockLines);
+        if (blockLines.length === 0) return;
+        let chunk = "";
+        for (let i = 0; i < blockLines.length; i++) {
+            let line = blockLines[i];
+            // If adding this line would exceed the limit, send the chunk and start a new one (fixes timestamp being cut off and looking very bad lol)
+            if (chunk.length + line.length > CHUNK_LIMIT) {
+                await autopsyLogs.send({ content: chunk });
+                await new Promise((res) => setTimeout(res, 5000));
+                // Start new chunk with prefix and current line
+                chunk = line;
+            } else {
+                chunk += "\n" + line;
+            }
+        }
+
+        if (chunk.length > 0) {
+            await autopsyLogs.send({ content: chunk });
+            await new Promise((res) => setTimeout(res, 5000));
         }
     }
+    // send all messages in autopsy logs
+    for (const msg of allMessages) {
+        // Format line with timestamp
+        const timestamp = `<t:${Math.floor(
+            msg.createdTimestamp / 1000
+        )}>`;
+      
+        // Check for image attachments without links (if an img is sent without a link, the bot sends an empty string as a log)
+        let imageLinks = [];
+        if (msg.attachments && msg.attachments.size > 0) {
+            msg.attachments.forEach((att) => {
+                if (
+                    att.contentType &&
+                    att.contentType.startsWith("image/") &&
+                    att.url
+                ) {
+                    imageLinks.push(att.url);
+                }
+            });
+        }
+
+        let msgContent = msg.content;
+        if (imageLinks.length > 0) {
+            msgContent +=
+                (msgContent ? "\n" : "") +
+                imageLinks.join("\n");
+        }
+
+        const line = `[${timestamp}] "${msgContent}"`;
+
+        // Send previous block if exists
+        currentBlock.push(line);
+    }
+    // Send last block
+    await sendBlock(currentBlock);
 
     await autopsyLogs.send({
         content:
@@ -2251,7 +2371,7 @@ async function startBlackout(client) {
     const newsChannel = await mainGuild.channels.fetch(
         gameConfig.channelIds.news
     );
-    await newsChannel.permissionOverwrites.edit(gameConfig.roleIds.civ, {
+    await newsChannel.permissionOverwrites.edit(gameConfig.roleIds.Civilian, {
         ViewChannel: false,
     });
 }
@@ -2261,7 +2381,7 @@ async function stopBlackout(client) {
     const newsChannel = await mainGuild.channels.fetch(
         gameConfig.channelIds.news
     );
-    await newsChannel.permissionOverwrites.edit(gameConfig.roleIds.civ, {
+    await newsChannel.permissionOverwrites.edit(gameConfig.roleIds.Civilian, {
         ViewChannel: true,
     });
 
@@ -2396,7 +2516,7 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
     // Add kidnapped role and remove civ role
     try {
         await victimMember.roles.add(gameConfig.roleIds.Kidnapped);
-        await victimMember.roles.remove(gameConfig.roleIds.civ);
+        await victimMember.roles.remove(gameConfig.roleIds.Civilian);
     } catch (err) {
         console.log("Failed to update roles for kidnapped member:", err);
     }
@@ -2448,7 +2568,7 @@ async function kidnapRelease(client, kidnapDocId) {
     await freeNotebooks(kidnappedUser, "kidnapped");
     // Add civ role and remove kidnapped role
     try {
-        await kidnappedMember.roles.add(gameConfig.roleIds.civ);
+        await kidnappedMember.roles.add(gameConfig.roleIds.Civilian);
         await kidnappedMember.roles.remove(gameConfig.roleIds.Kidnapped);
     } catch (err) {
         console.log("Failed to update roles for kidnapped member:", err);

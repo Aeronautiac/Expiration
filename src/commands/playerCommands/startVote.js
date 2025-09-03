@@ -418,8 +418,6 @@ module.exports = {
                         let lastSpeakerId = null;
                         let currentBlock = [];
                         let currentBlockName = "";
-                        let blockText = "";
-                        let chunks = [];
                         const CHUNK_LIMIT = 2000;
 
                         // Send a block as chunks, ensuring no message is split
@@ -464,14 +462,7 @@ module.exports = {
                         for (const msg of ordered) {
                             if (msg.author.bot) continue;
                             // Get display name from mainGuild. This should probably be stored as a table outside this scope but apparently fetch isn't expensive? IDK LOL!
-                            let mainMember;
-                            try {
-                                mainMember = await mainGuild.members.fetch(
-                                    msg.author.id
-                                );
-                            } catch {
-                                mainMember = null;
-                            }
+                            const mainMember = await mainGuild.members.fetch(msg.author.id).catch(() => null);
                             const displayName = mainMember
                                 ? mainMember.displayName
                                 : msg.author.username;

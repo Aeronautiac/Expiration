@@ -38,6 +38,7 @@
         "2nd Kira": ["2kira"]
     },
 
+    "possibleAffiliations": [ "Task Force", "Kira's Kingdom", "Task Force Chief" ],
     "groupGuilds": ["lwatari", "tf", "kk"],
 
     "organisations": ["Task Force", "Kira's Kingdom"],
@@ -50,17 +51,17 @@
         "Blackout": {
             "cooldown": 999,
             "organisation": "Kira's Kingdom",
-            "membersRequired": 1
+            "membersRequired": 5
         },
         "Public Kidnap": {
             "cooldown": 1,
             "organisation": "Kira's Kingdom",
-            "membersRequired": 1
+            "membersRequired": 3
         },
         "Anonymous Kidnap": {
             "cooldown": 2,
             "organisation": "Kira's Kingdom",
-            "membersRequired": 1
+            "membersRequired": 5
         },
         "2nd Kira+Kira Anonymous Kidnap": {
             "cooldown": 2,
@@ -70,7 +71,7 @@
         "Tap In": {
             "cooldown": 1,
             "organisation": "Kira's Kingdom",
-            "membersRequired": 3
+            "membersRequired": 4
         },
 
         "Background Check": {
@@ -159,17 +160,26 @@
     },
 
     "roleIds": {
-        "spec": "1406115825844359315",
-        "pi": "1406115825957732546",
-        "watari": "1406115825957732548",
-        "civ": "1406115825886167047",
-        "shinigami": "1406115825886167046",
+        "Spectator": "1406115825844359315",
+        "Shinigami": "1406115825886167046",
+
+        "PI": "1406115825957732546",
+        "BB": "1406115825957732547",
+        "L": "1406115825957732552",
+        "Watari": "1406115825957732548",
+        "Kira": "1406115825957732553",
+        "2nd Kira": "1406115825957732551",
+
+        "Civilian": "1406115825886167047",
+        "Rogue Civilian": "1406115825928376365",
+        "News Anchor": "1406115825928376364",
+
         "Kira's Kingdom": "1406115825928376368",
         "Task Force": "1406115825928376367",
+
         "Arrested": "1412394267556446228",
         "Prosecutor": "1406115825928376361",
         "Custody": "1406115825907269651",
-        "Kidnapped": "1406115825928376362",
-        "News Anchor": "1406115825928376364"
+        "Kidnapped": "1406115825928376362"
     }
 }
