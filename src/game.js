@@ -1962,7 +1962,7 @@ async function restrictNotebooks(user, reason) {
     const userData = await getPlayerData(user);
 
     if (!userData) return "This user has no data.";
-    if (!userData.notebookRestrictReasons.includes(reason))
+    if (userData.notebookRestrictReasons.includes(reason))
         return "User's notebook is already blocked by this.";
 
     userData.notebookRestrictReasons.push(reason);
