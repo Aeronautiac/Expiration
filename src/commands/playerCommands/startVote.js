@@ -21,9 +21,6 @@ function hrsToMs(hrs) {
     return 1000 * 60 * 60 * hrs;
 }
 
-const HOURS_FOR_CIVILIAN_ARREST_VOTE = 6;
-const HOURS_ARRESTED_FOR = 24;
-const HOURS_BLACKOUT_DURATION = 24;
 const MS_TIME_BETWEEN_TAP_IN_CHUNKS = 6000;
 
 module.exports = {
@@ -74,6 +71,7 @@ module.exports = {
             guildId === gameConfig.guildIds.tf
                 ? "Task Force"
                 : "Kira's Kingdom";
+        const abilityConfig = gameConfig.abilities[action];
 
         const abilityRequiresATarget =
             abilitiesThatRequireAUserTarget.includes(action);
@@ -113,8 +111,8 @@ module.exports = {
         }
         // Check if vote is part of correct organisation (TF cant use KK ability)
         if (
-            gameConfig.abilities[action].organisation &&
-            gameConfig.abilities[action].organisation !== ourAffiliation
+            abilityConfig.organisation &&
+            abilityConfig.organisation !== ourAffiliation
         ) {
             await interaction.editReply({
                 content: "You are not allowed to start a vote for this action.",
@@ -196,7 +194,7 @@ module.exports = {
         }
 
         // Start a poll for the ability
-        let requiredRoles = gameConfig.abilities[action].requiredRoles || [];
+        let requiredRoles = abilityConfig.requiredRoles || [];
         let membersInOrganisation = 0;
 
         for (const member of guild.members.cache.values()) {
@@ -224,13 +222,18 @@ module.exports = {
         }
 
         if (
-            gameConfig.abilities[action].membersRequired &&
-            membersInOrganisation < gameConfig.abilities[action].membersRequired
+            abilityConfig.membersRequired &&
+            membersInOrganisation < abilityConfig.membersRequired
         ) {
             await interaction.editReply({
-                content: `This ability requires at least ${gameConfig.abilities[action].membersRequired} members to be alive in your organisation. You only have ${membersInOrganisation} alive members.`,
+                content: `This ability requires at least ${abilityConfig.membersRequired} members to be alive in your organisation. You only have ${membersInOrganisation} alive members.`,
             });
             return;
+        }
+        if (action.includes("Arrest") || action.includes("Kidnap")) {
+            if (target.roles.cache.some(r => r.id === gameConfig.roleIds.Arrested || r.id === gameConfig.roleIds.Custody || r.id === gameConfig.roleIds.Kidnapped)) {
+                return "You cannot start a lock up on someone that is already locked up.";
+            }
         }
 
         const majority = Math.ceil(membersInOrganisation * 0.5);
@@ -264,7 +267,7 @@ module.exports = {
             async (result) => {
                 if (result === "win") {
                     pollMessage.reply(
-                        `The vote has passed! The **${action}** will be performed. This ability will now go on a cooldown of ${gameConfig.abilities[action].cooldown} day(s).`
+                        `The vote has passed! The **${action}** will be performed. This ability will now go on a cooldown of ${abilityConfig.cooldown} day(s).`
                     );
 
                     // Do another cooldown check here incase players stack polls.. Those cheeky players...
@@ -281,7 +284,7 @@ module.exports = {
                     // Add cooldown to the organisation for the ability
                     await game.updateOrganisationData(ourAffiliation, {
                         [`cooldowns.${action}`]:
-                            gameConfig.abilities[action].cooldown,
+                            abilityConfig.cooldown,
                     });
 
                     const news = await client.channels.fetch(
@@ -301,12 +304,12 @@ module.exports = {
                         }
                     } else if (action === "Civilian Arrest") {
                         const civArrestMsg = await news.send({
-                            content: `@everyone The ${affiliationMention} has started a civilian arrest on **${target.displayName}**. Vote 👍 if you would like this person to be arrested for 1 day. Vote 👎 if you do not want this person to be arrested. This vote will last for ${HOURS_FOR_CIVILIAN_ARREST_VOTE} hours, then the verdict will be announced.`,
+                            content: `@everyone The ${affiliationMention} has started a civilian arrest on **${target.displayName}**. Vote 👍 if you would like this person to be arrested for ${gameConfig.HRS_ARREST_DURATION} hours. Vote 👎 if you do not want this person to be arrested. This vote will last for ${gameConfig.HRS_CIVILIAN_ARREST_VOTE_DURATION} hours, then the verdict will be announced.`,
                         });
 
                         game.createGenericPoll(
                             civArrestMsg,
-                            hrsToMs(HOURS_FOR_CIVILIAN_ARREST_VOTE),
+                            hrsToMs(gameConfig.HRS_CIVILIAN_ARREST_VOTE_DURATION),
                             null,
                             async (user) => {
                                 const playerData = await game.getPlayerData(
@@ -320,6 +323,12 @@ module.exports = {
                                         "The vote has passed. The **Civilian Arrest** will be carried out."
                                     );
                                     game.incarcerate(client, targetId);
+                                    game.createDelayedAction(
+                                        client,
+                                        "delayedRelease",
+                                        hrsToMs(gameConfig.HRS_ARREST_DURATION),
+                                        [targetId.id]
+                                    );
                                 } else if (result === "lose") {
                                     civArrestMsg.reply(
                                         "The vote has failed. The **Civilian Arrest** has been cancelled."
@@ -336,25 +345,25 @@ module.exports = {
                         action === "PI+Watari Unlawful Arrest"
                     ) {
                         news.send({
-                            content: `@everyone The ${affiliationMention} have performed an unlawful arrest on **${target.displayName}**. They will return from their sentence in ${HOURS_ARRESTED_FOR} hours.`,
+                            content: `@everyone The ${affiliationMention} have performed an unlawful arrest on **${target.displayName}**. They will return from their sentence in ${gameConfig.HRS_ARREST_DURATION} hours.`,
                         });
                         game.incarcerate(client, targetId);
                         game.createDelayedAction(
                             client,
                             "delayedRelease",
-                            hrsToMs(HOURS_ARRESTED_FOR),
+                            hrsToMs(gameConfig.HRS_ARREST_DURATION),
                             [targetId.id]
                         );
                     } else if (action === "Blackout") {
                         news.send({
-                            content: `@everyone The ${affiliationMention} have performed a blackout on the local network! All trials will cancel and news will stop in 1 minute for ${HOURS_BLACKOUT_DURATION} hours.`,
+                            content: `@everyone The ${affiliationMention} have performed a blackout on the local network! All trials will cancel and news will stop in 1 minute for ${gameConfig.HRS_BLACKOUT_DURATION} hours.`,
                         });
                         setTimeout(() => {
                             game.startBlackout(client);
                             game.createDelayedAction(
                                 client,
                                 "stopBlackout",
-                                hrsToMs(HOURS_BLACKOUT_DURATION)
+                                hrsToMs(gameConfig.HRS_BLACKOUT_DURATION)
                             );
                         }, 60 * 1000);
                     } else if (action === "Public Kidnap") {

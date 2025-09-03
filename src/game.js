@@ -1904,6 +1904,7 @@ async function incarcerate(client, user) {
     const member = await mainGuild.members.fetch(user.id).catch(() => null);
     if (member) {
         await member.roles.add(gameConfig.roleIds.Arrested);
+        await member.roles.remove(gameConfig.roleIds.civ)
     }
 
     await hideLounges(client, user, "incarcerated");
@@ -1915,6 +1916,7 @@ async function release(client, user) {
     const member = await mainGuild.members.fetch(user.id).catch(() => null);
     if (member) {
         await member.roles.remove(gameConfig.roleIds.Arrested);
+        await member.roles.add(gameConfig.roleIds.civ)
     }
 
     await unhideLounges(client, user, "incarcerated");
@@ -2289,7 +2291,7 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
     const actionId = await createDelayedAction(
         client,
         "kidnapRelease",
-        hrsToMs(gameConfig.defaultKidnapDuration),
+        hrsToMs(gameConfig.HRS_KIDNAP_DURATION),
         [kidnapDoc._id]
     );
 
@@ -2439,6 +2441,72 @@ async function eyes(interaction) {
     return result;
 }
 
+// Used by News Anchor
+async function civilianArrest(interaction) {
+    const target = interaction.options.getUser("target")
+
+    const mainGuild = await interaction.client.guilds.fetch(gameConfig.guildIds.main);
+    const news = await mainGuild.channels.fetch(gameConfig.channelIds.news);
+    const member = await mainGuild.members.fetch(interaction.user.id);
+    const targetMember = await mainGuild.members.fetch(target.id);
+
+    const playerData = await getPlayerData(interaction.user)
+    const targetData = await getPlayerData(target)
+   
+    if (interaction.channel.name !== "news") {
+        return "You can only start a civilian arrest in the news channel.";
+    }
+    if (!targetData || !targetData.alive) {
+        return "The target must be alive.";
+    }
+    if (targetMember.roles.cache.some(r => r.id === gameConfig.roleIds.Arrested || r.id === gameConfig.roleIds.Custody || r.id === gameConfig.roleIds.Kidnapped)) {
+        return "You cannot start a civilian arrest on someone that is already locked up.";
+    }
+
+    const genericUseResult = await genericUseRoleAbility(
+        interaction.user.id,
+        "civilianArrest"
+    );
+    if (genericUseResult !== true) return genericUseResult;
+
+    const civArrestMsg = await news.send({
+        content: `@everyone The <@&${gameConfig.roleIds["News Anchor"]}> has started a civilian arrest on **${strippedName(target.displayName)}**. Vote 👍 if you would like this person to be arrested for ${gameConfig.HRS_ARREST_DURATION} hours. Vote 👎 if you do not want this person to be arrested. This vote will last for ${gameConfig.HRS_CIVILIAN_ARREST_VOTE_DURATION} hours, then the verdict will be announced.`,
+    });
+    createGenericPoll(
+        civArrestMsg,
+        hrsToMs(gameConfig.HRS_CIVILIAN_ARREST_VOTE_DURATION),
+        null,
+        async (user) => {
+            const playerData = await getPlayerData(user);
+            return playerData && playerData.alive;
+        },
+        async (result) => {
+            if (result === "win") {
+                civArrestMsg.reply(
+                    `The vote has passed! **${target.displayName}** will be arrested for ${gameConfig.HRS_ARREST_DURATION} hours.`
+                )
+                incarcerate(interaction.client, target);
+                createDelayedAction(
+                    interaction.client,
+                    "delayedRelease",
+                    hrsToMs(gameConfig.HRS_ARREST_DURATION),
+                    [target.id]
+                );
+            } else if (result === "loss") {
+                civArrestMsg.reply(
+                    `The vote has failed! **${target.displayName}** will not be arrested.`
+                )
+            } else {
+                civArrestMsg.reply(
+                    `The vote has been tied! **${target.displayName}** will not be arrested.`
+                )
+            }
+        }
+    );
+
+    return true;
+}
+
 const namesToCallbacks = {
     onPseudocideRevival: onPseudocideRevival,
     scheduledDeath: onScheduledKill,
@@ -2531,6 +2599,7 @@ module.exports = {
     changeGroupChatOwner,
     removeUserFromGroupChat,
     createGroupChat,
+    civilianArrest,
     changeGroupChatName,
     role,
     kill,

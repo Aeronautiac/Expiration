@@ -7,8 +7,12 @@
     "dailyTokens": 5,
     "maxGroupChatMembers": 5,
     "maxGroupChats": 3,
-    "defaultKidnapDuration": 24,
     "underTheRadarCharges": 1,
+
+    "HRS_CIVILIAN_ARREST_VOTE_DURATION": 6,
+    "HRS_BLACKOUT_DURATION": 24,
+    "HRS_ARREST_DURATION": 24,
+    "HRS_KIDNAP_DURATION": 24,
 
     "guildIds": {
         "main": "1406115825844359314",
@@ -45,7 +49,7 @@
         "Blackout": {
             "cooldown": 999,
             "organisation": "Kira's Kingdom",
-            "membersRequired": 5
+            "membersRequired": 1
         },
         "Public Kidnap": {
             "cooldown": 1,
@@ -164,6 +168,7 @@
         "Arrested": "1412394267556446228",
         "Prosecutor": "1406115825928376361",
         "Custody": "1406115825907269651",
-        "Kidnapped": "1406115825928376362"
+        "Kidnapped": "1406115825928376362",
+        "News Anchor": "1406115825928376364"
     }
 }
