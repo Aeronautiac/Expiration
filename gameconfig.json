@@ -24,33 +24,123 @@
         "notebook3": "1406302628450930708"
     },
 
-    "organisations": [ "Task Force", "Kira's Kingdom" ],
-
-    "abilities": {
-        "Blackout": { "cooldown": 999, "organisation": "Kira's Kingdom", "membersRequired": 5 },
-        "Public Kidnap": { "cooldown": 1, "organisation": "Kira's Kingdom", "membersRequired": 1 },
-        "Anonymous Kidnap": { "cooldown": 2, "organisation": "Kira's Kingdom", "membersRequired": 1 },
-        "2nd Kira+Kira Anonymous Kidnap": { "cooldown": 2, "organisation": "Kira's Kingdom", "rolesRequiredInOrganisation": ["2nd Kira", "Kira"] },
-        "Tap In": { "cooldown": 1, "organisation": "Kira's Kingdom", "membersRequired": 3 },
-
-        "Background Check": { "cooldown": 1, "organisation": "Task Force", "membersRequired": 3 },
-        "Civilian Arrest": { "cooldown": 1, "organisation": "Task Force", "membersRequired": 4 },
-        "Unlawful Arrest": { "cooldown": 2, "organisation": "Task Force", "membersRequired": 5 },
-        "PI+Watari Unlawful Arrest": { "cooldown": 2, "organisation": "Task Force", "rolesRequiredInOrganisation": ["PI", "Watari"] }
-    },
-
     "roleGuilds": {
         "Kira": ["kira"],
         "BB": ["bb"],
         "L": ["lwatari"],
         "Watari": ["lwatari"],
         "PI": ["pi"],
-        "2nd Kira": ["2kira"],
-        "Extra": ["tf", "kk"]
+        "2nd Kira": ["2kira"]
+    },
+
+    "groupGuilds": ["lwatari", "tf", "kk"],
+
+    "organisations": ["Task Force", "Kira's Kingdom"],
+    "organisationGuilds": {
+        "Task Force": ["tf"],
+        "Kira's Kingdom": ["kk"]
+    },
+
+    "abilities": {
+        "Blackout": {
+            "cooldown": 999,
+            "organisation": "Kira's Kingdom",
+            "membersRequired": 5
+        },
+        "Public Kidnap": {
+            "cooldown": 1,
+            "organisation": "Kira's Kingdom",
+            "membersRequired": 1
+        },
+        "Anonymous Kidnap": {
+            "cooldown": 2,
+            "organisation": "Kira's Kingdom",
+            "membersRequired": 1
+        },
+        "2nd Kira+Kira Anonymous Kidnap": {
+            "cooldown": 2,
+            "organisation": "Kira's Kingdom",
+            "rolesRequiredInOrganisation": ["2nd Kira", "Kira"]
+        },
+        "Tap In": {
+            "cooldown": 1,
+            "organisation": "Kira's Kingdom",
+            "membersRequired": 3
+        },
+
+        "Background Check": {
+            "cooldown": 1,
+            "organisation": "Task Force",
+            "membersRequired": 3
+        },
+        "Civilian Arrest": {
+            "cooldown": 1,
+            "organisation": "Task Force",
+            "membersRequired": 4
+        },
+        "Unlawful Arrest": {
+            "cooldown": 2,
+            "organisation": "Task Force",
+            "membersRequired": 5
+        },
+        "PI+Watari Unlawful Arrest": {
+            "cooldown": 2,
+            "organisation": "Task Force",
+            "rolesRequiredInOrganisation": ["PI", "Watari"]
+        }
     },
 
     "roleAbilities": {
-        
+        "autopsy": {
+            "useableBy": ["PI"],
+            "charges": 1,
+            "cooldown": 0
+        },
+        "bug": {
+            "useableBy": ["Watari"],
+            "charges": 1,
+            "cooldown": 1
+        },
+        "pseudocide": {
+            "useableBy": ["BB"],
+            "charges": [1, 2],
+            "cooldown": 1
+        },
+        "nameReveal": {
+            "useableBy": ["2nd Kira", "BB"],
+            "charges": 1,
+            "cooldown": 0
+        },
+        "notebookDetect": {
+            "useableBy": ["2nd Kira", "BB"],
+            "charges": 1,
+            "cooldown": 0
+        },
+        "underTheRadar": {
+            "useableBy": ["2nd Kira", "Kira"],
+            "charges": 1,
+            "cooldown": 999
+        },
+        "anonymousMessage": {
+            "useableBy": ["Kira", "2nd Kira", "L"],
+            "charges": 3,
+            "cooldown": 0
+        },
+        "ipp": {
+            "useableBy": ["PI"],
+            "charges": [1, 2],
+            "cooldown": 1
+        },
+        "anonymousContact": {
+            "useableBy": ["Watari", "PI"],
+            "charges": 2,
+            "cooldown": 0
+        },
+        "civilianArrest": {
+            "useableBy": ["News Anchor"],
+            "charges": 1,
+            "cooldown": 1
+        }
     },
 
     "channelIds": {

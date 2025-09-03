@@ -7,19 +7,23 @@ module.exports = {
         .setDescription("Go under the radar."),
 
     async execute(interaction) {
-        if (!(await game.canGoUtr(interaction.user))) {
-            await interaction.reply({
-                content: "You cannot use under the radar.",
-                ephemeral: true,
-            });
-            return;
-        }
-
-        await game.utr(interaction.user);
-
-        await interaction.reply({
-            content: "You are now under the radar.",
+        await interaction.deferReply({
             ephemeral: true,
         });
+
+        // do the thing here
+        const result = await game.underTheRadar(interaction);
+
+        if (result !== true) {
+            await interaction.editReply({
+                content: result,
+                ephemeral: true,
+            });
+        } else {
+            await interaction.editReply({
+                content: "Success.",
+                ephemeral: true,
+            });
+        }
     },
 };

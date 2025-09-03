@@ -66,6 +66,91 @@ async function getOrganisationData(organisationName) {
     return await Organisation.findOne({ organisation: organisationName });
 }
 
+async function genericUseRoleAbility(userId, abilityName) {
+    const playerData = await Player.findOne({ userId });
+    const season = await Season.findOne({});
+
+    if (!season) return "No season is currently active.";
+    if (!season.active) return "No season is currently active.";
+
+    if (!playerData) return "Player data not found.";
+    if (!playerData.alive) return "Player is not alive.";
+
+    const ability = gameConfig.roleAbilities[abilityName];
+    if (!ability) return "Ability not found.";
+
+    // check if the player has the role required to use the ability
+    if (!ability.useableBy.includes(playerData.role))
+        return "You do not have permission to use this ability.";
+
+    // check if the player has enough charges to use the ability today
+    if (playerData.abilityCharges.has(abilityName)) {
+        const charges = playerData.abilityCharges.get(abilityName) || 0;
+        if (charges <= 0)
+            return "You do not have enough charges to use this ability.";
+    }
+
+    // check if the ability is on cooldown
+    const cooldown = playerData.cooldowns.get(abilityName) || 0;
+    if (cooldown > 0) return "Ability is on cooldown.";
+
+    // charges
+    // find default ability number based on the current day
+    function getChargesBasedOnDay(chargeArray) {
+        // array with index 0 corresponding to season day 1 and onward. the value in this index is the number of charges available on that day and beyond.
+        // if there is no value at the index of the current day, then the value is the last index in the array.
+        const currentDay = season.day - 1;
+        return chargeArray[currentDay] || chargeArray[chargeArray.length - 1];
+    }
+
+    const defaultCharges = Array.isArray(ability.charges)
+        ? getChargesBasedOnDay(ability.charges)
+        : ability.charges;
+
+    // if their charges for this ability have not been initialized today, initialize them.
+    // if they have, then subtract 1 and clamp to 0.
+    if (!playerData.abilityCharges.has(abilityName)) {
+        playerData.abilityCharges.set(abilityName, defaultCharges - 1);
+    } else {
+        playerData.abilityCharges.set(
+            abilityName,
+            Math.max(0, playerData.abilityCharges.get(abilityName) - 1)
+        );
+    }
+
+    // add ability to abilities used today. this is used to handle cooldown logic in nextday.
+    playerData.abilitiesUsedToday.push(abilityName);
+
+    // save changes
+    await playerData.save();
+
+    return true;
+}
+
+// call at the end of a day
+async function applyRoleAbilityCooldowns() {
+    const players = await Player.find({});
+
+    for (const player of players) {
+        for (const abilityName of player.abilitiesUsedToday) {
+            const ability = gameConfig.roleAbilities[abilityName];
+            if (!ability) continue;
+
+            // apply cooldown
+            player.cooldowns.set(abilityName, ability.cooldown);
+
+            // remove ability from abilities used today
+            player.abilitiesUsedToday = player.abilitiesUsedToday.filter(
+                (name) => name !== abilityName
+            );
+
+            // remove charges from ability
+            player.abilityCharges.delete(abilityName);
+        }
+        await player.save();
+    }
+}
+
 function rawName(name) {
     return name
         .replace(/[^a-zA-Z\s]/g, "")
@@ -167,6 +252,58 @@ async function inviteToRoleGuilds(client, user) {
     }
 }
 
+async function banFromGroupGuilds(client, user) {
+    for (const guildName of gameConfig.groupGuilds) {
+        try {
+            const guild = await client.guilds.fetch(
+                gameConfig.guildIds[guildName]
+            );
+            const member = await guild.members.fetch(user.id).catch(() => null);
+            if (member) await member.ban({ reason: "lounges hidden" });
+        } catch (err) {
+            console.log("Failed to ban from group discord:", err);
+        }
+    }
+}
+
+// if L or Watari, then L and Watari discord
+// if an affiliation is present, then the discord for that affiliation
+async function getUserGroupGuilds(client, user) {
+    const guilds = [];
+    const playerData = await getPlayerData(user);
+    const affiliations = playerData.affiliations;
+
+    if (affiliations.length > 0) {
+        for (const affiliation of affiliations) {
+            const guildId = gameConfig.guildIds[affiliation];
+            if (guildId) {
+                try {
+                    const guild = await client.guilds.fetch(guildId);
+                    guilds.push(guild);
+                } catch (err) {
+                    console.log("Failed to get user group guild:", err);
+                }
+            }
+        }
+    }
+
+    return guilds;
+}
+
+async function unbanFromGroupGuilds(client, user) {
+    for (const guildName of gameConfig.groupGuilds) {
+        try {
+            const guild = await client.guilds.fetch(
+                gameConfig.guildIds[guildName]
+            );
+            const member = await guild.members.fetch(user.id).catch(() => null);
+            if (member) await member.unban({ reason: "lounges unhidden" });
+        } catch (err) {
+            console.log("Failed to unban from group discord:", err);
+        }
+    }
+}
+
 async function kickFromRoleGuilds(client, user) {
     for (const roleGuilds of Object.values(gameConfig.roleGuilds)) {
         for (const guildName of roleGuilds) {
@@ -203,7 +340,7 @@ async function hideLounges(client, user, reason) {
         }
     }
 
-    await kickFromRoleGuilds(client, user);
+    // await kickFromGroupGuilds(client, user);
 }
 
 async function unhideLounges(client, user, reason) {
@@ -485,8 +622,8 @@ async function logContact(client, loungeId, user, target, anonymous) {
     let playerData = await getPlayerData(user);
 
     // handle watari and PI anonymous contact log message
-    let userDisplay = userMember.displayName;
-    let targetDisplay = targetMember.displayName;
+    let userDisplay = strippedName(userMember.displayName);
+    let targetDisplay = strippedName(targetMember.displayName);
 
     if (playerData.role === "Watari" && anonymous) userDisplay = `@Watari`;
 
@@ -1392,57 +1529,46 @@ async function kickNotebookOwners(client) {
     }
 }
 
+async function kickPlayersFromRoleGuilds(client) {
+    const allPlayers = await Player.find({});
+
+    for (const player of allPlayers) {
+        try {
+            kickFromRoleGuilds(client, await client.users.fetch(player.userId));
+        } catch (err) {
+            console.log("Failed to kick player from role guilds:", err);
+        }
+    }
+}
+
 // cleans all game data
 // should remove everyone from death note servers
 async function cleanSlate(client) {
     await nextDay(client);
-    // must be called after nextDay
-    await kickNotebookOwners(client);
-    await clearContactLogs(client.channels);
-    await clearTemporaryChannels(client);
+    // must be called after nextDay. should not await. it is better if these are done concurrently.
+    kickPlayersFromRoleGuilds(client);
+    kickNotebookOwners(client);
+    clearContactLogs(client.channels);
+    clearTemporaryChannels(client);
     // must be called last
     await resetDatabase();
 }
 
-// returns true if the user is able to use the under the radar ability
-async function canGoUtr(user) {
-    const season = await Season.findOne({ _id: "season" });
+async function underTheRadar(interaction) {
+    const user = interaction.user;
 
-    if (!season) return false;
+    const genericUseResult = await genericUseRoleAbility(
+        user.id,
+        "underTheRadar"
+    );
+    if (genericUseResult !== true) return genericUseResult;
 
-    let playerData = await getPlayerData(user);
-
-    if (!(playerData.role === "Kira" || playerData.role === "2nd Kira"))
-        return false;
-    if (!playerData.alive) return false;
-    if (playerData.underTheRadarCharges && playerData.underTheRadarCharges <= 0)
-        return false;
-    if (playerData.underTheRadar) return false;
-
-    return true;
-}
-
-// resets all player's contact tokens to the daily token amount
-async function resetTokens() {
-    await Player.updateMany({}, { contactTokens: gameConfig.dailyTokens });
-}
-
-// uses under the radar on a player
-async function utr(user) {
-    if (!(await canGoUtr(user))) {
-        return;
-    }
-
-    const userData = await getPlayerData(user);
-    const charges = Math.max(
-        (userData.underTheRadarCharges ?? gameConfig.underTheRadarCharges) - 1,
-        0
+    await Player.findOneAndUpdate(
+        { userId: user.id },
+        { $set: { underTheRadar: true } }
     );
 
-    await updatePlayerData(user, {
-        usedUnderTheRadar: true,
-        underTheRadarCharges: charges,
-    });
+    return true;
 }
 
 // decreases all cooldown counters by 1
@@ -1548,40 +1674,6 @@ async function disableIPPs(mainGuild) {
     }
 }
 
-async function applyPseudocideCooldowns(client) {
-    const pseudosUsedToday = await Player.find({
-        pseudocideUsedToday: true,
-    });
-    for (const player of pseudosUsedToday) {
-        try {
-            const user = await client.users.fetch(player.userId);
-            await addCooldown(user, "pseudocide", 1);
-            player.pseudocideUsedToday = false;
-            player.pseudocideCharges = undefined;
-            await player.save();
-        } catch (err) {
-            console.log("Failed to update pseudocide cooldown:", err);
-        }
-    }
-}
-
-async function applyIppCooldowns(client) {
-    const ippsUsedToday = await Player.find({
-        ippUsedToday: true,
-    });
-    for (const player of ippsUsedToday) {
-        try {
-            const user = await client.users.fetch(player.userId);
-            await addCooldown(user, "ipp", 1);
-            player.ippUsedToday = false;
-            player.ippCharges = undefined;
-            await player.save();
-        } catch (err) {
-            console.log("Failed to update ipp cooldown:", err);
-        }
-    }
-}
-
 async function removeBugs(guild) {
     const buggedPlayers = await Player.find({ bugged: true });
 
@@ -1606,18 +1698,24 @@ async function removeBugs(guild) {
     }
 }
 
-// resets tokens for all player, progresses cooldowns by one day, and deactivates any abilities that should only last for a day.
+async function resetTokens() {
+    await Player.updateMany(
+        {},
+        { $set: { contactTokens: gameConfig.dailyTokens } }
+    );
+}
+
+// handles day transition logic
 async function nextDay(client) {
     const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
     await resetTokens();
     await returnNotebooks(client);
     await progressCooldowns();
+    await applyRoleAbilityCooldowns();
     await Player.updateMany({ underTheRadar: true }, { underTheRadar: false });
     await removeBugs(mainGuild);
     await disableIPPs(mainGuild);
     await resetNotebookCooldowns();
-    await applyPseudocideCooldowns(client);
-    await applyIppCooldowns(client);
     await Season.updateOne(
         { _id: "season" },
         {
@@ -1678,7 +1776,6 @@ async function clearContactLogs(channels) {
 }
 
 async function pseudocide(interaction) {
-    const season = await Season.findOne({});
     const user = interaction.user;
     const target = interaction.options.getUser("target");
     const role = interaction.options.getString("role");
@@ -1686,42 +1783,21 @@ async function pseudocide(interaction) {
     const message = interaction.options.getString("deathmessage");
     const hasNotebook = interaction.options.getBoolean("hasnotebook");
     const affiliationsString = interaction.options.getString("affiliations");
-    const userData = await getPlayerData(user);
-    const targetData = await getPlayerData(target);
 
     let affiliations = [];
     if (affiliationsString) affiliations = affiliationsString.split(", ");
 
-    if (!season) return "A season is not yet active.";
-    if (!userData) return "You do not have any data.";
-    if (!userData.alive) return "You are dead.";
+    // pseudocide specific checks
+    const targetData = await Player.findOne({ userId: target.id });
     if (!targetData) return "This user has no data.";
     if (!targetData.alive) return "This user is dead.";
     if (targetData.ipp) return "This user is under IPP.";
-    if (userData.role !== "BB") return "You are not BB.";
-    if (userData.cooldowns.get("pseudocide")) return "Pseudocide on cooldown.";
-    if (
-        userData.pseudocideCharges !== null &&
-        userData.pseudocideCharges !== undefined &&
-        userData.pseudocideCharges <= 0
-    )
-        return "You are out of pseudocides.";
 
-    if (userData.pseudocideCharges !== null)
-        await Player.updateOne(
-            { _id: userData._id },
-            { $inc: { pseudocideCharges: -1 } }
-        );
+    // generic role ability checks + usage
+    const genericUseResult = await genericUseRoleAbility(user.id, "pseudocide");
+    if (genericUseResult !== true) return genericUseResult;
 
-    if (
-        userData.pseudocideCharges === null ||
-        userData.pseudocideCharges === undefined
-    )
-        await Player.updateOne(
-            { _id: userData._id },
-            { $set: { pseudocideCharges: clamp(season.day, 1, 2) - 1 } }
-        );
-
+    // continue with pseudocide specific logic
     await killUser(interaction.client, target, null, true);
     await deathMessage(
         interaction.client,
@@ -1740,60 +1816,33 @@ async function pseudocide(interaction) {
         [target.id, targetData.role]
     );
 
-    await Player.updateOne(
-        { _id: userData._id },
-        { $set: { pseudocideUsedToday: true } }
-    );
-
     return true;
 }
 
 async function ipp(interaction) {
-    const season = await Season.findOne({});
     const user = interaction.user;
     const target = interaction.options.getUser("target");
-    const userData = await getPlayerData(user);
-    const targetData = await getPlayerData(target);
+
+    const targetData = await Player.findOne({ userId: target.id });
+    if (!targetData) return "This user has no data.";
+    if (!targetData.alive) return "This user is dead.";
+    if (targetData.ipp) return "This user is already under IPP.";
+
     const mainGuild = await interaction.client.guilds.fetch(
         gameConfig.guildIds.main
     );
-    const targetMember = await mainGuild.members.fetch(target.id);
+    const targetMember = await mainGuild.members
+        .fetch(target.id)
+        .catch(() => null);
+    if (!targetMember) return "Target is not in the main Discord server.";
 
-    if (!season) return "The season has not yet begun.";
-    if (!userData) return "You have no data.";
-    if (!userData.alive) return "You are dead.";
-    if (!targetData) return "This user has no data.";
-    if (!targetData.alive) return "This user is dead.";
-    if (userData.role !== "PI") return "You are not PI.";
-    if (userData.cooldowns.get("ipp")) return "IPP on cooldown.";
-    if (
-        userData.ippCharges !== null &&
-        userData.ippCharges !== undefined &&
-        userData.ippCharges <= 0
-    )
-        return "You are out of IPP charges.";
-
-    if (userData.ippCharges !== null)
-        await Player.updateOne(
-            { _id: userData._id },
-            { $inc: { ippCharges: -1 } }
-        );
-
-    if (userData.ippCharges === null || userData.ippCharges === undefined)
-        await Player.updateOne(
-            { _id: userData._id },
-            { $set: { ippCharges: clamp(season.day, 1, 2) - 1 } }
-        );
+    const result = await genericUseRoleAbility(user.id, "ipp");
+    if (result !== true) return result;
 
     await updatePlayerData(target, {
         ipp: true,
     });
     await targetMember.setNickname(`${targetMember.displayName} (IPP)`);
-
-    await Player.updateOne(
-        { _id: userData._id },
-        { $set: { ippUsedToday: true } }
-    );
 
     return true;
 }
@@ -1913,25 +1962,22 @@ async function resetDatabase() {
 }
 
 async function bug(interaction) {
-    const season = await Season.findOne({});
     const user = interaction.user;
     const target = interaction.options.getUser("target");
-    const userData = await getPlayerData(user);
-    const targetData = await getPlayerData(target);
+    const targetData = await Player.findOne({ userId: target.id });
+
+    if (!targetData) return "This user has no data.";
+    if (!targetData.alive) return "This user is dead.";
+
+    const genericUseResult = await genericUseRoleAbility(user.id, "bug");
+    if (genericUseResult !== true) return genericUseResult;
+
     const mainGuild = await interaction.client.guilds.fetch(
         gameConfig.guildIds.main
     );
-    const targetMember = await mainGuild.members.fetch(target.id);
-
-    if (!season) return "The season has not yet begun.";
-    if (!userData) return "You have no data.";
-    if (!userData.alive) return "You are dead.";
-    if (!targetData) return "This user has no data.";
-    if (!targetData.alive) return "This user is dead.";
-    if (userData.role !== "Watari") return "You are not Watari.";
-    if (userData.cooldowns.get("bug")) return "Bug on cooldown.";
-
-    await addCooldown(user, "bug", 2);
+    const targetMember = await mainGuild.members
+        .fetch(target.id)
+        .catch(() => null);
 
     // notify user that they have been bugged
     try {
@@ -1940,11 +1986,12 @@ async function bug(interaction) {
         console.log("Failed to notify user of bug.", err);
     }
 
-    await updatePlayerData(target, {
-        bugged: true,
-    });
+    await Player.findOneAndUpdate(
+        { userId: target.id },
+        { $set: { bugged: true } }
+    );
 
-    // Function to insert '*' before any parenthetical suffix (chatgpt generated)
+    // function to insert '*' before any parenthetical suffix (chatgpt generated)
     function addBugAsterisk(displayName) {
         if (displayName.includes("*")) return displayName; // prevent double asterisk
         const match = displayName.match(/\s\([^)]+\)$/);
@@ -1955,91 +2002,90 @@ async function bug(interaction) {
         }
     }
 
-    const newNickname = addBugAsterisk(targetMember.displayName);
-    await targetMember.setNickname(newNickname);
+    if (targetMember) {
+        const newNickname = addBugAsterisk(targetMember.displayName);
+        await targetMember.setNickname(newNickname);
+    }
 
     return true;
 }
 
-async function fetchAllMessages(channel, predicate = () => true) {
+async function fetchAllMessages(
+    channel,
+    earliestTimestamp,
+    predicate = () => true
+) {
     let allMessages = [];
     let lastId;
+    let done = false;
 
-    while (true) {
+    while (!done) {
         const options = { limit: 100 };
-        if (lastId) {
-            options.before = lastId;
-        }
+        if (lastId) options.before = lastId;
 
         const messages = await channel.messages.fetch(options);
-
-        if (messages.size === 0) {
-            break; // no more messages
-        }
+        if (messages.size === 0) break;
 
         for (const msg of messages.values()) {
+            if (msg.createdTimestamp < earliestTimestamp) {
+                done = true; // all remaining messages are too old
+                break;
+            }
             if (predicate(msg)) allMessages.push(msg);
         }
 
-        lastId = messages.last().id; // move the cursor back
+        lastId = messages.last().id;
     }
 
     return allMessages;
 }
 
-// just search through all loggable channels and then order based on time from oldest to newest
-// then, send the messages to autopsy logs
+// later, optimize by combining all messages that can be safely combined into once and separating with newline.
+// if a message contains an embed or attachment, then it cannot be combined.
+// currently there is a bug where if the message is too long, then it will not be sent. (fix by designing the system mentioned above)
+// [LET ME DO THIS KINDER. IT IS A SLIGHTLY FUN PUZZLE!!! I DO NOT WANT TO USE AI FOR IT.]
 async function autopsy(interaction) {
-    const season = await Season.findOne({});
     const user = interaction.user;
     const target = interaction.options.getUser("target");
-    const userData = await getPlayerData(user);
-    const targetData = await getPlayerData(target);
+    const targetData = await Player.findOne({ userId: target.id });
+    const season = await Season.findOne({});
 
-    if (!season) return "The season has not yet begun.";
-    if (!userData) return "You have no data.";
-    if (!userData.alive) return "You are dead.";
     if (!targetData) return "This user has no data.";
     if (targetData.alive) return "This user is not dead.";
-    if (userData.role !== "PI") return "You are not the PI.";
-    if (userData.cooldowns.get("autopsy")) return "Autopsy on cooldown.";
 
-    await addCooldown(user, "autopsy", 1);
+    const genericUseResult = await genericUseRoleAbility(user.id, "autopsy");
+    if (genericUseResult !== true) return genericUseResult;
 
     const timeOfDeath = targetData.timeOfDeath;
-    const hrs3 = hrsToMs(3);
     const autopsyLogs = await interaction.client.channels.fetch(
         gameConfig.channelIds.autopsyLogs
     );
 
-    let allMessages = [];
-    for (const channelId of season.messageLoggedChannels) {
-        const channel = await interaction.client.channels
-            .fetch(channelId)
-            .catch(() => null);
-        if (!channel) continue;
-        const channelMessages = await fetchAllMessages(channel, (msg) => {
-            const timeSinceSent = Math.max(
-                0,
-                timeOfDeath - msg.createdTimestamp
+    // fetch all messages after and including earliest
+    const earliest = timeOfDeath - hrsToMs(3);
+    const allMessagesArrays = await Promise.all(
+        season.messageLoggedChannels.map(async (channelId) => {
+            const channel = await interaction.client.channels
+                .fetch(channelId)
+                .catch(() => null);
+            if (!channel) return [];
+            return fetchAllMessages(
+                channel,
+                earliest,
+                (msg) => msg.author.id === target.id
             );
-            return timeSinceSent <= hrs3;
-        });
-        allMessages.push(...channelMessages);
-    }
-
-    // remove messages that are not sent by the person being autopsied
-    allMessages = allMessages.filter(
-        (message) => message.author.id === target.id
+        })
     );
+    const allMessages = allMessagesArrays.flat();
 
     // sort in ascending order based on timestamp
     allMessages.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
 
     // send autopsy notifier
-    await autopsyLogs.send({
-        content: `=====================================\nAutopsy logs for ${target}:`,
+    const beginMessage = await autopsyLogs.send({
+        content: `Autopsy logs for ${target}:`,
     });
+    await beginMessage.pin().catch(console.error);
 
     // send all messages in autopsy logs
     for (const message of allMessages) {
@@ -2056,8 +2102,24 @@ async function autopsy(interaction) {
     }
 
     await autopsyLogs.send({
-        content: "=====================================",
+        content:
+            "==========================<END OF AUTOPSY>==========================",
     });
+
+    return true;
+}
+
+// the ability
+async function anonymousAnnouncement(interaction) {
+    const message = interaction.options.getString("message");
+
+    const genericUseResult = await genericUseRoleAbility(
+        interaction.user.id,
+        "anonymousMessage"
+    );
+    if (genericUseResult !== true) return genericUseResult;
+
+    await announce(interaction.client, `@everyone "${message}"`);
 
     return true;
 }
@@ -2290,6 +2352,93 @@ async function kidnapRelease(client, kidnapDocId) {
     await KidnapLounge.deleteOne({ _id: kidnapDocId });
 }
 
+async function nameReveal(interaction) {
+    const target = interaction.options.getUser("target");
+    const user = interaction.user;
+    const targetData = await Player.findOne({ userId: target.id });
+    const userData = await Player.findOne({ userId: user.id });
+
+    if (!targetData) return "This player has no data.";
+    if (!targetData.alive) return "This player is dead.";
+    if (userData.role === "BB" && userData.eyes <= 0)
+        return "You no longer possess shinigami eyes.";
+
+    const genericUseResult = await genericUseRoleAbility(
+        interaction.user.id,
+        "nameReveal"
+    );
+    if (genericUseResult !== true) return genericUseResult;
+
+    await interaction.user.send(
+        `The true name of ${target} is **${targetData.trueName}**.`
+    );
+
+    return true;
+}
+
+async function notebookReveal(interaction) {
+    const target = interaction.options.getUser("target");
+    const user = interaction.user;
+    const targetData = await Player.findOne({ userId: target.id });
+    const userData = await Player.findOne({ userId: user.id });
+
+    if (!targetData) return "This player has no data.";
+    if (!targetData.alive) return "This player is dead.";
+    if (userData.role === "BB" && userData.eyes <= 0)
+        return "You no longer possess shinigami eyes.";
+
+    const genericUseResult = await genericUseRoleAbility(
+        user.id,
+        "notebookDetect"
+    );
+    if (genericUseResult !== true) return genericUseResult;
+
+    // need to check if the target is currently holding a notebook. for all notebooks which they are the currentOwner of,
+    // check if there is a temporary owner. if there is a temporary owner, they do not hold that notebook.
+    // also, if the target is the temporary owner of any notebook, then they currently hold a notebook.
+    const temporaryOwner = await Notebook.findOne({
+        temporaryOwner: target.id,
+    });
+
+    let notebooksNotPassed = 0;
+    const notebooksOwned = await Notebook.find({ currentOwner: target.id });
+    for (const notebook of notebooksOwned) {
+        // if temporary owner, target does not hold this notebook
+        if (notebook.temporaryOwner) {
+            continue;
+        }
+        // else, they do hold the notebook
+        notebooksNotPassed++;
+    }
+
+    if (temporaryOwner || notebooksNotPassed > 0) {
+        await interaction.user.send(
+            `${target} currently possesses a notebook.`
+        );
+    } else {
+        if (userData.role === "BB")
+            await Player.updateOne({ userId: user.id }, { $inc: { eyes: -1 } });
+        await interaction.user.send(
+            `${target} does not currently possess a notebook.`
+        );
+    }
+
+    return true;
+}
+
+async function eyes(interaction) {
+    const useFor = interaction.options.getString("usefor");
+
+    let result = true;
+    if (useFor === "name") {
+        result = await nameReveal(interaction);
+    } else if (useFor === "notebook") {
+        result = await notebookReveal(interaction);
+    }
+
+    return result;
+}
+
 const namesToCallbacks = {
     onPseudocideRevival: onPseudocideRevival,
     scheduledDeath: onScheduledKill,
@@ -2389,12 +2538,11 @@ module.exports = {
     nextDay,
     startBlackout,
     stopBlackout,
-    utr,
+    underTheRadar,
     getPlayerData,
     getOrganisationData,
     updatePlayerData,
     updateOrganisationData,
-    canGoUtr,
     newSeason,
     closeLounge,
     hideLounges,
@@ -2421,4 +2569,6 @@ module.exports = {
     strippedName,
     kidnap,
     earlyKidnapRelease,
+    anonymousAnnouncement,
+    eyes,
 };

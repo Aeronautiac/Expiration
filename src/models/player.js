@@ -19,6 +19,11 @@ const playerSchema = new mongoose.Schema({
     loungeHideReasons: { type: [String], required: true },
     affiliations: { type: [String], required: true },
     notebookRestrictReasons: { type: [String], required: true },
+
+    // role ability system
+    abilitiesUsedToday: { type: [String], required: true, default: [] },
+    abilityCharges: { type: Map, of: Number, default: {}, required: true },
+
     bugged: Boolean,
     timeOfDeath: Number,
 
@@ -33,6 +38,7 @@ const playerSchema = new mongoose.Schema({
     // BB
     pseudocideCharges: Number,
     pseudocideUsedToday: Boolean,
+    eyes: { type: Number, required: true, default: 2 },
 
     // PI
     ippCharges: Number,
