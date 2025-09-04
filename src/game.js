@@ -63,6 +63,161 @@ async function getPlayerData(user) {
     return await Player.findOne({ userId: user.id });
 }
 
+// invite system
+
+// grants a user access to a guild.
+async function grantAccess(user, guild) {
+    const userId = user.id;
+    const guildId = guild.id;
+    const invitePrefix = `https://discord.gg/`;
+
+    // we need player data to handle this. if there is no player data, return false.
+    const playerData = await Player.findOne({ userId });
+    if (!playerData) return "Player has no data. Cannot grant access to guild.";
+
+    async function sendInvite(code) {
+        try {
+            await user.send(`${invitePrefix}${code}`);
+        } catch (err) {
+            console.log("Failed to send guild invite to user.", err);
+        }
+    }
+
+    // check if the player already has access
+    if (playerData.invites.has(guildId)) {
+        // const code = playerData.invites.get(guildId);
+        // await sendInvite(code);
+        return true; // already has access
+    }
+
+    // check if the guildId is valid
+    if (!Object.values(gameConfig.guildIds).includes(guildId))
+        return "Invalid guild ID.";
+    if (guildId === gameConfig.guildIds.main)
+        return "Cannot grant access to the main guild.";
+
+    // create and add the invite to their data
+    const channels = await guild.channels.fetch().catch(() => new Map());
+    const channel =
+        guild.systemChannel ||
+        [...channels.values()].find(
+            (c) =>
+                c.isTextBased() &&
+                c.permissionsFor(guild.members.me).has("CreateInstantInvite")
+        );
+
+    if (!channel)
+        return `Cannot create guild invite in ${guild.name}. No suitable channel or invalid permissions.`;
+
+    // if they were banned, unban them
+    const banned = await guild.bans.fetch(userId).catch(() => null);
+    if (banned)
+        await guild.bans.remove(userId, "granting access").catch(() => {});
+
+    const invite = await channel.createInvite({
+        maxUses: 1,
+        unique: true,
+    });
+
+    playerData.invites.set(guildId, invite.code);
+    await playerData.save();
+
+    await sendInvite(invite.code);
+
+    return true;
+}
+
+// restricts access to a server by banning the player and deleting their invite if they have one
+async function revokeAccess(user, guild) {
+    const userId = user.id;
+    const guildId = guild.id;
+
+    // we need player data to handle this. if there is no player data, return false.
+    const playerData = await Player.findOne({ userId });
+    if (!playerData)
+        return "Player has no data. Cannot revoke access to guild.";
+
+    // remove the invite from their data and delete the invite
+    const inviteCode = playerData.invites.get(guildId);
+    if (inviteCode) {
+        const invite = await guild.invites.fetch(inviteCode).catch(() => null);
+        if (invite) await invite.delete("revoking access");
+    }
+    playerData.invites.delete(guildId);
+    await playerData.save();
+
+    // ban the player from the guild
+    await guild.bans.add(userId, { reason: "revoking access" }).catch(() => {});
+
+    return true;
+}
+
+// restricts access from all game guilds except main
+async function restrictGuildAccess(client, user) {
+    for (const guildId of Object.values(gameConfig.guildIds)) {
+        if (guildId === gameConfig.guildIds.main) continue;
+        const guild = await client.guilds.fetch(guildId).catch(() => null);
+        if (guild) await revokeAccess(user, guild);
+    }
+}
+
+// grants access to role guilds based on the player's role
+async function grantRoleGuildAccess(client, user) {
+    const playerData = await Player.findOne({ userId: user.id });
+    if (!playerData) return;
+
+    const role = playerData.role;
+    const guildsToGrant = gameConfig.roleGuilds[role] || [];
+
+    for (const guildId of guildsToGrant) {
+        const guild = await client.guilds.fetch(guildId).catch(() => null);
+        if (guild) await grantAccess(user, guild);
+    }
+}
+
+// restricts access from all group guilds
+async function restrictGroupGuildAccess(client, user) {
+    for (const guildName of gameConfig.groupGuilds) {
+        const guildId = gameConfig.guildIds[guildName];
+        const guild = await client.guilds.fetch(guildId).catch(() => null);
+        if (guild) await revokeAccess(user, guild);
+    }
+}
+
+// grants access to all group guilds that the player should have access to based on their affiliations and roles
+async function grantGroupGuildAccess(client, user) {
+    const playerData = await Player.findOne({ userId: user.id });
+    if (!playerData) return;
+
+    const guildsToGrant = new Set();
+
+    // add affiliation guilds
+    const affiliations = playerData.affiliations || [];
+    for (const affiliation of affiliations) {
+        const orgGuilds = gameConfig.affiliationGuilds[affiliation] || [];
+        for (const guildName of orgGuilds) {
+            guildsToGrant.add(guildName);
+        }
+    }
+
+    // add any role guilds that are also group guilds
+    const role = playerData.role;
+    const roleGuilds = gameConfig.roleGuilds[role] || [];
+    for (const guildName of roleGuilds) {
+        if (gameConfig.groupGuilds.includes(guildName)) {
+            guildsToGrant.add(guildName);
+        }
+    }
+
+    for (const guildName of guildsToGrant) {
+        const guildId = gameConfig.guildIds[guildName];
+        const guild = await client.guilds.fetch(guildId).catch(() => null);
+        if (guild) await grantAccess(user, guild);
+    }
+}
+
+//
+
 async function getOrganisationData(organisationName) {
     return await Organisation.findOne({ organisation: organisationName });
 }
@@ -207,23 +362,22 @@ function minToMs(min) {
 
 // creates a player's data if there is none, gives the player the role specified, and revives them if they were dead
 // also returns their notebooks if they owned any and their notebooks were not taken from them
+// bans from all guilds except main. Unbans and invites to role guilds.
 async function role(client, targetUser, role) {
     let playerData = await getPlayerData(targetUser);
-
     if (!playerData) {
+        // const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
         const name = await getRandomName();
+        // const monologueChannel = await createLoungeChannel(mainGuild, `${targetUser.username}-monologue`, "monologue", [targetUser]);
 
         playerData = await Player.create({
             userId: targetUser.id,
             role: role,
             alive: true,
-            lounges: [],
             contactTokens: gameConfig.dailyTokens,
             kills: 0,
             trueName: rawName(name),
-            loungeHideReasons: [],
-            affiliations: [],
-            notebookRestrictReasons: [],
+            // monologueChannelId: monologueChannel.id,
         });
 
         targetUser.send(`Your true name is ${readableName(name)}`);
@@ -247,6 +401,12 @@ async function role(client, targetUser, role) {
         }
     }
 
+    // restricts access to all guilds except main (this is called no matter what because your role could change even while alive.)
+    await restrictGuildAccess(client, targetUser);
+
+    // grants access to role guilds
+    await grantRoleGuildAccess(client, targetUser);
+
     await unhideLounges(client, targetUser, "dead");
 
     // roles
@@ -255,96 +415,16 @@ async function role(client, targetUser, role) {
         .fetch(targetUser.id)
         .catch(() => null);
     if (member) {
-        // no need to await here
-        member.roles.add(gameConfig.roleIds.Civilian);
-        member.roles.remove(gameConfig.roleIds.Shinigami);
+        await member.roles
+            .add(gameConfig.roleIds.Civilian)
+            .catch(console.error);
+        await member.roles
+            .remove(gameConfig.roleIds.Shinigami)
+            .catch(console.error);
     }
 }
 
-async function inviteToRoleGuilds(client, user) {
-    const userData = await getPlayerData(user);
-    if (!(userData.role in gameConfig.roleGuilds)) return;
-    for (const guildName of gameConfig.roleGuilds[userData.role]) {
-        const guildId = gameConfig.guildIds[guildName];
-        try {
-            const guild = await client.guilds.fetch(guildId);
-            await inviteToGuild(client, guild, user.id);
-        } catch (err) {
-            console.log("Failed to invite to role guild:", err);
-        }
-    }
-}
-
-async function banFromGroupGuilds(client, user) {
-    for (const guildName of gameConfig.groupGuilds) {
-        try {
-            const guild = await client.guilds.fetch(
-                gameConfig.guildIds[guildName]
-            );
-            const member = await guild.members.fetch(user.id).catch(() => null);
-            if (member) await member.ban({ reason: "lounges hidden" });
-        } catch (err) {
-            console.log("Failed to ban from group discord:", err);
-        }
-    }
-}
-
-// if L or Watari, then L and Watari discord
-// if an affiliation is present, then the discord for that affiliation
-async function getUserGroupGuilds(client, user) {
-    const guilds = [];
-    const playerData = await getPlayerData(user);
-    const affiliations = playerData.affiliations;
-
-    if (affiliations.length > 0) {
-        for (const affiliation of affiliations) {
-            const guildId = gameConfig.guildIds[affiliation];
-            if (guildId) {
-                try {
-                    const guild = await client.guilds.fetch(guildId);
-                    guilds.push(guild);
-                } catch (err) {
-                    console.log("Failed to get user group guild:", err);
-                }
-            }
-        }
-    }
-
-    return guilds;
-}
-
-async function unbanFromGroupGuilds(client, user) {
-    for (const guildName of gameConfig.groupGuilds) {
-        try {
-            const guild = await client.guilds.fetch(
-                gameConfig.guildIds[guildName]
-            );
-            const member = await guild.members.fetch(user.id).catch(() => null);
-            if (member) await member.unban({ reason: "lounges unhidden" });
-        } catch (err) {
-            console.log("Failed to unban from group discord:", err);
-        }
-    }
-}
-
-async function kickFromRoleGuilds(client, user) {
-    for (const roleGuilds of Object.values(gameConfig.roleGuilds)) {
-        for (const guildName of roleGuilds) {
-            try {
-                const guild = await client.guilds.fetch(
-                    gameConfig.guildIds[guildName]
-                );
-                const member = await guild.members
-                    .fetch(user.id)
-                    .catch(() => null);
-                if (member) await member.kick("lounges hidden");
-            } catch (err) {
-                console.log("Failed to kick from role discord:", err);
-            }
-        }
-    }
-}
-
+// hides lounges from a player and restricts access to any group guilds.
 async function hideLounges(client, user, reason) {
     var playerData = await getPlayerData(user);
 
@@ -363,9 +443,10 @@ async function hideLounges(client, user, reason) {
         }
     }
 
-    // await kickFromGroupGuilds(client, user);
+    await restrictGroupGuildAccess(client, user);
 }
 
+// unhides lounges from a player if they have no more hide reasons and grants access to group guilds that they should have access to.
 async function unhideLounges(client, user, reason) {
     const channels = client.channels;
     var playerData = await getPlayerData(user);
@@ -376,18 +457,17 @@ async function unhideLounges(client, user, reason) {
         }),
     });
 
-    if (playerData.loungeHideReasons.length === 0) {
-        for (const loungeId of playerData.loungeChannelIds) {
-            const lounge = await channels.fetch(loungeId);
-            if (!lounge) continue;
+    if (playerData.loungeHideReasons.length > 0) return;
 
-            await lounge.permissionOverwrites.edit(user.id, {
-                ViewChannel: true,
-            });
-        }
+    for (const loungeId of playerData.loungeChannelIds) {
+        const lounge = await channels.fetch(loungeId);
+        if (!lounge) continue;
+
+        await lounge.permissionOverwrites.edit(user.id, {
+            ViewChannel: true,
+        });
     }
-
-    await inviteToRoleGuilds(client, user);
+    await grantGroupGuildAccess(client, user);
 }
 
 async function deathMessage(
@@ -402,13 +482,15 @@ async function deathMessage(
     const readablename = readableName(trueName);
     const targetData = await getPlayerData(user);
     const affiliations = affiliatiated ?? targetData.affiliations;
-    
+
     const news = await client.channels.fetch(gameConfig.channelIds.news);
 
     const deathReason = message ?? `They died from a sudden heart attack`;
 
     // Compose the base death message
-    let output = `@everyone ${user} (${readableName(trueName)}) has died. ${deathReason}.`;
+    let output = `@everyone ${user} (${readableName(
+        trueName
+    )}) has died. ${deathReason}.`;
 
     // Send the initial death message
     const deathMsg = await news.send({
@@ -450,8 +532,8 @@ async function deathMessage(
     }
     revealMsg += roleMention(roleName);
 
-    const chiefs = affiliations.filter(a => a.endsWith("Chief"));
-    const orgs = affiliations.filter(a => !a.endsWith("Chief"));
+    const chiefs = affiliations.filter((a) => a.endsWith("Chief"));
+    const orgs = affiliations.filter((a) => !a.endsWith("Chief"));
 
     if (orgs.length === 1 && chiefs.length === 0) {
         // Single org, not chief
@@ -459,19 +541,31 @@ async function deathMessage(
     } else if (orgs.length > 1 && chiefs.length === 0) {
         // Multiple orgs, not chief
         const mentions = orgs.map(orgMention);
-        revealMsg += ` and members of the ${mentions.slice(0, -1).join(", ")} and ${mentions.slice(-1)}.`;
-    } else if (orgs.length === 1 && chiefs.length === 1 && chiefs[0].startsWith(orgs[0])) {
+        revealMsg += ` and members of the ${mentions
+            .slice(0, -1)
+            .join(", ")} and ${mentions.slice(-1)}.`;
+    } else if (
+        orgs.length === 1 &&
+        chiefs.length === 1 &&
+        chiefs[0].startsWith(orgs[0])
+    ) {
         // Chief of their only org
         const chiefOrg = orgs[0];
-        revealMsg += ` and the chief of the ${orgMention(chiefOrg)}. Now no new members may join the ${orgMention(chiefOrg)}.`;
+        revealMsg += ` and the chief of the ${orgMention(
+            chiefOrg
+        )}. Now no new members may join the ${orgMention(chiefOrg)}.`;
     } else if (orgs.length > 0 && chiefs.length > 0) {
         // Member of orgs and also chief(s)
         const mentions = orgs.map(orgMention);
-        let msg = ` and members of the ${mentions.slice(0, -1).join(", ")}${orgs.length > 1 ? " and " : ""}${mentions.slice(-1)}.`;
+        let msg = ` and members of the ${mentions.slice(0, -1).join(", ")}${
+            orgs.length > 1 ? " and " : ""
+        }${mentions.slice(-1)}.`;
         // List all chief roles
         for (const chief of chiefs) {
             const chiefOrg = chief.replace(/ Chief$/, "");
-            msg += ` They were also the chief of the ${orgMention(chiefOrg)}. Now no new members may join the ${orgMention(chiefOrg)}.`;
+            msg += ` They were also the chief of the ${orgMention(
+                chiefOrg
+            )}. Now no new members may join the ${orgMention(chiefOrg)}.`;
         }
         revealMsg += msg;
     }
@@ -486,7 +580,7 @@ async function deathMessage(
     if (hasNotebook) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
         await deathMsg.reply({
-            content: `Whoever is responsible has gained possession of their death note(s).`
+            content: `Whoever is responsible has gained possession of their death note(s).`,
         });
     }
 }
@@ -1333,36 +1427,9 @@ async function onPlayerKillPlayer(client, idKiller, idVictim) {
     }
 }
 
-async function inviteToGuild(client, guild, userId) {
-    await deleteAllInvites(guild);
-
-    const user = await client.users.fetch(userId);
-
-    // Fetch all channels from Discord
-    const channels = await guild.channels.fetch();
-
-    // Find the channel by name
-    const channel = channels.find(
-        (ch) =>
-            ch.isTextBased() &&
-            ch.permissionsFor(guild.members.me)?.has("CreateInstantInvite")
-    );
-
-    const invite = await channel.createInvite({
-        maxAge: 0,
-        maxUses: 1,
-        reason: "Gained notebook access.",
-    });
-
-    await user.send(invite.url);
-}
-
 // if guild is not a notebook yet, this function creates a new notebook and sets the current and original owner to owner.
 // if guild is already a notebook, the notebook's current owner is updated to the next owner.
-// in both cases, if the owner did not have access to the notebook yet, then they are invited to the guild.
-// if a notebook owner loses access, then they are kicked from the guild.
-// make sure to destroy all invites before any new invites are created. people might save invites.
-// also kick everyone at the end of a season. (not handled by this function)
+// grants and revokes guild access as necessary.
 // if temporary is true, then instead of current owner being changed, temporary owner is changed. notebooks with temporary owners
 // are sent back to their current owners when the next day begins.
 async function setNotebook(client, guild, ownerid, temporary) {
@@ -1373,56 +1440,38 @@ async function setNotebook(client, guild, ownerid, temporary) {
             existingBook.temporaryOwner ?? existingBook.currentOwner;
         const newHolder = ownerid;
 
+        const currentHolderUser = await client.users.fetch(currentHolder);
+        const newHolderUser = await client.users.fetch(newHolder);
+
+        // if the current holder and new holder are the same, do nothing
+        if (currentHolder === newHolder) return;
+
         // if temporary, change the temporary owner field, otherwise, change current owner
         if (temporary) {
-            await Notebook.updateOne(
+            await Notebook.findOneAndUpdate(
                 { _id: existingBook._id },
                 { $set: { temporaryOwner: ownerid } }
             );
         } else {
             if (existingBook.currentOwner !== ownerid)
-                await Notebook.updateOne(
+                await Notebook.findOneAndUpdate(
                     { _id: existingBook._id },
                     { $set: { currentOwner: ownerid } }
                 );
         }
 
-        // if the person holding the notebook, changed, kick the old and invite the new
+        // if the person holding the notebook, changed, revoke access from the old and grant to the new.
         if (newHolder !== currentHolder) {
-            // kick old owner
-            try {
-                const oldOwnerMember = await guild.members
-                    .fetch(currentHolder)
-                    .catch(() => null);
-                if (oldOwnerMember)
-                    await oldOwnerMember.kick("No longer possesses notebook.");
-            } catch (err) {
-                console.log("Kick failed:", err);
-            }
-
-            // invite new owner
-            try {
-                await inviteToGuild(client, guild, ownerid);
-            } catch (err) {
-                console.log("Failed to invite user:", err);
-            }
+            await revokeAccess(currentHolderUser, guild);
+            await grantAccess(newHolderUser, guild);
         }
 
         // if the notebook was being held temporarily before the posession change, then remove the temporary owner field
         if (existingBook.temporaryOwner && !temporary) {
-            await Notebook.updateOne(
+            await Notebook.findOneAndUpdate(
                 { _id: existingBook._id },
                 { $unset: { temporaryOwner: "" } }
             );
-        }
-
-        // if the owner didn't change but they're not in the server, then invite them back.
-        if (currentHolder === newHolder && !existingBook.temporaryOwner) {
-            try {
-                await inviteToGuild(client, guild, ownerid);
-            } catch (err) {
-                console.log("Failed to invite user:", err);
-            }
         }
 
         return;
@@ -1435,7 +1484,8 @@ async function setNotebook(client, guild, ownerid, temporary) {
         originalOwner: ownerid,
     });
 
-    await inviteToGuild(client, guild, ownerid);
+    const ownerUser = await client.users.fetch(ownerid);
+    await grantAccess(ownerUser, guild);
 }
 
 async function handlePlayerKill(client, killerId, targetId, message) {
@@ -1666,24 +1716,11 @@ async function kickNotebookOwners(client) {
     }
 }
 
-async function kickPlayersFromRoleGuilds(client) {
-    const allPlayers = await Player.find({});
-
-    for (const player of allPlayers) {
-        try {
-            kickFromRoleGuilds(client, await client.users.fetch(player.userId));
-        } catch (err) {
-            console.log("Failed to kick player from role guilds:", err);
-        }
-    }
-}
-
 // cleans all game data
 // should remove everyone from death note servers
 async function cleanSlate(client) {
     await nextDay(client);
     // must be called after nextDay. should not await. it is better if these are done concurrently.
-    kickPlayersFromRoleGuilds(client);
     kickNotebookOwners(client);
     clearContactLogs(client.channels);
     clearTemporaryChannels(client);
@@ -2020,7 +2057,9 @@ async function removeAffiliation(user, affiliation) {
     if (!userData.affiliations.includes(affiliation))
         return "User does not have this affiliation.";
 
-    userData.affiliations = userData.affiliations.filter((aff) => aff !== affiliation);
+    userData.affiliations = userData.affiliations.filter(
+        (aff) => aff !== affiliation
+    );
     await userData.save();
 
     return true;
@@ -2266,7 +2305,9 @@ async function autopsy(interaction) {
     );
 
     // sort in ascending order based on timestamp
-    const allMessages = allMessagesArrays.flat().sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+    const allMessages = allMessagesArrays
+        .flat()
+        .sort((a, b) => a.createdTimestamp - b.createdTimestamp);
 
     let currentBlock = [];
     const CHUNK_LIMIT = 2000;
@@ -2309,10 +2350,8 @@ async function autopsy(interaction) {
     // send all messages in autopsy logs
     for (const msg of allMessages) {
         // Format line with timestamp
-        const timestamp = `<t:${Math.floor(
-            msg.createdTimestamp / 1000
-        )}>`;
-      
+        const timestamp = `<t:${Math.floor(msg.createdTimestamp / 1000)}>`;
+
         // Check for image attachments without links (if an img is sent without a link, the bot sends an empty string as a log)
         let imageLinks = [];
         if (msg.attachments && msg.attachments.size > 0) {
@@ -2329,9 +2368,7 @@ async function autopsy(interaction) {
 
         let msgContent = msg.content;
         if (imageLinks.length > 0) {
-            msgContent +=
-                (msgContent ? "\n" : "") +
-                imageLinks.join("\n");
+            msgContent += (msgContent ? "\n" : "") + imageLinks.join("\n");
         }
 
         const line = `[${timestamp}] "${msgContent}"`;

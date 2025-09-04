@@ -38,8 +38,14 @@
         "2nd Kira": ["2kira"]
     },
 
-    "possibleAffiliations": [ "Task Force", "Kira's Kingdom", "Task Force Chief" ],
+    "affiliationGuilds": {
+        "Kira's Kingdom": ["kk"],
+        "Task Force": ["tf"]
+    },
+
     "groupGuilds": ["lwatari", "tf", "kk"],
+
+    "possibleAffiliations": [ "Task Force", "Kira's Kingdom", "Task Force Chief" ],
 
     "organisations": ["Task Force", "Kira's Kingdom"],
     "organisationGuilds": {

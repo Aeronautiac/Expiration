@@ -6,8 +6,9 @@ const playerSchema = new mongoose.Schema({
     trueName: { type: String, required: true, unique: true },
     role: { type: String, required: true },
     alive: { type: Boolean, required: true },
-    loungeChannelIds: { type: [String], required: true }, // stores lounge ids
-    contactTokens: { type: Number, required: true },
+    loungeChannelIds: { type: [String], required: true, default: [] }, // stores lounge ids
+    contactTokens: { type: Number, required: true  },
+    // monologueChannelId: { type: String, required: true },
     monologueChannelId: String,
     cooldowns: {
         type: Map,
@@ -15,10 +16,10 @@ const playerSchema = new mongoose.Schema({
         default: {},
         required: true,
     },
-    kills: { type: Number, required: true },
-    loungeHideReasons: { type: [String], required: true },
-    affiliations: { type: [String], required: true },
-    notebookRestrictReasons: { type: [String], required: true },
+    kills: { type: Number, required: true, default: 0 },
+    loungeHideReasons: { type: [String], required: true, default: [] },
+    affiliations: { type: [String], required: true, default: [] },
+    notebookRestrictReasons: { type: [String], required: true, default: [] },
 
     // role ability system
     abilitiesUsedToday: { type: [String], required: true, default: [] },
@@ -43,6 +44,9 @@ const playerSchema = new mongoose.Schema({
     // PI
     ippCharges: Number,
     ippUsedToday: Boolean,
+
+    // server management stuff
+    invites: { type: Map, of: String, required: true, default: {} },
 });
 
 const Player = mongoose.model("player", playerSchema);
