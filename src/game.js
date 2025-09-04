@@ -773,7 +773,7 @@ async function createTemporaryChannel(
 
     if (guild.id === gameConfig.guildIds.main) {
         permissionOverwrites.push({
-            id: gameConfig.roleIds.spec,
+            id: gameConfig.roleIds.Spectator,
             allow: [PermissionsBitField.Flags.ViewChannel],
         });
     }
