@@ -8,6 +8,8 @@ const organisationSchema = new mongoose.Schema({
         default: {},
         required: true,
     },
+    originalMembers: { type: [String], default: [] },
+    // members: { type: [String], default: [] },
     leader: String,
 });
 

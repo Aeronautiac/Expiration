@@ -7,6 +7,7 @@ const {
 } = require("discord.js");
 const { mongoose } = require("./mongoose");
 const Player = require("./models/player");
+const Ability = require("./models/ability");
 const Lounge = require("./models/lounge");
 const Season = require("./models/season");
 const BugLog = require("./models/bugLog");
@@ -72,7 +73,7 @@ async function grantAccess(user, guild) {
     const invitePrefix = `https://discord.gg/`;
 
     // we need player data to handle this. if there is no player data, return false.
-    const playerData = await Player.findOne({ userId });
+    const playerData = await Player.findOne({ userId: user.id });
     if (!playerData) return "Player has no data. Cannot grant access to guild.";
 
     async function sendInvite(code) {
@@ -110,9 +111,13 @@ async function grantAccess(user, guild) {
         return `Cannot create guild invite in ${guild.name}. No suitable channel or invalid permissions.`;
 
     // if they were banned, unban them
-    const banned = await guild.bans.fetch(userId).catch(() => null);
-    if (banned)
-        await guild.bans.remove(userId, "granting access").catch(() => {});
+    const ban = await guild.bans.fetch(userId).catch(() => null);
+    if (!ban) {
+        console.log(`User ${userId} is not banned, skipping unban.`);
+    } else {
+        await guild.bans.remove(userId);
+        console.log(`Unbanned user ${userId}`);
+    }
 
     const invite = await channel.createInvite({
         maxUses: 1,
@@ -147,7 +152,7 @@ async function revokeAccess(user, guild) {
     await playerData.save();
 
     // ban the player from the guild
-    await guild.bans.add(userId, { reason: "revoking access" }).catch(() => {});
+    await guild.bans.create(userId).catch(() => {});
 
     return true;
 }
@@ -169,7 +174,8 @@ async function grantRoleGuildAccess(client, user) {
     const role = playerData.role;
     const guildsToGrant = gameConfig.roleGuilds[role] || [];
 
-    for (const guildId of guildsToGrant) {
+    for (const guildName of guildsToGrant) {
+        const guildId = gameConfig.guildIds[guildName];
         const guild = await client.guilds.fetch(guildId).catch(() => null);
         if (guild) await grantAccess(user, guild);
     }
@@ -222,8 +228,13 @@ async function getOrganisationData(organisationName) {
     return await Organisation.findOne({ organisation: organisationName });
 }
 
-async function genericUseRoleAbility(client, userId, abilityName) {
+async function genericUseAbility(client, userId, abilityName) {
     const playerData = await Player.findOne({ userId });
+    const abilityData = await Ability.findOne({
+        ownerId: userId,
+        ability: abilityName,
+    });
+
     const season = await Season.findOne({});
 
     if (!season) return "No season is currently active.";
@@ -232,23 +243,19 @@ async function genericUseRoleAbility(client, userId, abilityName) {
     if (!playerData) return "Player data not found.";
     if (!playerData.alive) return "Player is not alive.";
 
-    const ability = gameConfig.roleAbilities[abilityName];
-    if (!ability) return "Ability not found.";
+    const ability = gameConfig.abilities[abilityName];
+    if (!ability) return "Ability does not exist.";
 
-    // check if the player has the role required to use the ability
-    if (!ability.useableBy.includes(playerData.role))
-        return "You do not have permission to use this ability.";
+    // check if the player owns the ability
+    if (!abilityData) return "You do not own this ability.";
 
-    // check if the player has enough charges to use the ability today
-    if (playerData.abilityCharges.has(abilityName)) {
-        const charges = playerData.abilityCharges.get(abilityName) || 0;
-        if (charges <= 0)
+    // check if the ability has enough charges to be used today
+    if (abilityData.charges !== undefined && abilityData.charges !== null)
+        if (abilityData.charges <= 0)
             return "You do not have enough charges to use this ability.";
-    }
 
     // check if the ability is on cooldown
-    const cooldown = playerData.cooldowns.get(abilityName) || 0;
-    if (cooldown > 0) return "Ability is on cooldown.";
+    if (abilityData.cooldown > 0) return "Ability is on cooldown.";
 
     // log
     try {
@@ -287,45 +294,61 @@ async function genericUseRoleAbility(client, userId, abilityName) {
 
     // if their charges for this ability have not been initialized today, initialize them.
     // if they have, then subtract 1 and clamp to 0.
-    if (!playerData.abilityCharges.has(abilityName)) {
-        playerData.abilityCharges.set(abilityName, defaultCharges - 1);
+    if (abilityData.charges === null || abilityData.charges === undefined) {
+        abilityData.charges = defaultCharges - 1;
     } else {
-        playerData.abilityCharges.set(
-            abilityName,
-            Math.max(0, playerData.abilityCharges.get(abilityName) - 1)
-        );
+        abilityData.charges = Math.max(0, abilityData.charges - 1);
     }
 
     // add ability to abilities used today. this is used to handle cooldown logic in nextday.
-    playerData.abilitiesUsedToday.push(abilityName);
+    // playerData.abilitiesUsedToday.push(abilityName);
+    abilityData.usedToday = true;
 
     // save changes
-    await playerData.save();
+    await abilityData.save();
 
     return true;
 }
 
 // call at the end of a day
-async function applyRoleAbilityCooldowns() {
-    const players = await Player.find({});
+async function applyAbilityCooldowns() {
+    const abilitiesUsedToday = await Ability.find({ usedToday: true });
 
-    for (const player of players) {
-        for (const abilityName of player.abilitiesUsedToday) {
-            const ability = gameConfig.roleAbilities[abilityName];
-            if (!ability) continue;
+    for (const ability of abilitiesUsedToday) {
+        const abilityConfig = gameConfig.abilities[ability.ability];
+        ability.cooldown = abilityConfig.cooldown;
+        ability.charges = undefined;
+        ability.usedToday = false;
+        await ability.save();
+    }
+}
 
-            // apply cooldown
-            player.cooldowns.set(abilityName, ability.cooldown);
+async function removeOldAbilities(user) {
+    await Ability.deleteMany({
+        ownerId: user.id,
+        persistsThroughRoleChange: false,
+    });
+}
 
-            // remove ability from abilities used today
-            player.abilitiesUsedToday = player.abilitiesUsedToday.filter(
-                (name) => name !== abilityName
-            );
+async function giveRoleAbilities(user) {
+    const playerData = await Player.findOne({ userId: user.id });
+    if (!playerData) return;
 
-            // remove charges from ability
-            player.abilityCharges.delete(abilityName);
-        }
-        await player.save();
+    const role = playerData.role;
+    const abilitiesToGive = gameConfig.roleAbilities[role] || [];
+
+    for (const abilityName of abilitiesToGive) {
+        const abilityConfig = gameConfig.abilities[abilityName];
+        if (!abilityConfig) continue;
+        const existingAbility = await Ability.findOne({
+            ownerId: user.id,
+            ability: abilityName,
+        });
+        if (existingAbility) continue; // player already has this ability
+        await Ability.create({
+            ownerId: user.id,
+            ability: abilityName,
+        });
     }
 }
 
@@ -402,9 +425,12 @@ async function role(client, targetUser, role) {
     }
 
     // restricts access to all guilds except main (this is called no matter what because your role could change even while alive.)
+    // remove all old role abilities
+    await removeOldAbilities(targetUser);
     await restrictGuildAccess(client, targetUser);
 
-    // grants access to role guilds
+    // grants access to role guilds and abilities
+    await giveRoleAbilities(targetUser);
     await grantRoleGuildAccess(client, targetUser);
 
     await unhideLounges(client, targetUser, "dead");
@@ -580,7 +606,14 @@ async function deathMessage(
     if (hasNotebook) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
         await deathMsg.reply({
-            content: `Whoever is responsible has gained possession of their death note(s).`,
+            content: `Whoever is responsible has now gained possession of their death note(s).`,
+        });
+    }
+
+    if (roleName === "Watari") {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        await deathMsg.reply({
+            content: `Whoever is responsible has now gained possession of their bug and contact log abilities.`,
         });
     }
 }
@@ -639,10 +672,8 @@ async function custody(client, user) {
     // bug the player with the custody source
     await bugUser(client, user, "custody");
 
-    // add roles
-    if (member) {
-        await member.roles.add(gameConfig.roleIds.Custody);
-    }
+    // add role
+    if (member) await member.roles.add(gameConfig.roleIds.Custody);
 }
 
 // removes custody effects from a user
@@ -656,11 +687,8 @@ async function removeCustody(client, user) {
     // remove the custody bug
     await BugLog.deleteMany({ targetId: user.id, source: "custody" });
 
-    // add roles
-    if (member) {
-        await member.roles.add(gameConfig.roleIds.Civilian);
-        await member.roles.remove(gameConfig.roleIds.Custody);
-    }
+    // remove role
+    if (member) await member.roles.remove(gameConfig.roleIds.Custody);
 }
 
 async function createTemporaryChannel(
@@ -731,7 +759,7 @@ async function createTemporaryChannel(
 
         for (const user of users) {
             permissionOverwrites.push({
-                id: typeof user === "string" ? user : user.id,
+                id: user.id,
                 allow: [
                     PermissionsBitField.Flags.SendMessages,
                     PermissionsBitField.Flags.ReadMessageHistory,
@@ -867,6 +895,11 @@ async function logContact(client, loungeId, user, target, anonymous) {
             );
             await watariContactLogs.send(logMessage);
         }
+        // stolen logs
+        const stolenContactLogs = await channels.fetch(
+            gameConfig.channelIds.stolenContactLogs
+        );
+        await stolenContactLogs.send(logMessage);
     }
 
     // host logs
@@ -1323,7 +1356,6 @@ async function killUser(client, user, message, messageOverride, hadNotebook) {
     const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
 
     // remove bugs
-    if (userData.role === "Watari") await removeWatariBugs(mainGuild);
     await BugLog.deleteMany({ targetId: user.id });
 
     // roles and nickname
@@ -1423,6 +1455,36 @@ async function onPlayerKillPlayer(client, idKiller, idVictim) {
                 await client.guilds.fetch(notebook.guildId),
                 idKiller
             );
+        }
+    }
+
+    // if the victim was Watari, give the killer access to the Watari abilities and transfer any Watari bugs to the killer
+    const victimData = await Player.findOne({ userId: idVictim });
+    if (victimData.role === "Watari") {
+        const killerUser = await client.users.fetch(idKiller);
+        const watarilaptopGuild = await client.guilds.fetch(
+            gameConfig.guildIds.watarilaptop
+        );
+
+        // grant access to watari's stolen laptop
+        await grantAccess(killerUser, watarilaptopGuild);
+
+        // transfer bug ability to killer
+        await Ability.updateMany(
+            { ownerId: idVictim, ability: "bug" },
+            { $set: { ownerId: idKiller, persistsThroughRoleChange: true } }
+        );
+
+        // transfer any watari bugs to the killer
+        const watariBugs = await BugLog.find({
+            source: "bug",
+            buggedBy: idVictim,
+        });
+
+        for (const bug of watariBugs) {
+            bug.buggedBy = idKiller;
+            bug.channelIds.delete("watari");
+            await bug.save();
         }
     }
 }
@@ -1731,7 +1793,7 @@ async function cleanSlate(client) {
 async function underTheRadar(interaction) {
     const user = interaction.user;
 
-    const genericUseResult = await genericUseRoleAbility(
+    const genericUseResult = await genericUseAbility(
         interaction.client,
         user.id,
         "underTheRadar"
@@ -1768,6 +1830,12 @@ async function progressCooldowns() {
         }
         await organisation.save();
     }
+
+    // ability cooldowns
+    await Ability.updateMany(
+        { cooldown: { $gt: 0 } },
+        { $inc: { cooldown: -1 } }
+    );
 }
 
 // returns all notebooks to their current owners
@@ -1895,7 +1963,7 @@ async function nextDay(client) {
     await resetTokens();
     await returnNotebooks(client);
     await progressCooldowns();
-    await applyRoleAbilityCooldowns();
+    await applyAbilityCooldowns();
     await Player.updateMany({ underTheRadar: true }, { underTheRadar: false });
     await removeWatariBugs(mainGuild);
     await disableIPPs(mainGuild);
@@ -1976,7 +2044,7 @@ async function pseudocide(interaction) {
     if (targetData.ipp) return "This user is under IPP.";
 
     // generic role ability checks + usage
-    const genericUseResult = await genericUseRoleAbility(
+    const genericUseResult = await genericUseAbility(
         interaction.client,
         user.id,
         "pseudocide"
@@ -2022,11 +2090,7 @@ async function ipp(interaction) {
         .catch(() => null);
     if (!targetMember) return "Target is not in the main Discord server.";
 
-    const result = await genericUseRoleAbility(
-        interaction.client,
-        user.id,
-        "ipp"
-    );
+    const result = await genericUseAbility(interaction.client, user.id, "ipp");
     if (result !== true) return result;
 
     await updatePlayerData(target, {
@@ -2155,34 +2219,54 @@ async function resetDatabase() {
     }
 }
 
-async function bugUser(client, user, source) {
+async function bugUser(client, buggedBy, user, source) {
     const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
     const lwatariGuild = await client.guilds.fetch(gameConfig.guildIds.lwatari);
+    const stolenGuild = await client.guilds.fetch(
+        gameConfig.guildIds.watarilaptop
+    );
     const member = await mainGuild.members.fetch(user.id).catch(() => null);
 
     const channelName = `${source}-${strippedName(
         member ? strippedName(member.displayName) : user.username
     )}`;
 
-    const logChannel = await createTemporaryChannel(
+    const newLog = await BugLog.create({
+        buggedBy: buggedBy.id,
+        source: source,
+        targetId: user.id,
+    });
+
+    const logChannelWatari = await createTemporaryChannel(
         lwatariGuild,
         channelName,
         gameConfig.bugLogCategoryPrefix,
         "everyone"
     );
-
-    await BugLog.create({
-        channelId: logChannel.id,
-        source: source,
-        targetId: user.id,
-    });
+    if (source === "bug") {
+        const logChannelStolen = await createTemporaryChannel(
+            stolenGuild,
+            channelName,
+            gameConfig.stolenBugLogCategoryPrefix,
+            "everyone"
+        );
+        newLog.channelIds.set("stolen", logChannelStolen.id);
+    }
+    newLog.channelIds.set("watari", logChannelWatari.id);
+    await newLog.save();
 
     let notifierMessage = (() => {
-        if (source === "bug") return `You have been bugged by Watari.`;
+        if (source === "bug") return `You have been bugged.`;
         if (source === "custody") return `You have been placed into custody.`;
         return "";
     })();
-    notifierMessage += `\nAs a result, anything you send in shared channels will be viewable by L and Watari.\nA shared channel is any channel which is not solely visible to you at all times.`;
+    let viewableBy = (() => {
+        if (source === "bug") return "the person who bugged you";
+        if (source === "custody") return "L and Watari";
+        return "";
+    })();
+    notifierMessage += `\nAs a result, anything you send in shared channels will be viewable by ${viewableBy}.
+    \nA shared channel is any channel which is not solely visible to you at all times.`;
 
     try {
         await user.send(notifierMessage);
@@ -2199,7 +2283,7 @@ async function bug(interaction) {
     if (!targetData) return "This user has no data.";
     if (!targetData.alive) return "This user is dead.";
 
-    const genericUseResult = await genericUseRoleAbility(
+    const genericUseResult = await genericUseAbility(
         interaction.client,
         user.id,
         "bug"
@@ -2213,7 +2297,7 @@ async function bug(interaction) {
         .fetch(target.id)
         .catch(() => null);
 
-    await bugUser(interaction.client, target, "bug");
+    await bugUser(interaction.client, interaction.user, target, "bug");
 
     // function to insert '*' before any parenthetical suffix (chatgpt generated)
     function addBugAsterisk(displayName) {
@@ -2276,7 +2360,7 @@ async function autopsy(interaction) {
     if (!targetData) return "This user has no data.";
     // if (targetData.alive) return "This user is not dead.";
 
-    const genericUseResult = await genericUseRoleAbility(
+    const genericUseResult = await genericUseAbility(
         interaction.client,
         user.id,
         "autopsy"
@@ -2391,7 +2475,7 @@ async function autopsy(interaction) {
 async function anonymousAnnouncement(interaction) {
     const message = interaction.options.getString("message");
 
-    const genericUseResult = await genericUseRoleAbility(
+    const genericUseResult = await genericUseAbility(
         interaction.client,
         interaction.user.id,
         "anonymousMessage"
@@ -2642,7 +2726,7 @@ async function nameReveal(interaction) {
     if (userData.role === "BB" && userData.eyes <= 0)
         return "You no longer possess shinigami eyes.";
 
-    const genericUseResult = await genericUseRoleAbility(
+    const genericUseResult = await genericUseAbility(
         interaction.client,
         interaction.user.id,
         "nameReveal"
@@ -2650,7 +2734,7 @@ async function nameReveal(interaction) {
     if (genericUseResult !== true) return genericUseResult;
 
     // apply cooldowns for the other ability
-    await genericUseRoleAbility(null, user.id, "notebookDetect");
+    await genericUseAbility(null, user.id, "notebookDetect");
 
     await interaction.user.send(
         `The true name of ${target} is **${targetData.trueName}**.`
@@ -2670,7 +2754,7 @@ async function notebookReveal(interaction) {
     if (userData.role === "BB" && userData.eyes <= 0)
         return "You no longer possess shinigami eyes.";
 
-    const genericUseResult = await genericUseRoleAbility(
+    const genericUseResult = await genericUseAbility(
         interaction.client,
         user.id,
         "notebookDetect"
@@ -2678,8 +2762,8 @@ async function notebookReveal(interaction) {
     if (genericUseResult !== true) return genericUseResult;
 
     // apply cooldowns for the other ability
-    await genericUseRoleAbility(null, user.id, "nameReveal");
-    await genericUseRoleAbility(null, user.id, "nameReveal");
+    await genericUseAbility(null, user.id, "nameReveal");
+    await genericUseAbility(null, user.id, "nameReveal");
 
     // need to check if the target is currently holding a notebook. for all notebooks which they are the currentOwner of,
     // check if there is a temporary owner. if there is a temporary owner, they do not hold that notebook.
@@ -2757,7 +2841,7 @@ async function civilianArrest(interaction) {
         return "You cannot start a civilian arrest on someone that is already locked up.";
     }
 
-    const genericUseResult = await genericUseRoleAbility(
+    const genericUseResult = await genericUseAbility(
         interaction.client,
         interaction.user.id,
         "civilianArrest"

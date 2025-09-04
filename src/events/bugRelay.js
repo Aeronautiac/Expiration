@@ -28,15 +28,21 @@ module.exports = {
 
         for (const bugLog of bugLogs) {
             try {
-                const channel = await message.client.channels.fetch(
-                    bugLog.channelId
-                );
-                await channel.send({
-                    content: `**${
-                        member ? game.strippedName(member.displayName) : message.author.username
-                    }:** ${message.content}`,
-                    files: [...message.attachments.values()],
-                });
+                const channelIds = [...bugLog.channelIds.values()];
+                for (const channelId of channelIds) {
+                    const channel = await message.client.channels.fetch(
+                        channelId
+                    );
+                    if (!channel) continue;
+                    await channel.send({
+                        content: `**${
+                            member
+                                ? game.strippedName(member.displayName)
+                                : message.author.username
+                        }:** ${message.content}`,
+                        files: [...message.attachments.values()],
+                    });
+                }
             } catch (err) {
                 console.log(`Failed to relay bug message`, err);
             }

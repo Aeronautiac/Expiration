@@ -4,6 +4,7 @@
     "groupchatCategoryPrefix": "Group Chats ",
     "kidnapCategoryPrefix": "Kidnapped ",
     "bugLogCategoryPrefix": "Bug & Custody Logs ",
+    "stolenBugLogCategoryPrefix": "Bug Logs ",
     "maxChannelsPerCategory": 50,
     "dailyTokens": 5,
     "maxGroupChatMembers": 5,
@@ -26,7 +27,8 @@
         "2kira": "1406120699654836344",
         "notebook1": "1406302123901321216",
         "notebook2": "1406302376083722270",
-        "notebook3": "1406302628450930708"
+        "notebook3": "1406302628450930708",
+        "watarilaptop": "1412998755430432788"
     },
 
     "roleGuilds": {
@@ -45,7 +47,11 @@
 
     "groupGuilds": ["lwatari", "tf", "kk"],
 
-    "possibleAffiliations": [ "Task Force", "Kira's Kingdom", "Task Force Chief" ],
+    "possibleAffiliations": [
+        "Task Force",
+        "Kira's Kingdom",
+        "Task Force Chief"
+    ],
 
     "organisations": ["Task Force", "Kira's Kingdom"],
     "organisationGuilds": {
@@ -53,7 +59,7 @@
         "Kira's Kingdom": ["kk"]
     },
 
-    "abilities": {
+    "organisationAbilities": {
         "Blackout": {
             "cooldown": 999,
             "organisation": "Kira's Kingdom",
@@ -103,53 +109,53 @@
     },
 
     "roleAbilities": {
+        "PI": ["autopsy", "ipp", "anonymousContact"],
+        "Watari": ["bug", "anonymousContact"],
+        "BB": ["pseudocide", "nameReveal", "notebookDetect"],
+        "2nd Kira": ["nameReveal", "notebookDetect", "underTheRadar", "anonymousMessage"],
+        "Kira": ["underTheRadar", "anonymousMessage"],
+        "L": ["anonymousMessage"],
+        "News Anchor": ["civilianArrest"]
+    },
+
+    "abilities": {
         "autopsy": {
-            "useableBy": ["PI"],
             "charges": 1,
             "cooldown": 0
         },
         "bug": {
-            "useableBy": ["Watari"],
             "charges": 1,
             "cooldown": 1
         },
         "pseudocide": {
-            "useableBy": ["BB"],
             "charges": [1, 2],
             "cooldown": 1
         },
         "nameReveal": {
-            "useableBy": ["2nd Kira", "BB"],
             "charges": [1, 2],
             "cooldown": 0
         },
         "notebookDetect": {
-            "useableBy": ["2nd Kira", "BB"],
             "charges": 1,
             "cooldown": 0
         },
         "underTheRadar": {
-            "useableBy": ["2nd Kira", "Kira"],
             "charges": 1,
             "cooldown": 999
         },
         "anonymousMessage": {
-            "useableBy": ["Kira", "2nd Kira", "L"],
             "charges": 3,
             "cooldown": 0
         },
         "ipp": {
-            "useableBy": ["PI"],
             "charges": [1, 2],
             "cooldown": 1
         },
         "anonymousContact": {
-            "useableBy": ["Watari", "PI"],
             "charges": 2,
             "cooldown": 0
         },
         "civilianArrest": {
-            "useableBy": ["News Anchor"],
             "charges": 1,
             "cooldown": 0
         }
@@ -162,7 +168,8 @@
         "bugLogs": "1411117992204570664",
         "autopsyLogs": "1410422544028274788",
         "courtroom": "1412595089858887743",
-        "tapinLogs": "1412595345481011240"
+        "tapinLogs": "1412595345481011240",
+        "stolenContactLogs": "1412998755795599376"
     },
 
     "roleIds": {

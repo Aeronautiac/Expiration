@@ -22,8 +22,8 @@ const playerSchema = new mongoose.Schema({
     notebookRestrictReasons: { type: [String], required: true, default: [] },
 
     // role ability system
-    abilitiesUsedToday: { type: [String], required: true, default: [] },
-    abilityCharges: { type: Map, of: Number, default: {}, required: true },
+    // abilitiesUsedToday: { type: [String], required: true, default: [] },
+    // abilityCharges: { type: Map, of: Number, default: {}, required: true },
 
     // for autopsy
     timeOfDeath: Number,

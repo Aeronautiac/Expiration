@@ -33,7 +33,7 @@ module.exports = {
             option
                 .setName("action")
                 .setDescription("The action you want to vote for")
-                .addChoices(...Object.keys(gameConfig.abilities).map(choice))
+                .addChoices(...Object.keys(gameConfig.organisationAbilities).map(choice))
                 .setRequired(true)
         )
         .addStringOption((option) =>
@@ -71,7 +71,7 @@ module.exports = {
             guildId === gameConfig.guildIds.tf
                 ? "Task Force"
                 : "Kira's Kingdom";
-        const abilityConfig = gameConfig.abilities[action];
+        const abilityConfig = gameConfig.organisationAbilities[action];
 
         const abilityRequiresATarget =
             abilitiesThatRequireAUserTarget.includes(action);
