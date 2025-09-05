@@ -3103,6 +3103,7 @@ module.exports = {
     incarcerate,
     release,
     announce,
+    removeCustody,
     setChannelLoggable,
     bug,
     autopsy,
