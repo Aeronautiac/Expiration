@@ -2067,6 +2067,14 @@ async function pseudocide(interaction) {
     );
     if (genericUseResult !== true) return genericUseResult;
 
+    await target
+        .send(
+            "You have been pseudocided. Do not ask any players for information in the shinigami realm. If you do so, you will be punished."
+        )
+        .catch(() => {
+            console.log("Could not notify user of pseudocide.");
+        });
+
     // continue with pseudocide specific logic
     await killUser(interaction.client, target, null, true);
     await deathMessage(
