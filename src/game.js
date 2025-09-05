@@ -1403,6 +1403,11 @@ async function killUser(
     await removeCustody(client, user);
     await release(client, user);
     await earlyKidnapRelease(client, user);
+
+    // remove prosecutor role if they had it
+    if (member && member.roles.cache.has(gameConfig.roleIds.Prosecutor)) {
+        await member.roles.remove(gameConfig.roleIds.Prosecutor);
+    }
 }
 
 async function killUserById(
