@@ -27,7 +27,7 @@ module.exports = {
         const target = interaction.options.getUser("target");
         const reason = interaction.options.getString("reason");
 
-        game.unhideLounges(interaction.client, target, reason);
+        await game.unhideLounges(interaction.client, target, reason);
 
         await interaction.editReply({
             content: `Successfully removed lounge blocker \"${reason}\" for ${target}.`,

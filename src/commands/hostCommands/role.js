@@ -36,6 +36,11 @@ module.exports = {
                 )
                 .setRequired(true)
         )
+        .addStringOption((option) =>
+            option
+                .setName("truename")
+                .setDescription("The true name of the player")
+        )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
 
     async execute(interaction) {
@@ -43,10 +48,11 @@ module.exports = {
             ephemeral: true,
         });
 
-        game.role(
+        await game.role(
             interaction.client,
             interaction.options.getUser("target"),
-            interaction.options.getString("role")
+            interaction.options.getString("role"),
+            interaction.options.getString("truename")
         );
 
         interaction.editReply({

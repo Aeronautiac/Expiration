@@ -33,7 +33,9 @@ module.exports = {
             option
                 .setName("action")
                 .setDescription("The action you want to vote for")
-                .addChoices(...Object.keys(gameConfig.organisationAbilities).map(choice))
+                .addChoices(
+                    ...Object.keys(gameConfig.organisationAbilities).map(choice)
+                )
                 .setRequired(true)
         )
         .addStringOption((option) =>
@@ -82,6 +84,7 @@ module.exports = {
 
         const targetId = interaction.options.getString("target");
         const target = await mainGuild.members.fetch(targetId);
+        const targetUser = await client.users.fetch(targetId).catch(() => null);
         const channel = interaction.options.getString("channel");
         const kidnapper = interaction.options.getUser("kidnapper");
 
@@ -231,7 +234,13 @@ module.exports = {
             return;
         }
         if (action.includes("Arrest") || action.includes("Kidnap")) {
-            if (target.roles.cache.some(r => r.id === gameConfig.roleIds.Arrested || r.id === gameConfig.roleIds.Kidnapped)) {
+            if (
+                target.roles.cache.some(
+                    (r) =>
+                        r.id === gameConfig.roleIds.Arrested ||
+                        r.id === gameConfig.roleIds.Kidnapped
+                )
+            ) {
                 return "You cannot start a lock up on someone that is already locked up.";
             }
         }
@@ -256,7 +265,7 @@ module.exports = {
             content: messageContent,
         });
 
-        game.createGenericPoll(
+        await game.createGenericPoll(
             pollMessage,
             60 * 1000 * 60,
             majority,
@@ -266,8 +275,8 @@ module.exports = {
             },
             async (result) => {
                 if (result === "win") {
-                    pollMessage.reply(
-                        `The vote has passed! The **${action}** will be performed. This ability will now go on a cooldown of ${abilityConfig.cooldown} day(s).`
+                    await pollMessage.reply(
+                        `The vote has passed! The **${action}** will be performed. If this ability is able to be used, it will go on a cooldown of ${abilityConfig.cooldown} day(s).`
                     );
 
                     // Do another cooldown check here incase players stack polls.. Those cheeky players...
@@ -275,17 +284,11 @@ module.exports = {
                         ourAffiliation
                     );
                     if (orgData.cooldowns.get(action)) {
-                        await interaction.editReply({
+                        await pollMessage.reply({
                             content: `The ${action} ability is on cooldown.`,
                         });
                         return;
                     }
-
-                    // Add cooldown to the organisation for the ability
-                    await game.updateOrganisationData(ourAffiliation, {
-                        [`cooldowns.${action}`]:
-                            abilityConfig.cooldown,
-                    });
 
                     const news = await client.channels.fetch(
                         gameConfig.channelIds.news
@@ -294,22 +297,24 @@ module.exports = {
 
                     if (action === "Background Check") {
                         const targetPlayerData = await game.getPlayerData(
-                            targetId
+                            targetUser
                         );
                         if (targetPlayerData) {
                             const msg = await pollMessage.reply(
-                                `The true name of **${target.displayName}** is **${targetPlayerData.trueName}**.`
+                                `The true name of **${game.strippedName(target.displayName)}** is **${targetPlayerData.trueName}**.`
                             );
                             msg.pin();
                         }
                     } else if (action === "Civilian Arrest") {
                         const civArrestMsg = await news.send({
-                            content: `@everyone The ${affiliationMention} has started a civilian arrest on **${target.displayName}**. Vote 👍 if you would like this person to be arrested for ${gameConfig.HRS_ARREST_DURATION} hours. Vote 👎 if you do not want this person to be arrested. This vote will last for ${gameConfig.HRS_CIVILIAN_ARREST_VOTE_DURATION} hours, then the verdict will be announced.`,
+                            content: `@everyone The ${affiliationMention} has started a civilian arrest on **${game.strippedName(target.displayName)}**. Vote 👍 if you would like this person to be arrested for ${gameConfig.HRS_ARREST_DURATION} hours. Vote 👎 if you do not want this person to be arrested. This vote will last for ${gameConfig.HRS_CIVILIAN_ARREST_VOTE_DURATION} hours, then the verdict will be announced.`,
                         });
 
-                        game.createGenericPoll(
+                        await game.createGenericPoll(
                             civArrestMsg,
-                            hrsToMs(gameConfig.HRS_CIVILIAN_ARREST_VOTE_DURATION),
+                            hrsToMs(
+                                gameConfig.HRS_CIVILIAN_ARREST_VOTE_DURATION
+                            ),
                             null,
                             async (user) => {
                                 const playerData = await game.getPlayerData(
@@ -318,23 +323,32 @@ module.exports = {
                                 return playerData && playerData.alive;
                             },
                             async (result) => {
+                                const targetData = await game.getPlayerData(
+                                    target
+                                );
                                 if (result === "win") {
-                                    civArrestMsg.reply(
+                                    if (targetData.ipp) {
+                                        await civArrestMsg.reply(
+                                            `The vote has passed, but **${target.displayName}** is now under IPP and cannot be arrested.`
+                                        )
+                                        return;
+                                    }
+                                    await civArrestMsg.reply(
                                         "The vote has passed. The **Civilian Arrest** will be carried out."
                                     );
-                                    game.incarcerate(client, targetId);
-                                    game.createDelayedAction(
+                                    await game.incarcerate(client, targetUser);
+                                    await game.createDelayedAction(
                                         client,
                                         "delayedRelease",
                                         hrsToMs(gameConfig.HRS_ARREST_DURATION),
-                                        [targetId.id]
+                                        [targetId]
                                     );
                                 } else if (result === "lose") {
-                                    civArrestMsg.reply(
+                                    await civArrestMsg.reply(
                                         "The vote has failed. The **Civilian Arrest** has been cancelled."
                                     );
                                 } else {
-                                    civArrestMsg.reply(
+                                    await civArrestMsg.reply(
                                         "The vote has ended with a tie! Nothing will happen."
                                     );
                                 }
@@ -344,50 +358,73 @@ module.exports = {
                         action === "Unlawful Arrest" ||
                         action === "PI+Watari Unlawful Arrest"
                     ) {
-                        news.send({
+                        const targetData = await game.getPlayerData(target);
+                        if (targetData.ipp) {
+                            await pollMessage.reply(
+                                `The vote has passed, but **${target.displayName}** is now under IPP and cannot be arrested.`
+                            );
+                            return;
+                        }
+                        await news.send({
                             content: `@everyone The ${affiliationMention} have performed an unlawful arrest on **${target.displayName}**. They will return from their sentence in ${gameConfig.HRS_ARREST_DURATION} hours.`,
                         });
-                        game.incarcerate(client, targetId);
-                        game.createDelayedAction(
+                        await game.incarcerate(client, target);
+                        await game.createDelayedAction(
                             client,
                             "delayedRelease",
                             hrsToMs(gameConfig.HRS_ARREST_DURATION),
-                            [targetId.id]
+                            [targetId]
                         );
                     } else if (action === "Blackout") {
-                        news.send({
+                        await news.send({
                             content: `@everyone The ${affiliationMention} have performed a blackout on the local network! All trials will cancel and news will stop in 1 minute for ${gameConfig.HRS_BLACKOUT_DURATION} hours.`,
                         });
-                        setTimeout(() => {
-                            game.startBlackout(client);
-                            game.createDelayedAction(
+                        setTimeout(async () => {
+                            await game.startBlackout(client);
+                            await game.createDelayedAction(
                                 client,
                                 "stopBlackout",
                                 hrsToMs(gameConfig.HRS_BLACKOUT_DURATION)
                             );
                         }, 60 * 1000);
                     } else if (action === "Public Kidnap") {
-                        news.send({
-                            content: `@everyone The ${affiliationMention} have performed a kidnapping on **${game.strippedName(
-                                target.displayName
-                            )}**. They will return in 24 hours, or less - if they are charming. The kidnapper will be announced upon their return.`,
-                        });
-                        await game.kidnap(
+                        const result = await game.kidnap(
                             client,
                             guild,
                             target.id,
                             kidnapper.id
                         );
+                        if (result !== true) {
+                            await pollMessage.reply({
+                                content: result,
+                            });
+                            return;
+                        }
+                        await news.send({
+                            content: `@everyone The ${affiliationMention} have performed a kidnapping on **${game.strippedName(
+                                target.displayName
+                            )}**. They will return in 24 hours, or less - if they are charming. The kidnapper will be announced upon their return.`,
+                        });
                     } else if (
                         action === "Anonymous Kidnap" ||
                         action === "2nd Kira+Kira Anonymous Kidnap"
                     ) {
-                        news.send({
+                        const result = await game.kidnap(
+                            client,
+                            guild,
+                            target.id
+                        );
+                        if (result !== true) {
+                            await pollMessage.reply({
+                                content: result,
+                            });
+                            return;
+                        }
+                        await news.send({
                             content: `@everyone The ${affiliationMention} have performed an anonymous kidnapping on **${game.strippedName(
                                 target.displayName
                             )}**. They will return in 24 hours, or less - if they are charming.`,
                         });
-                        await game.kidnap(client, guild, target.id);
                     } else if (action === "Tap In") {
                         const kiraGuild = await client.guilds.fetch(
                             gameConfig.guildIds.kk
@@ -462,7 +499,9 @@ module.exports = {
                         for (const msg of ordered) {
                             if (msg.author.bot) continue;
                             // Get display name from mainGuild. This should probably be stored as a table outside this scope but apparently fetch isn't expensive? IDK LOL!
-                            const mainMember = await mainGuild.members.fetch(msg.author.id).catch(() => null);
+                            const mainMember = await mainGuild.members
+                                .fetch(msg.author.id)
+                                .catch(() => null);
                             const displayName = mainMember
                                 ? mainMember.displayName
                                 : msg.author.username;
@@ -515,12 +554,17 @@ module.exports = {
                             `**End of Tap In Logs For Lounge ${channel}**`
                         );
                     }
+
+                    // apply cooldowns (after ability usage so we can prevent things like kidnap being refused but cooldown still applied)
+                    await game.updateOrganisationData(ourAffiliation, {
+                        [`cooldowns.${action}`]: abilityConfig.cooldown,
+                    });
                 } else if (result === "loss") {
-                    pollMessage.reply(
+                    await pollMessage.reply(
                         `The vote has failed. The **${action}** has been cancelled.`
                     );
                 } else {
-                    pollMessage.reply(
+                    await pollMessage.reply(
                         `No majority was reached so no decision could be made. The **${action}** has been cancelled.`
                     );
                 }

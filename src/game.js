@@ -386,11 +386,11 @@ function minToMs(min) {
 // creates a player's data if there is none, gives the player the role specified, and revives them if they were dead
 // also returns their notebooks if they owned any and their notebooks were not taken from them
 // bans from all guilds except main. Unbans and invites to role guilds.
-async function role(client, targetUser, role) {
+async function role(client, targetUser, role, trueName) {
     let playerData = await getPlayerData(targetUser);
     if (!playerData) {
         // const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
-        const name = await getRandomName();
+        const name = trueName ?? (await getRandomName());
         // const monologueChannel = await createLoungeChannel(mainGuild, `${targetUser.username}-monologue`, "monologue", [targetUser]);
 
         playerData = await Player.create({
@@ -503,7 +503,8 @@ async function deathMessage(
     trueName,
     role,
     hasNotebook,
-    affiliatiated
+    affiliatiated,
+    hasBugAbility
 ) {
     const readablename = readableName(trueName);
     const targetData = await getPlayerData(user);
@@ -610,7 +611,7 @@ async function deathMessage(
         });
     }
 
-    if (roleName === "Watari") {
+    if (hasBugAbility) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
         await deathMsg.reply({
             content: `Whoever is responsible has now gained possession of their bug and contact log abilities.`,
@@ -688,7 +689,8 @@ async function removeCustody(client, user) {
     await BugLog.deleteMany({ targetId: user.id, source: "custody" });
 
     // remove role
-    if (member) await member.roles.remove(gameConfig.roleIds.Custody);
+    if (member)
+        await member.roles.remove(gameConfig.roleIds.Custody).catch(() => {});
 }
 
 async function createTemporaryChannel(
@@ -1162,7 +1164,7 @@ async function changeGroupChatOwner(client, user, channel, newOwner) {
         return "You are already the owner of this group chat.";
     }
     if (!groupChatTable.members.includes(newOwner.id)) {
-        return "You can't transfer ownership to somebody not in the group chat.";
+        return "You can't transfer ownership to somebody who not in the group chat.";
     }
     if (season.groupChats.some((chat) => chat.owner === newOwner.id)) {
         return "This user already owns a group chat. You can only own one group chat at a time.";
@@ -1221,7 +1223,7 @@ async function addUserToGroupChat(client, user, target, channel) {
     groupChatTable.members.push(target.id);
     targetData.loungeChannelIds.push(channel.id);
 
-    addUsersToChannel([target], channel);
+    await addUsersToChannel([target], channel);
 
     await season.save();
     await channel.send(`${target} has been added to the group chat`);
@@ -1260,7 +1262,7 @@ async function removeUserFromGroupChat(client, user, target, channel) {
         (id) => id !== channel.id
     );
 
-    removeUsersFromChannel([target], channel);
+    await removeUsersFromChannel([target], channel);
 
     await season.save();
     await updatePlayerData(target, targetData);
@@ -1316,7 +1318,14 @@ async function newSeason() {
 }
 
 // any of the killUser functions should only be killed after onPlayerKillPlayer is called. This is to prevent some fuckery with stuff like death note ownership.
-async function killUser(client, user, message, messageOverride, hadNotebook) {
+async function killUser(
+    client,
+    user,
+    message,
+    messageOverride,
+    hadNotebook,
+    hadBugAbility
+) {
     const userData = await getPlayerData(user);
 
     await updatePlayerData(user, { alive: false, timeOfDeath: Date.now() });
@@ -1330,7 +1339,8 @@ async function killUser(client, user, message, messageOverride, hadNotebook) {
             userData.trueName,
             userData.role,
             hadNotebook,
-            userData.affiliations
+            userData.affiliations,
+            hadBugAbility
         );
 
     const allNotebooks = await Notebook.find({});
@@ -1366,6 +1376,12 @@ async function killUser(client, user, message, messageOverride, hadNotebook) {
         member.roles.remove(gameConfig.roleIds.Civilian);
         member.setNickname(strippedName(member.displayName));
     }
+
+    // remove custody and incarceration (in case they were in custody/incarcerated when they died)
+    // also release them early from any kidnaps
+    await removeCustody(client, user);
+    await release(client, user);
+    await earlyKidnapRelease(client, user);
 }
 
 async function killUserById(client, id, message, messageOverride, hadNotebook) {
@@ -1377,44 +1393,16 @@ async function killUserById(client, id, message, messageOverride, hadNotebook) {
 async function kill(interaction) {
     const target = interaction.options.getUser("target");
     const books = await Notebook.find({ currentOwner: target.id });
+    const bugs = await BugLog.find({ buggedBy: target.id });
     const message = interaction.options.getString("message");
     await killUser(
         interaction.client,
         target,
         message,
         false,
-        books.length > 0
+        books.length > 0,
+        bugs.length > 0
     );
-}
-
-// chatgpt
-async function deleteAllInvites(guild) {
-    try {
-        // Check if bot has permission
-        if (
-            !guild.members.me.permissions.has(
-                PermissionsBitField.Flags.ManageGuild
-            )
-        ) {
-            console.log(
-                "I don't have permission to manage invites in this server!"
-            );
-            return;
-        }
-
-        // Fetch all invites
-        const invites = await guild.invites.fetch();
-
-        // Delete each invite
-        for (const invite of invites.values()) {
-            await invite.delete(`Bulk delete all invites`);
-            console.log(`Deleted invite: ${invite.code}`);
-        }
-
-        console.log(`All invites deleted!`);
-    } catch (err) {
-        console.error("Error deleting invites:", err);
-    }
 }
 
 async function guildIsNotebook(guild) {
@@ -1458,35 +1446,35 @@ async function onPlayerKillPlayer(client, idKiller, idVictim) {
         }
     }
 
-    // if the victim was Watari, give the killer access to the Watari abilities and transfer any Watari bugs to the killer
+    // bug and contact log ability transfers
+    const bugs = await BugLog.find({
+        source: "bug",
+        buggedBy: idVictim,
+    });
+
+    // if the victim was Watari, remove the "watari" channel from all the bugs they created.
     const victimData = await Player.findOne({ userId: idVictim });
     if (victimData.role === "Watari") {
-        const killerUser = await client.users.fetch(idKiller);
-        const watarilaptopGuild = await client.guilds.fetch(
-            gameConfig.guildIds.watarilaptop
-        );
-
-        // grant access to watari's stolen laptop
-        await grantAccess(killerUser, watarilaptopGuild);
-
-        // transfer bug ability to killer
-        await Ability.updateMany(
-            { ownerId: idVictim, ability: "bug" },
-            { $set: { ownerId: idKiller, persistsThroughRoleChange: true } }
-        );
-
-        // transfer any watari bugs to the killer
-        const watariBugs = await BugLog.find({
-            source: "bug",
-            buggedBy: idVictim,
-        });
-
-        for (const bug of watariBugs) {
-            bug.buggedBy = idKiller;
+        for (const bug of bugs) {
             bug.channelIds.delete("watari");
             await bug.save();
         }
     }
+
+    // if the victim had the bug ability, transfer all of their bugs to the killer.
+    for (const bug of bugs) {
+        bug.buggedBy = idKiller;
+        await bug.save();
+    }
+
+    // give killer access to the watari's stolen laptop and revoke access from the victim
+    const watariLaptop = await client.channels.fetch(
+        gameConfig.guildIds.watarilaptop
+    );
+    const killerUser = await client.users.fetch(idKiller);
+    const victimUser = await client.users.fetch(idVictim);
+    await revokeAccess(victimUser, watariLaptop);
+    await grantAccess(killerUser, watariLaptop);
 }
 
 // if guild is not a notebook yet, this function creates a new notebook and sets the current and original owner to owner.
@@ -1557,13 +1545,15 @@ async function handlePlayerKill(client, killerId, targetId, message) {
 
     if (!targetData.ipp) {
         const targetNotebooks = await Notebook.find({ currentOwner: targetId });
+        const targetBugs = await BugLog.find({ targetId: targetId });
         await onPlayerKillPlayer(client, killerId, targetId);
         await killUserById(
             client,
             targetId,
             message,
             false,
-            targetNotebooks.length > 0
+            targetNotebooks.length > 0,
+            targetBugs.length > 0
         );
     }
 }
@@ -1761,31 +1751,13 @@ async function clearTemporaryChannels(client) {
     await season.save();
 }
 
-async function kickNotebookOwners(client) {
-    const notebooks = await Notebook.find({});
-
-    for (const notebook of notebooks) {
-        try {
-            const guild = await client.guilds.fetch(notebook.guildId);
-            await deleteAllInvites(guild);
-            const member = await guild.members
-                .fetch(notebook.currentOwner)
-                .catch(() => null);
-            if (member) member.kick("Game reset");
-        } catch (err) {
-            console.log("Failed to kick notebook owner:", err);
-        }
-    }
-}
-
 // cleans all game data
 // should remove everyone from death note servers
 async function cleanSlate(client) {
     await nextDay(client);
     // must be called after nextDay. should not await. it is better if these are done concurrently.
-    kickNotebookOwners(client);
-    clearContactLogs(client.channels);
-    clearTemporaryChannels(client);
+    await clearContactLogs(client.channels);
+    await clearTemporaryChannels(client);
     // must be called last
     await resetDatabase();
 }
@@ -2032,6 +2004,7 @@ async function pseudocide(interaction) {
     const trueName = interaction.options.getString("truename");
     const message = interaction.options.getString("deathmessage");
     const hasNotebook = interaction.options.getBoolean("hasnotebook");
+    const hasBugAbility = interaction.options.getBoolean("hasbugability");
     const affiliationsString = interaction.options.getString("affiliations");
 
     let affiliations = [];
@@ -2060,7 +2033,8 @@ async function pseudocide(interaction) {
         trueName,
         role,
         hasNotebook,
-        affiliations
+        affiliations,
+        hasBugAbility
     );
 
     await createDelayedAction(
@@ -2168,11 +2142,13 @@ async function incarcerate(client, user) {
 }
 
 async function release(client, user) {
+    const userData = await Player.findOne({ userId: user.id });
     const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
     const member = await mainGuild.members.fetch(user.id).catch(() => null);
     if (member) {
-        await member.roles.remove(gameConfig.roleIds.Arrested);
-        await member.roles.add(gameConfig.roleIds.Civilian);
+        await member.roles.remove(gameConfig.roleIds.Arrested).catch(() => {});
+        if (userData.alive)
+            await member.roles.add(gameConfig.roleIds.Civilian).catch(() => {});
     }
 
     await unhideLounges(client, user, "incarcerated");
@@ -2521,7 +2497,10 @@ async function delayedRelease(client, targetId) {
         content: `@everyone It appears that the <@&${gameConfig.roleIds["Task Force"]}> have finally released **${target.displayName}**. Lets hope they don't return to their old ways.`,
     });
 
-    await release(client, target);
+    // check if they are still arrested, if they are, release them. this can still potentially lead to bugs, but right now pseudocide lasts 24 hours, so it should be fine.
+    if (await target.roles.fetch(gameConfig.roleIds.Arrested)) {
+        await release(client, target);
+    }
 }
 
 const filter = (reaction, user) => {
@@ -2613,7 +2592,14 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
     const victimMember = await mainGuild.members
         .fetch(targetId)
         .catch(() => null);
-    if (!victimMember || !victimUser) return;
+    if (!victimMember || !victimUser)
+        return "Target is not in the main Discord server.";
+    const existingVictimKidnap = await KidnapLounge.findOne({
+        victimId: targetId,
+    });
+    if (existingVictimKidnap) return "This user is already kidnapped.";
+    const victimData = await Player.findOne({ userId: targetId });
+    if (victimData.ipp) return "This user is under IPP.";
 
     const victimName = strippedName(victimMember.displayName);
     const typeString = kidnapperId ? "public" : "anonymous";
@@ -2665,6 +2651,8 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
     await kidnapVictimChannel.send({
         content: `Here you can talk to your kidnappers. All messages sent here will be relayed to them in another channel. @everyone`,
     });
+
+    return true;
 }
 
 async function earlyKidnapRelease(client, kidnapDoc) {
@@ -2683,27 +2671,35 @@ async function kidnapRelease(client, kidnapDocId) {
     const kidnappedMember = await mainGuild.members
         .fetch(kidnapDoc.victimId)
         .catch(() => null);
+    const kidnappedUserData = await Player.findOne({
+        userId: kidnapDoc.victimId,
+    });
 
     // Remove kidnapped effects
     await unhideLounges(client, kidnappedUser, "kidnapped");
     await freeNotebooks(kidnappedUser, "kidnapped");
-    // Add civ role and remove kidnapped role
+
+    // Add civ role (if alive) and remove kidnapped role
     try {
-        await kidnappedMember.roles.add(gameConfig.roleIds.Civilian);
+        if (kidnappedUserData.alive) {
+            await kidnappedMember.roles.add(gameConfig.roleIds.Civilian);
+        }
         await kidnappedMember.roles.remove(gameConfig.roleIds.Kidnapped);
     } catch (err) {
         console.log("Failed to update roles for kidnapped member:", err);
     }
 
-    // Send notifiers
-    const revealString = kidnapDoc.kidnapperId
-        ? `When questioned by authorities, ${kidnappedUser} recalled the identity of their kidnapper: ${await client.users.fetch(
-              kidnapDoc.kidnapperId
-          )}`
-        : "";
-    await news.send(
-        `@everyone ${kidnappedUser} has been released from captivity. They have now returned to their normal life.\n${revealString}`
-    );
+    // Send notifiers (if alive)
+    if (kidnappedUserData.alive) {
+        const revealString = kidnapDoc.kidnapperId
+            ? `When questioned by authorities, ${kidnappedUser} recalled the identity of their kidnapper: ${await client.users.fetch(
+                  kidnapDoc.kidnapperId
+              )}`
+            : "";
+        await news.send(
+            `@everyone ${kidnappedUser} has been released from captivity. They have now returned to their normal life.\n${revealString}`
+        );
+    }
 
     // Remove perms from kidnapped channel
     const kidnapVictimChannel = await client.channels.fetch(
@@ -2840,6 +2836,7 @@ async function civilianArrest(interaction) {
     ) {
         return "You cannot start a civilian arrest on someone that is already locked up.";
     }
+    if (targetData.ipp) return "You cannot start a civilian arrest on someone that is under IPP.";
 
     const genericUseResult = await genericUseAbility(
         interaction.client,
@@ -2859,7 +2856,7 @@ async function civilianArrest(interaction) {
             gameConfig.HRS_CIVILIAN_ARREST_VOTE_DURATION
         } hours, then the verdict will be announced.`,
     });
-    createGenericPoll(
+    await createGenericPoll(
         civArrestMsg,
         hrsToMs(gameConfig.HRS_CIVILIAN_ARREST_VOTE_DURATION),
         null,
@@ -2869,22 +2866,29 @@ async function civilianArrest(interaction) {
         },
         async (result) => {
             if (result === "win") {
-                civArrestMsg.reply(
+                if (targetData.ipp) {
+                    await civArrestMsg.reply(
+                        `The vote has passed, but **${target.displayName}** is now under IPP and cannot be arrested.`
+                    );
+                    return;
+                }
+
+                await civArrestMsg.reply(
                     `The vote has passed! **${target.displayName}** will be arrested for ${gameConfig.HRS_ARREST_DURATION} hours.`
                 );
-                incarcerate(interaction.client, target);
-                createDelayedAction(
+                await incarcerate(interaction.client, target);
+                await createDelayedAction(
                     interaction.client,
                     "delayedRelease",
                     hrsToMs(gameConfig.HRS_ARREST_DURATION),
                     [target.id]
                 );
             } else if (result === "loss") {
-                civArrestMsg.reply(
+                await civArrestMsg.reply(
                     `The vote has failed! **${target.displayName}** will not be arrested.`
                 );
             } else {
-                civArrestMsg.reply(
+                await civArrestMsg.reply(
                     `The vote has been tied! **${target.displayName}** will not be arrested.`
                 );
             }

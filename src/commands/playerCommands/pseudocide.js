@@ -56,6 +56,14 @@ module.exports = {
                 )
                 .setRequired(false)
         )
+        .addBooleanOption((option) =>
+            option
+                .setName("hasbugability")
+                .setDescription(
+                    "Whether the death message should say they had the bug and contact logs abilities or not."
+                )
+                .setRequired(false)
+        )
         .addStringOption((option) =>
             option
                 .setName("deathmessage")
