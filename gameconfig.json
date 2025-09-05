@@ -132,10 +132,12 @@
             "cooldown": 1
         },
         "nameReveal": {
+            "canBeUsedInCustody": true,
             "charges": [1, 2],
             "cooldown": 0
         },
         "notebookDetect": {
+            "canBeUsedInCustody": true,
             "charges": 1,
             "cooldown": 0
         },

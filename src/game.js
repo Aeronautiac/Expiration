@@ -260,6 +260,14 @@ async function genericUseAbility(client, userId, abilityName) {
     // check if the player owns the ability
     if (!abilityData) return "You do not own this ability.";
 
+    // check if the player is in custody and if the ability can be used in custody
+    const mainGuild = await client.guilds.fetch(gameConfig.mainGuild.id);
+    const member = await mainGuild.members.fetch(userId).catch(() => null);
+    if (!member) return "You are not in the main discord.";
+    const inCustody = member.roles.cache.has(gameConfig.roleIds.Custody);
+    if (inCustody && !ability.canBeUsedInCustody)
+        return "You cannot use this ability while in custody.";
+
     // check if the ability has enough charges to be used today
     if (abilityData.charges !== undefined && abilityData.charges !== null)
         if (abilityData.charges <= 0)
@@ -1387,7 +1395,7 @@ async function killUser(
         // no need to await here
         member.roles.add(gameConfig.roleIds.Shinigami);
         member.roles.remove(gameConfig.roleIds.Civilian);
-        await setNickname(client, user, strippedName(member.displayName))
+        await setNickname(client, user, strippedName(member.displayName));
     }
 
     // remove custody and incarceration (in case they were in custody/incarcerated when they died)
@@ -1903,7 +1911,11 @@ async function disableIPPs(client, mainGuild) {
                 member.user.username.replace(/\s*\(IPP\)$/, "");
 
             if (newNick !== member.nickname) {
-                await setNickname(client, await client.users.fetch(player.userId), newNick);
+                await setNickname(
+                    client,
+                    await client.users.fetch(player.userId),
+                    newNick
+                );
             }
         } catch (err) {
             console.error(`Failed to update ${player.userId}:`, err.message);
@@ -1939,7 +1951,11 @@ async function removeWatariBugs(client, guild) {
             if (!member) continue;
 
             const cleanName = member.displayName.replace(/\*/g, "");
-            await setNickname(client, await client.users.fetch(player.userId), cleanName);
+            await setNickname(
+                client,
+                await client.users.fetch(player.userId),
+                cleanName
+            );
         } catch (err) {
             console.warn(
                 `Failed to reset nickname for ${player.userId}:`,
@@ -2097,7 +2113,11 @@ async function ipp(interaction) {
     await updatePlayerData(target, {
         ipp: true,
     });
-    await setNickname(interaction.client, user, `${targetMember.displayName} (IPP)`);
+    await setNickname(
+        interaction.client,
+        user,
+        `${targetMember.displayName} (IPP)`
+    );
 
     return true;
 }
