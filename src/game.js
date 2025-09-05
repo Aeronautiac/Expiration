@@ -261,7 +261,7 @@ async function genericUseAbility(client, userId, abilityName) {
     if (!abilityData) return "You do not own this ability.";
 
     // check if the player is in custody and if the ability can be used in custody
-    const mainGuild = await client.guilds.fetch(gameConfig.mainGuild.id);
+    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
     const member = await mainGuild.members.fetch(userId).catch(() => null);
     if (!member) return "You are not in the main discord.";
     const inCustody = member.roles.cache.has(gameConfig.roleIds.Custody);
