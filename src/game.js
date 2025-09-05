@@ -224,6 +224,17 @@ async function grantGroupGuildAccess(client, user) {
 
 //
 
+// sets nickname in all guilds
+async function setNickname(client, user, nickname) {
+    for (const guildId of Object.values(gameConfig.guildIds)) {
+        const guild = await client.guilds.fetch(guildId).catch(() => null);
+        if (!guild) continue;
+        const member = await guild.members.fetch(user.id).catch(() => null);
+        if (!member) continue;
+        await member.setNickname(nickname).catch(() => null);
+    }
+}
+
 async function getOrganisationData(organisationName) {
     return await Organisation.findOne({ organisation: organisationName });
 }
@@ -918,18 +929,12 @@ async function logContact(client, loungeId, user, target, anonymous) {
 }
 
 // returns a boolean stating whether or not the player can use the anonymous contact ability
-async function canAnonContact(user) {
-    const playerData = await getPlayerData(user);
-
-    return (
-        (playerData.role === "Watari" || playerData.role === "PI") &&
-        // !playerData.cooldowns.get("anonymousContact") &&
-        playerData.contactTokens >= 2
-    );
+async function canAnonContact(client, user) {
+    return await genericUseAbility(client, user.id, "anonymousContact");
 }
 
 // returns true if can contact, or a string (the contact rejected reason)
-async function canContact(user, target, anonymous, groupChat) {
+async function canContact(client, user, target, anonymous, groupChat) {
     const playerData = await getPlayerData(user);
     const targetData = await getPlayerData(target);
     const season = await Season.findById("season");
@@ -952,28 +957,30 @@ async function canContact(user, target, anonymous, groupChat) {
     if (targetData.loungeHideReasons.length > 0 && !monologue)
         return `Cannot contact because your target has at least one lounge hiding reason: ${targetData.loungeHideReasons}`;
 
-    if (!(await canAnonContact(user)) && anonymous)
-        return "You can't use anonymous contact buddy.. Heh...";
-
-    if (anonymous && monologue)
-        return "Why would you want to anonymously contact yourself???";
+    // if (anonymous && monologue)
+    //     return "Why would you want to anonymously contact yourself???";
 
     if (!(playerData.contactTokens > 0) && !monologue && !groupChat)
         return "You're broke buddy.. 0 CONTACT TOKENS!!!";
+
+    if (anonymous) {
+        const canAnon = await canAnonContact(client, user);
+        if (canAnon !== true) return canAnon;
+    }
 
     return true;
 }
 
 // handles the contact mechanic between two users and returns the command reply string
 async function contact(client, user, target, anonymous) {
-    const monologue = user.id === target.id;
+    const monologue = user.id === target.id && !anonymous;
     let playerData = await getPlayerData(user);
     let targetData = await getPlayerData(target);
 
     const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
 
     // reject contact early with the rejection message if the user is not allowed to contact
-    const allowedToContact = await canContact(user, target, anonymous);
+    const allowedToContact = await canContact(client, user, target, anonymous);
     if (allowedToContact !== true) return allowedToContact;
 
     if (monologue) {
@@ -1105,7 +1112,13 @@ async function createGroupChat(client, user, passedTargets) {
         if (user.id == target.id) {
             return `You cannot create a group chat with yourself as one of the specified members.`;
         }
-        const denialReason = await canContact(user, target, false, true);
+        const denialReason = await canContact(
+            client,
+            user,
+            target,
+            false,
+            true
+        );
         if (denialReason !== true) {
             return `You cannot create a group chat with ${target} because of the reason: (${denialReason})`;
         }
@@ -1206,7 +1219,7 @@ async function addUserToGroupChat(client, user, target, channel) {
     if (groupChatTable.owner !== user.id) {
         return "You are not the owner of this group chat.";
     }
-    const denialReason = await canContact(user, target, false, true);
+    const denialReason = await canContact(client, user, target, false, true);
     if (denialReason !== true) {
         return `You cannot add ${target} to the group chat because of the reason: (${denialReason})`;
     }
@@ -1374,7 +1387,7 @@ async function killUser(
         // no need to await here
         member.roles.add(gameConfig.roleIds.Shinigami);
         member.roles.remove(gameConfig.roleIds.Civilian);
-        member.setNickname(strippedName(member.displayName));
+        await setNickname(client, user, strippedName(member.displayName))
     }
 
     // remove custody and incarceration (in case they were in custody/incarcerated when they died)
@@ -1384,9 +1397,23 @@ async function killUser(
     await earlyKidnapRelease(client, user);
 }
 
-async function killUserById(client, id, message, messageOverride, hadNotebook) {
+async function killUserById(
+    client,
+    id,
+    message,
+    messageOverride,
+    hadNotebook,
+    hadBugAbility
+) {
     const user = await client.users.fetch(id);
-    await killUser(client, user, message, messageOverride, hadNotebook);
+    await killUser(
+        client,
+        user,
+        message,
+        messageOverride,
+        hadNotebook,
+        hadBugAbility
+    );
 }
 
 // sets a player's alive status to false and hides all of their lounges from them
@@ -1468,7 +1495,7 @@ async function onPlayerKillPlayer(client, idKiller, idVictim) {
     }
 
     // give killer access to the watari's stolen laptop and revoke access from the victim
-    const watariLaptop = await client.channels.fetch(
+    const watariLaptop = await client.guilds.fetch(
         gameConfig.guildIds.watarilaptop
     );
     const killerUser = await client.users.fetch(idKiller);
@@ -1857,7 +1884,7 @@ async function passNotebook(client, guild, fromId, toId) {
     return true;
 }
 
-async function disableIPPs(mainGuild) {
+async function disableIPPs(client, mainGuild) {
     const ippPlayers = await Player.find({ ipp: true });
     await Player.updateMany({ ipp: true }, { ipp: false });
     const updates = ippPlayers.map((player) => async () => {
@@ -1876,7 +1903,7 @@ async function disableIPPs(mainGuild) {
                 member.user.username.replace(/\s*\(IPP\)$/, "");
 
             if (newNick !== member.nickname) {
-                await member.setNickname(newNick);
+                await setNickname(client, await client.users.fetch(player.userId), newNick);
             }
         } catch (err) {
             console.error(`Failed to update ${player.userId}:`, err.message);
@@ -1889,7 +1916,7 @@ async function disableIPPs(mainGuild) {
     }
 }
 
-async function removeWatariBugs(guild) {
+async function removeWatariBugs(client, guild) {
     const bugLogs = await BugLog.find({
         source: "bug",
     });
@@ -1912,7 +1939,7 @@ async function removeWatariBugs(guild) {
             if (!member) continue;
 
             const cleanName = member.displayName.replace(/\*/g, "");
-            await member.setNickname(cleanName);
+            await setNickname(client, await client.users.fetch(player.userId), cleanName);
         } catch (err) {
             console.warn(
                 `Failed to reset nickname for ${player.userId}:`,
@@ -1937,8 +1964,8 @@ async function nextDay(client) {
     await progressCooldowns();
     await applyAbilityCooldowns();
     await Player.updateMany({ underTheRadar: true }, { underTheRadar: false });
-    await removeWatariBugs(mainGuild);
-    await disableIPPs(mainGuild);
+    await removeWatariBugs(client, mainGuild);
+    await disableIPPs(client, mainGuild);
     await resetNotebookCooldowns();
     await Season.updateOne(
         { _id: "season" },
@@ -2070,7 +2097,7 @@ async function ipp(interaction) {
     await updatePlayerData(target, {
         ipp: true,
     });
-    await targetMember.setNickname(`${targetMember.displayName} (IPP)`);
+    await setNickname(interaction.client, user, `${targetMember.displayName} (IPP)`);
 
     return true;
 }
@@ -2288,7 +2315,7 @@ async function bug(interaction) {
 
     if (targetMember) {
         const newNickname = addBugAsterisk(targetMember.displayName);
-        await targetMember.setNickname(newNickname);
+        await setNickname(interaction.client, target, newNickname);
     }
 
     return true;
@@ -2584,6 +2611,59 @@ function strippedName(name) {
     return name.replace(/\*/g, "").replace(/\s*\(IPP\)$/, "");
 }
 
+// later rework orgs to fully use the doc system instead of affiliations
+async function addToOrganisation(interaction) {
+    const user = interaction.options.getUser("target");
+    const orgName = interaction.options.getString("organisation");
+    const leader = interaction.options.getBoolean("leader");
+    const client = interaction.client;
+
+    const userData = await Player.findOne({ userId: user.id });
+
+    // add chief affiliation if leader and task force
+    const result = await addAffiliation(user, orgName);
+    if (result !== true) return result;
+
+    if (leader && orgName === "Task Force")
+        await addAffiliation(user, "Task Force Chief");
+
+    await userData.save();
+
+    // invite to guilds if they have no lounge blockers. if they have lounge blockers, this should be handled automatically when they are unblocked.
+    if (userData.loungeHideReasons.length === 0)
+        await grantGroupGuildAccess(client, user);
+
+    return true;
+}
+
+async function removeFromOrganisation(interaction) {
+    const user = interaction.options.getUser("target");
+    const orgName = interaction.options.getString("organisation");
+    const client = interaction.client;
+
+    const userData = await Player.findOne({ userId: user.id });
+    if (!userData) return "This user has no data.";
+
+    const result = await removeAffiliation(user, orgName);
+    if (result !== true) return result;
+
+    // remove chief affiliation if leader and task force
+    if (orgName === "Task Force")
+        await removeAffiliation(user, "Task Force Chief");
+
+    // revoke access to any guilds for the org
+    const orgGuildNames = gameConfig.organisationGuilds[orgName] || [];
+    for (const guildName of orgGuildNames) {
+        const guildId = gameConfig.guildIds[guildName];
+        if (!guildId) continue;
+
+        const guild = await interaction.client.guilds.fetch(guildId);
+        await revokeAccess(user, guild);
+    }
+
+    return true;
+}
+
 // if no kidnapper id, then it was an anonymous kidnapping
 // when kidnap is over, delete the kidnap channel using deleteTemporaryChannel as well as the kidnap db entry.
 async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
@@ -2836,7 +2916,8 @@ async function civilianArrest(interaction) {
     ) {
         return "You cannot start a civilian arrest on someone that is already locked up.";
     }
-    if (targetData.ipp) return "You cannot start a civilian arrest on someone that is under IPP.";
+    if (targetData.ipp)
+        return "You cannot start a civilian arrest on someone that is under IPP.";
 
     const genericUseResult = await genericUseAbility(
         interaction.client,
@@ -3033,4 +3114,7 @@ module.exports = {
     eyes,
     custody,
     removeCustody,
+    addToOrganisation,
+    removeFromOrganisation,
+    setNickname,
 };
