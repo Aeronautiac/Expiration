@@ -159,7 +159,7 @@
         },
         "civilianArrest": {
             "charges": 1,
-            "cooldown": 0
+            "cooldown": 1
         }
     },
 

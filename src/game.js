@@ -2394,7 +2394,7 @@ async function autopsy(interaction) {
     const season = await Season.findOne({});
 
     if (!targetData) return "This user has no data.";
-    // if (targetData.alive) return "This user is not dead.";
+    if (targetData.alive) return "This user is not dead.";
 
     const genericUseResult = await genericUseAbility(
         interaction.client,
