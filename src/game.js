@@ -878,6 +878,12 @@ async function logGroupChat(client, loungeId, user, members) {
             );
             await watariContactLogs.send(logMessage);
         }
+
+        // stolen logs
+        const stolenContactLogs = await channels.fetch(
+            gameConfig.channelIds.stolenContactLogs
+        );
+        await stolenContactLogs.send(logMessage);
     }
 
     // host logs
