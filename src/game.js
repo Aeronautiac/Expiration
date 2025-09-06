@@ -2851,7 +2851,7 @@ async function nameReveal(interaction) {
     if (genericUseResult !== true) return genericUseResult;
 
     // apply cooldowns for the other ability
-    await genericUseAbility(null, user.id, "notebookDetect");
+    await genericUseAbility(interaction.client, null, user.id, "notebookDetect");
 
     await interaction.user.send(
         `The true name of ${target} is **${targetData.trueName}**.`
