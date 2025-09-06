@@ -47,13 +47,10 @@ module.exports = {
         if (message) relayed = relayed.concat(`, ${message}`);
 
         if (result === true) {
-            await interaction.editReply({
-                content: relayed,
-            });
+            await interaction.editReply({ content: relayed });
         } else {
-            await interaction.editReply({
-                content: `${result} [${relayed}]`,
-            });
+            await interaction.editReply({ content: relayed });
+            await interaction.followUp({ content: result });
         }
     },
 };

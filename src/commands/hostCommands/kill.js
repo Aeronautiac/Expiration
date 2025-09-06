@@ -11,6 +11,12 @@ module.exports = {
                 .setDescription("The person you want to kill")
                 .setRequired(true)
         )
+        .addUserOption((option) => 
+            option
+                .setName("killer")
+                .setDescription("The person who is killing them")
+                .setRequired(false)
+        )
         .addStringOption((option) =>
             option
                 .setName("message")

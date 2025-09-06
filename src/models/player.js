@@ -28,8 +28,9 @@ const playerSchema = new mongoose.Schema({
     // for autopsy
     timeOfDeath: Number,
 
-    // death protection
+    // other systems
     ipp: Boolean,
+    custody: Boolean,
 
     // kira and 2nd kira
     unlocked: Boolean,

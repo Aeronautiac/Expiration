@@ -261,11 +261,7 @@ async function genericUseAbility(client, userId, abilityName) {
     if (!abilityData) return "You do not own this ability.";
 
     // check if the player is in custody and if the ability can be used in custody
-    const mainGuild = await client.guilds.fetch(gameConfig.guildIds.main);
-    const member = await mainGuild.members.fetch(userId).catch(() => null);
-    if (!member) return "You are not in the main discord.";
-    const inCustody = member.roles.cache.has(gameConfig.roleIds.Custody);
-    if (inCustody && !ability.canBeUsedInCustody)
+    if (playerData.custody && !ability.canBeUsedInCustody)
         return "You cannot use this ability while in custody.";
 
     // check if the ability has enough charges to be used today
@@ -694,6 +690,9 @@ async function custody(client, user) {
 
     // add role
     if (member) await member.roles.add(gameConfig.roleIds.Custody);
+
+    // edit data
+    await Player.updateOne({ userId: user.id }, { custody: true });
 }
 
 // removes custody effects from a user
@@ -710,6 +709,9 @@ async function removeCustody(client, user) {
     // remove role
     if (member)
         await member.roles.remove(gameConfig.roleIds.Custody).catch(() => {});
+
+    // edit data
+    await Player.updateOne({ userId: user.id }, { custody: false });
 }
 
 async function createTemporaryChannel(
@@ -1441,14 +1443,26 @@ async function kill(interaction) {
     const books = await Notebook.find({ currentOwner: target.id });
     const bugs = await BugLog.find({ buggedBy: target.id });
     const message = interaction.options.getString("message");
-    await killUser(
-        interaction.client,
-        target,
-        message,
-        false,
-        books.length > 0,
-        bugs.length > 0
-    );
+    const killer = interaction.options.getUser("killer");
+
+    if (killer) {
+        await handlePlayerKill(
+            interaction.client,
+            killer.id,
+            target.id,
+            message,
+            true
+        );
+    } else {
+        await killUser(
+            interaction.client,
+            target,
+            message,
+            false,
+            books.length > 0,
+            bugs.length > 0
+        );
+    }
 }
 
 async function guildIsNotebook(guild) {
@@ -1586,12 +1600,18 @@ async function setNotebook(client, guild, ownerid, temporary) {
     await grantAccess(ownerUser, guild);
 }
 
-async function handlePlayerKill(client, killerId, targetId, message) {
+async function handlePlayerKill(
+    client,
+    killerId,
+    targetId,
+    message,
+    bypassIpp
+) {
     const targetData = await Player.findOne({ userId: targetId });
 
     if (!targetData) return;
 
-    if (!targetData.ipp) {
+    if (!targetData.ipp || (targetData.ipp && bypassIpp)) {
         const targetNotebooks = await Notebook.find({ currentOwner: targetId });
         const targetBugs = await BugLog.find({ targetId: targetId });
         await onPlayerKillPlayer(client, killerId, targetId);
@@ -1717,6 +1737,9 @@ async function writeName(interaction) {
             return "You must connect with Kira before you can use your notebook.";
     }
 
+    if (notebookData.usedToday.includes(user.id))
+        return "You have already used this notebook to kill someone today.";
+
     let attemptsRemaining = notebookData.attemptsToday.get(user.id) ?? 3;
 
     if (attemptsRemaining === 0)
@@ -1730,9 +1753,6 @@ async function writeName(interaction) {
         );
         return `This true name does not refer to anyone. You have ${newAttempts} attempt(s) remaining today.`;
     }
-
-    if (notebookData.usedToday.includes(user.id))
-        return "You have already used this notebook to kill someone today.";
 
     await Notebook.updateOne(
         { _id: notebookData._id },
@@ -2539,6 +2559,12 @@ async function startBlackout(client) {
     await newsChannel.permissionOverwrites.edit(gameConfig.roleIds.Civilian, {
         ViewChannel: false,
     });
+
+    // remove custody from everyone on trial
+    const peopleInCustody = await Player.find({ custody: true });
+    for (const player of peopleInCustody) {
+        await removeCustody(client, await client.users.fetch(player.userId));
+    }
 }
 
 async function stopBlackout(client) {
@@ -2749,6 +2775,20 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
         console.log("Failed to update roles for kidnapped member:", err);
     }
 
+    // remove victim from custody
+    if (victimData.custody) {
+        await removeCustody(client, victimUser);
+    }
+
+    // remove prosecutor role from victim (if they have it)
+    try {
+        if (await victimMember.roles.fetch(gameConfig.roleIds.Prosecutor)) {
+            await victimMember.roles.remove(gameConfig.roleIds.Prosecutor);
+        }
+    } catch (err) {
+        console.log("Failed to remove prosecutor role from kidnapped member.");
+    }
+
     const kidnapDoc = await KidnapLounge.create({
         victimId: targetId,
         kidnapperId: kidnapperId,
@@ -2851,7 +2891,12 @@ async function nameReveal(interaction) {
     if (genericUseResult !== true) return genericUseResult;
 
     // apply cooldowns for the other ability
-    await genericUseAbility(interaction.client, null, user.id, "notebookDetect");
+    await genericUseAbility(
+        interaction.client,
+        null,
+        user.id,
+        "notebookDetect"
+    );
 
     await interaction.user.send(
         `The true name of ${target} is **${targetData.trueName}**.`
@@ -3144,7 +3189,6 @@ module.exports = {
     incarcerate,
     release,
     announce,
-    removeCustody,
     setChannelLoggable,
     bug,
     autopsy,
