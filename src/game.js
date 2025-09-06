@@ -1514,13 +1514,15 @@ async function onPlayerKillPlayer(client, idKiller, idVictim) {
     }
 
     // give killer access to the watari's stolen laptop and revoke access from the victim
-    const watariLaptop = await client.guilds.fetch(
-        gameConfig.guildIds.watarilaptop
-    );
-    const killerUser = await client.users.fetch(idKiller);
-    const victimUser = await client.users.fetch(idVictim);
-    await revokeAccess(victimUser, watariLaptop);
-    await grantAccess(killerUser, watariLaptop);
+    if (bugs.length > 0) {
+        const watariLaptop = await client.guilds.fetch(
+            gameConfig.guildIds.watarilaptop
+        );
+        const killerUser = await client.users.fetch(idKiller);
+        const victimUser = await client.users.fetch(idVictim);
+        await revokeAccess(victimUser, watariLaptop);
+        await grantAccess(killerUser, watariLaptop);
+    }
 }
 
 // if guild is not a notebook yet, this function creates a new notebook and sets the current and original owner to owner.
