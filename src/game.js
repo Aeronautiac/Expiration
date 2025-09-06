@@ -690,7 +690,7 @@ async function custody(client, user) {
     await restrictNotebooks(user, "custody");
 
     // bug the player with the custody source
-    await bugUser(client, user, "custody");
+    await bugUser(client, null, user, "custody");
 
     // add role
     if (member) await member.roles.add(gameConfig.roleIds.Custody);
