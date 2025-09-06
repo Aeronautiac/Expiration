@@ -2136,7 +2136,7 @@ async function ipp(interaction) {
     });
     await setNickname(
         interaction.client,
-        user,
+        target,
         `${targetMember.displayName} (IPP)`
     );
 
