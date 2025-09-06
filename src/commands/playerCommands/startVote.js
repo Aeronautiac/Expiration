@@ -200,7 +200,7 @@ module.exports = {
         let requiredRoles = abilityConfig.requiredRoles || [];
         let membersInOrganisation = 0;
 
-        for (const member of guild.members.cache.values()) {
+        for (const member of await guild.members.fetch()) {
             if (member.user.bot) continue;
             const playerData = await game.getPlayerData(member.user);
             if (playerData && playerData.alive) {
