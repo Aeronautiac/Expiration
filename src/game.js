@@ -2276,7 +2276,7 @@ async function bugUser(client, buggedBy, user, source) {
     )}`;
 
     const newLog = await BugLog.create({
-        buggedBy: buggedBy.id,
+        buggedBy: buggedBy ? buggedBy.id : null,
         source: source,
         targetId: user.id,
     });
