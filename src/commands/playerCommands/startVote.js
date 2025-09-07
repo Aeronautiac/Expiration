@@ -409,7 +409,7 @@ module.exports = {
                         const result = await game.kidnap(
                             client,
                             guild,
-                            target,
+                            targetId,
                             kidnapper.id
                         );
                         if (result !== true) {
@@ -430,7 +430,7 @@ module.exports = {
                         const result = await game.kidnap(
                             client,
                             guild,
-                            target.id
+                            targetId
                         );
                         if (result !== true) {
                             await pollMessage.reply({
