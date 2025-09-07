@@ -41,6 +41,7 @@ module.exports = {
                                 : message.author.username
                         }:** ${message.content}`,
                         files: [...message.attachments.values()],
+                        split: true,
                     });
                 }
             } catch (err) {

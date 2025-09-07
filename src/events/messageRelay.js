@@ -31,6 +31,7 @@ module.exports = {
                         await targetChannel.send({
                             content: message.content,
                             files: [...message.attachments.values()],
+                            split: true,
                         });
                     }
                 } catch (err) {
@@ -80,6 +81,7 @@ module.exports = {
                     await targetChannel.send({
                         content: sendText,
                         files: [...message.attachments.values()],
+                        split: true,
                     });
                 }
             } catch (err) {
