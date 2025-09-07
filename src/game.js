@@ -1656,7 +1656,7 @@ async function onPseudocideRevival(client, targetId, roleOnDeath) {
     const targetUser = await client.users.fetch(targetId);
 
     await news.send({
-        content: `@everyone It appears that ${targetUser} never actually died! Their death was orchestrated using an ultra-realistic doll.`,
+        content: `@everyone It appears that ${targetUser} never actually died! Their death was orchestrated using an ultra-realistic replica.`,
         allowedMentions: { parse: ["everyone"] },
     });
 
