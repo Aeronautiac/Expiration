@@ -2211,7 +2211,7 @@ async function freeNotebooks(user, reason) {
     if (!userData.notebookRestrictReasons.includes(reason))
         return "User's notebook is not restricted by this reason.";
 
-    userData.notebookRestrictReasons.filter((blocker) => blocker !== reason);
+    userData.notebookRestrictReasons = userData.notebookRestrictReasons.filter((blocker) => blocker !== reason);
     await userData.save();
 
     return true;
