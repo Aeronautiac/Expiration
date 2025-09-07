@@ -213,12 +213,11 @@ module.exports = {
             })
         ).length;
 
-        for (const member of alivePlayersWithAffiliation) {
-            const playerData = await game.getPlayerData(member.user);
-            if (playerData && playerData.alive) {
-                if (requiredRoles.includes(playerData.role)) {
+        for (const player of alivePlayersWithAffiliation) {
+            if (player && player.alive) {
+                if (requiredRoles.includes(player.role)) {
                     // Remove the player's role from requiredRoles
-                    const roleIndex = requiredRoles.indexOf(playerData.role);
+                    const roleIndex = requiredRoles.indexOf(player.role);
                     if (roleIndex !== -1) {
                         requiredRoles.splice(roleIndex, 1);
                     }
