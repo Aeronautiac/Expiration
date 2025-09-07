@@ -145,7 +145,7 @@ module.exports = {
                 });
                 return;
             }
-            const targetData = await game.getPlayerData(target);
+            const targetData = await game.getPlayerData(targetUser);
             if (!targetData || !targetData.alive) {
                 await interaction.editReply({
                     content: "The target must be alive.",

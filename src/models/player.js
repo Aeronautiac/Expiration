@@ -7,7 +7,7 @@ const playerSchema = new mongoose.Schema({
     role: { type: String, required: true },
     alive: { type: Boolean, required: true },
     loungeChannelIds: { type: [String], required: true, default: [] }, // stores lounge ids
-    contactTokens: { type: Number, required: true  },
+    contactTokens: { type: Number, required: true },
     // monologueChannelId: { type: String, required: true },
     monologueChannelId: String,
     cooldowns: {
@@ -20,6 +20,7 @@ const playerSchema = new mongoose.Schema({
     loungeHideReasons: { type: [String], required: true, default: [] },
     affiliations: { type: [String], required: true, default: [] },
     notebookRestrictReasons: { type: [String], required: true, default: [] },
+    states: { type: Map, of: Boolean, default: {}, required: true }, // holds states like ipp, unlocked, 
 
     // role ability system
     // abilitiesUsedToday: { type: [String], required: true, default: [] },
