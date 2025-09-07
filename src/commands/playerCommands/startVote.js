@@ -409,7 +409,7 @@ module.exports = {
                         const result = await game.kidnap(
                             client,
                             guild,
-                            target.id,
+                            target,
                             kidnapper.id
                         );
                         if (result !== true) {
