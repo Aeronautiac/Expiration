@@ -200,16 +200,20 @@ module.exports = {
         let requiredRoles = abilityConfig.requiredRoles || [];
         // let membersInOrganisation = 0;
 
-        const alivePlayersWithAffiliation = await Player.find({affiliations: ourAffiliation, alive: true});
-        const membersInOrganisation = alivePlayersWithAffiliation.length;
-        const membersWhoCanVote = (await Player.find({
+        const alivePlayersWithAffiliation = await Player.find({
             affiliations: ourAffiliation,
             alive: true,
-            loungeHideReasons: { $size: 0 },
-        })).length;
+        });
+        const membersInOrganisation = alivePlayersWithAffiliation.length;
+        const membersWhoCanVote = (
+            await Player.find({
+                affiliations: ourAffiliation,
+                alive: true,
+                loungeHideReasons: { $size: 0 },
+            })
+        ).length;
 
         for (const member of alivePlayersWithAffiliation) {
-            if (member.user.bot) continue;
             const playerData = await game.getPlayerData(member.user);
             if (playerData && playerData.alive) {
                 if (requiredRoles.includes(playerData.role)) {
@@ -308,13 +312,21 @@ module.exports = {
                         );
                         if (targetPlayerData) {
                             const msg = await pollMessage.reply(
-                                `The true name of **${game.strippedName(target.displayName)}** is **${targetPlayerData.trueName}**.`
+                                `The true name of **${game.strippedName(
+                                    target.displayName
+                                )}** is **${targetPlayerData.trueName}**.`
                             );
                             msg.pin();
                         }
                     } else if (action === "Civilian Arrest") {
                         const civArrestMsg = await news.send({
-                            content: `@everyone The ${affiliationMention} has started a civilian arrest on **${game.strippedName(target.displayName)}**. Vote 👍 if you would like this person to be arrested for ${gameConfig.HRS_ARREST_DURATION} hours. Vote 👎 if you do not want this person to be arrested. This vote will last for ${gameConfig.HRS_CIVILIAN_ARREST_VOTE_DURATION} hours, then the verdict will be announced.`,
+                            content: `@everyone The ${affiliationMention} has started a civilian arrest on **${game.strippedName(
+                                target.displayName
+                            )}**. Vote 👍 if you would like this person to be arrested for ${
+                                gameConfig.HRS_ARREST_DURATION
+                            } hours. Vote 👎 if you do not want this person to be arrested. This vote will last for ${
+                                gameConfig.HRS_CIVILIAN_ARREST_VOTE_DURATION
+                            } hours, then the verdict will be announced.`,
                         });
 
                         await game.createGenericPoll(
@@ -337,7 +349,7 @@ module.exports = {
                                     if (targetData.ipp) {
                                         await civArrestMsg.reply(
                                             `The vote has passed, but **${target.displayName}** is now under IPP and cannot be arrested.`
-                                        )
+                                        );
                                         return;
                                     }
                                     await civArrestMsg.reply(
