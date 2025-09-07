@@ -1651,7 +1651,7 @@ async function prepareScheduledDeath(client, targetId) {
     }
 }
 
-async function onPseudocideRevival(client, targetId, role) {
+async function onPseudocideRevival(client, targetId, roleOnDeath) {
     const news = await client.channels.fetch(gameConfig.channelIds.news);
     const targetUser = await client.users.fetch(targetId);
 
@@ -1660,7 +1660,7 @@ async function onPseudocideRevival(client, targetId, role) {
         allowedMentions: { parse: ["everyone"] },
     });
 
-    await role(client, targetUser, role);
+    await role(client, targetUser, roleOnDeath);
 }
 
 async function scheduleDeath(client, fromId, targetId, delay, message) {

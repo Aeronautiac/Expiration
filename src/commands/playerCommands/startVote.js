@@ -198,9 +198,16 @@ module.exports = {
 
         // Start a poll for the ability
         let requiredRoles = abilityConfig.requiredRoles || [];
-        let membersInOrganisation = 0;
+        // let membersInOrganisation = 0;
 
-        for (const member of (await guild.members.fetch()).values()) {
+        const alivePlayersWithAffiliation = await Player.find({affiliations: ourAffiliation, alive: true});
+        const membersInOrganisation = playersWithAffiliation.length;
+        const membersWhoCanVote = await Player.find({
+            affiliations: ourAffiliation,
+            alive: true,
+        });
+
+        for (const member of playersWithAffiliation) {
             if (member.user.bot) continue;
             const playerData = await game.getPlayerData(member.user);
             if (playerData && playerData.alive) {
@@ -211,7 +218,7 @@ module.exports = {
                         requiredRoles.splice(roleIndex, 1);
                     }
                 }
-                membersInOrganisation++;
+                // membersInOrganisation++;
             }
         }
 
