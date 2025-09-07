@@ -201,13 +201,14 @@ module.exports = {
         // let membersInOrganisation = 0;
 
         const alivePlayersWithAffiliation = await Player.find({affiliations: ourAffiliation, alive: true});
-        const membersInOrganisation = playersWithAffiliation.length;
-        const membersWhoCanVote = await Player.find({
+        const membersInOrganisation = alivePlayersWithAffiliation.length;
+        const membersWhoCanVote = (await Player.find({
             affiliations: ourAffiliation,
             alive: true,
-        });
+            loungeHideReasons: { $size: 0 },
+        })).length;
 
-        for (const member of playersWithAffiliation) {
+        for (const member of alivePlayersWithAffiliation) {
             if (member.user.bot) continue;
             const playerData = await game.getPlayerData(member.user);
             if (playerData && playerData.alive) {
@@ -218,7 +219,6 @@ module.exports = {
                         requiredRoles.splice(roleIndex, 1);
                     }
                 }
-                // membersInOrganisation++;
             }
         }
 
@@ -252,7 +252,7 @@ module.exports = {
             }
         }
 
-        const majority = Math.ceil(membersInOrganisation * 0.5);
+        const majority = Math.floor(membersWhoCanVote / 2) + 1;
         const loungeChannel = await client.channels.fetch(
             interaction.channel.id
         );
