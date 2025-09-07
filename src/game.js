@@ -2592,7 +2592,7 @@ async function delayedRelease(client, targetId) {
     });
 
     // check if they are still arrested, if they are, release them. this can still potentially lead to bugs, but right now pseudocide lasts 24 hours, so it should be fine.
-    if (await target.roles.fetch(gameConfig.roleIds.Arrested)) {
+    if (await target.roles.cache.get(gameConfig.roleIds.Arrested)) {
         await release(client, target);
     }
 }
