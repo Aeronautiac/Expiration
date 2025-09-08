@@ -4,7 +4,7 @@ import Player from "../models/playerts";
 import Ability from "../models/ability";
 import Season from "../models/season";
 import config from "../../gameconfig.json";
-import game from "./game";
+import names from "./names";
 
 type Result = {
     success: boolean,
@@ -96,7 +96,7 @@ async function useAbility<K extends keyof AbilityArgs>(userId: string, abilityNa
 
     // log ability usage
     const timeString = `<t:${Math.floor(Date.now() / 1000)}:F>`;
-    const userAlias = await game.getAlias(userId);
+    const userAlias = await names.getAlias(userId);
     const logMessage = `**${userAlias}** used **${abilityName}** at ${timeString} with args: ${JSON.stringify(args)}`
     const hostLogs = await client.channels.fetch(config.channelIds.hostLogs);
     if (hostLogs && hostLogs.isSendable()) await hostLogs.send(logMessage);
@@ -184,7 +184,7 @@ abilities.ipp = async function(userId, args) {
     targetData.flags.set("ipp", true);
     await targetData.save();
 
-    game.setNickname(args.targetId, `${targetMember.displayName} (IPP)`);
+    names.setNick(args.targetId, `${targetMember.displayName} (IPP)`);
 
     return success();
 }
