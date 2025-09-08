@@ -800,6 +800,8 @@ async function createTemporaryChannel(
             allow: [PermissionsBitField.Flags.ViewChannel],
         });
     }
+    
+    console.log(permissionOverwrites);
 
     const newChannel = await guild.channels.create({
         name: channelName,
@@ -2755,7 +2757,7 @@ async function kidnap(client, kidnapperGuild, targetId, kidnapperId) {
         mainGuild,
         `kidnapped-${victimName}`,
         "kidnap",
-        [targetId]
+        [victimUser]
     );
     const kidnapperChannel = await createLoungeChannel(
         kidnapperGuild,

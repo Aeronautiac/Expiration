@@ -122,6 +122,7 @@ McClure
 OKeefe
 Wintheiser
 Conroy
+Foley
 Windler
 Rutherford
 Lemke
@@ -583,6 +584,7 @@ Kuphal
 Bergstrom
 HarrisBradtke
 Quitzon
+Harrison
 Schiller
 Purdy
 Bergnaum

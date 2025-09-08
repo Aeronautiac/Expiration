@@ -234,6 +234,8 @@ module.exports = {
             return;
         }
 
+        console.log("reached here");
+
         if (
             abilityConfig.membersRequired &&
             membersInOrganisation < abilityConfig.membersRequired
@@ -251,11 +253,15 @@ module.exports = {
                         r.id === gameConfig.roleIds.Kidnapped
                 )
             ) {
-                return "You cannot start a lock up on someone that is already locked up.";
+                await interaction.editReply({
+                    content:
+                        "You cannot start a lock up on someone that is already locked up.",
+                });
+                return;
             }
         }
 
-        const majority = Math.floor(membersWhoCanVote / 2) + 1;
+        const majority = /*Math.floor(membersWhoCanVote / 2) + 1*/ 1;
         const loungeChannel = await client.channels.fetch(
             interaction.channel.id
         );
@@ -275,6 +281,7 @@ module.exports = {
             content: messageContent,
         });
 
+        // console.log("reached here");
         await game.createGenericPoll(
             pollMessage,
             60 * 1000 * 60,
