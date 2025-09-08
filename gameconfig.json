@@ -112,7 +112,12 @@
         "PI": ["autopsy", "ipp", "anonymousContact"],
         "Watari": ["bug", "anonymousContact"],
         "BB": ["pseudocide", "nameReveal", "notebookDetect"],
-        "2nd Kira": ["nameReveal", "notebookDetect", "underTheRadar", "anonymousMessage"],
+        "2nd Kira": [
+            "nameReveal",
+            "notebookDetect",
+            "underTheRadar",
+            "anonymousMessage"
+        ],
         "Kira": ["underTheRadar", "anonymousMessage"],
         "L": ["anonymousMessage"],
         "News Anchor": ["civilianArrest"]
@@ -121,45 +126,70 @@
     "abilities": {
         "autopsy": {
             "charges": 1,
-            "cooldown": 0
+            "cooldown": 0,
+            "bypasses": []
         },
         "bug": {
             "charges": 1,
-            "cooldown": 1
+            "cooldown": 1,
+            "bypasses": []
         },
         "pseudocide": {
             "charges": [1, 2],
-            "cooldown": 1
+            "cooldown": 1,
+            "bypasses": []
         },
         "nameReveal": {
             "canBeUsedInCustody": true,
             "charges": [1, 2],
-            "cooldown": 0
+            "cooldown": 0,
+            "bypasses": ["custody"]
         },
         "notebookDetect": {
             "canBeUsedInCustody": true,
             "charges": 1,
-            "cooldown": 0
+            "cooldown": 0,
+            "bypasses": ["custody"]
         },
         "underTheRadar": {
             "charges": 1,
-            "cooldown": 999
+            "cooldown": 999,
+            "bypasses": []
         },
         "anonymousMessage": {
             "charges": 3,
-            "cooldown": 0
+            "cooldown": 0,
+            "bypasses": []
         },
         "ipp": {
             "charges": [1, 2],
-            "cooldown": 1
+            "cooldown": 1,
+            "bypasses": []
         },
         "anonymousContact": {
             "charges": 2,
-            "cooldown": 0
+            "cooldown": 0,
+            "bypasses": []
         },
         "civilianArrest": {
             "charges": 1,
-            "cooldown": 1
+            "cooldown": 1,
+            "bypasses": []
+        }
+    },
+
+    "playerStates": {
+        "custody": {
+            "hidesLounges": false,
+            "restrictsNotebookWriting": true,
+            "restrictsNotebookPassing": true,
+            "restrictsAbilities": true
+        },
+        "kidnapped": {
+            "hidesLounges": true,
+            "restrictsNotebookWriting": false,
+            "restrictsNotebookPassing": true,
+            "restrictsAbilities": true
         }
     },
 

@@ -1,6 +1,17 @@
-const { mongoose } = require("../mongoose");
+import { Document, Schema, Model, model } from "mongoose";
 
-const abilitySchema = new mongoose.Schema({
+export interface IAbility extends Document {
+  persistsThroughRoleChange: boolean;
+  usedToday: boolean;
+  ownerId: string;
+  ability: string;
+  cooldown: number;
+  charges?: number;
+}
+
+export interface IAbilityDocument extends IAbility, Document {}
+
+const abilitySchema = new Schema<IAbility>({
     persistsThroughRoleChange: { type: Boolean, required: true, default: false },
     usedToday: { type: Boolean, required: true, default: false },
     ownerId: { type: String, required: true }, // abilities may only be used by their owner. each player may only own one copy of an ability at a time.
@@ -9,5 +20,5 @@ const abilitySchema = new mongoose.Schema({
     charges: Number, // at the end of a day, charges are removed from the ability's data.
 });
 
-const Ability = mongoose.model("ability", abilitySchema);
-module.exports = Ability;
+const Ability: Model<IAbilityDocument> = model<IAbility>("ability", abilitySchema);
+export default Ability;

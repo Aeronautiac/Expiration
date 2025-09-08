@@ -20,7 +20,8 @@ const playerSchema = new mongoose.Schema({
     loungeHideReasons: { type: [String], required: true, default: [] },
     affiliations: { type: [String], required: true, default: [] },
     notebookRestrictReasons: { type: [String], required: true, default: [] },
-    states: { type: Map, of: Boolean, default: {}, required: true }, // holds states like ipp, unlocked, 
+    states: { type: Map, of: Boolean, default: {}, required: true }, // holds states like ipp, unlocked, etc...
+    abilityRestrictors: { type: Map, of: Boolean, default: {}, required: true },
 
     // role ability system
     // abilitiesUsedToday: { type: [String], required: true, default: [] },

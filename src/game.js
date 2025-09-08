@@ -3,7 +3,6 @@ const fs = require("fs");
 const {
     ChannelType,
     PermissionsBitField,
-    PermissionFlagsBits,
 } = require("discord.js");
 const { mongoose } = require("./mongoose");
 const Player = require("./models/player");
@@ -800,7 +799,7 @@ async function createTemporaryChannel(
             allow: [PermissionsBitField.Flags.ViewChannel],
         });
     }
-    
+
     console.log(permissionOverwrites);
 
     const newChannel = await guild.channels.create({
@@ -967,7 +966,7 @@ async function canContact(client, user, target, anonymous, groupChat) {
     if (!playerData.alive && !monologue) return "You're dead...";
 
     if (!targetData.alive && !monologue)
-        return "You're trying to talk to a corpse... Lane moment...";
+        return "You're trying to talk to a corpse...";
 
     if (playerData.loungeHideReasons.length > 0 && !monologue)
         return `Cannot contact because you have at least one lounge hiding reason: ${playerData.loungeHideReasons}`;
@@ -2213,7 +2212,9 @@ async function freeNotebooks(user, reason) {
     if (!userData.notebookRestrictReasons.includes(reason))
         return "User's notebook is not restricted by this reason.";
 
-    userData.notebookRestrictReasons = userData.notebookRestrictReasons.filter((blocker) => blocker !== reason);
+    userData.notebookRestrictReasons = userData.notebookRestrictReasons.filter(
+        (blocker) => blocker !== reason
+    );
     await userData.save();
 
     return true;
