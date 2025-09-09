@@ -1,6 +1,6 @@
 # Expiration Discord Bot
 
-A Discord bot for managing and interacting with the Alumina: Elite community.
+A Discord bot for managing and interacting with the Expiration community.
 
 ## Setup
 1. Clone the repository:
