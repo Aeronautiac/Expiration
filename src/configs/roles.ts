@@ -1,0 +1,71 @@
+import type { Role } from "./types";
+
+export const roles = {
+    Kira: {
+        abilities: ["underTheRadar", "anonymousAnnouncement"],
+        guilds: ["kira"],
+        abilityOverrides: {},
+        guildChannels: {},
+    },
+    "Beyond Birthday": {
+        abilities: ["pseudocide", "nameReveal", "notebookReveal"],
+        guilds: ["bb"],
+        abilityOverrides: {},
+        guildChannels: {},
+    },
+    Watari: {
+        abilities: ["bug", "anonymousContact"],
+        guilds: ["lwatari"],
+        abilityOverrides: {},
+        guildChannels: {
+            lwatari: ["wataridescription"],
+        },
+    },
+    L: {
+        abilities: ["anonymousAnnouncement", "anonymousProsecution"],
+        guilds: ["lwatari"],
+        abilityOverrides: {},
+        guildChannels: {
+            lwatari: ["ldescription", "legacyledgers"],
+        },
+    },
+    "Private Investigator": {
+        abilities: ["autopsy", "ipp", "anonymousContact"],
+        guilds: ["pi"],
+            abilityOverrides: {},
+        guildChannels: {},
+    },
+    "2nd Kira": {
+        abilities: [
+            "nameReveal",
+            "notebookReveal",
+            "underTheRadar",
+            "anonymousAnnouncement",
+        ],
+        guilds: ["2kira"],
+        abilityOverrides: {},
+        guildChannels: {},
+    },
+    "News Anchor": {
+        abilities: ["civilianArrest"],
+        guildChannels: {
+            main: ["news"],
+        },
+        guilds: [],
+        abilityOverrides: {},
+    },
+    Civilian: {
+        abilities: [],
+        guildChannels: {},
+        guilds: [],
+        abilityOverrides: {},
+    },
+    "Rogue Civilian": {
+        abilities: [],
+        guildChannels: {},
+        guilds: [],
+        abilityOverrides: {},
+    },
+} as const satisfies { [roleName: string]: Role };
+
+export type RoleName = keyof typeof roles;

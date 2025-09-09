@@ -1,6 +1,6 @@
 import { Client, Guild } from "discord.js";
 import fs from "fs";
-import config from "../../config.json";
+import { config } from "../configs/config";
 import Player from "../models/playerts";
 
 let client: Client;
@@ -14,7 +14,6 @@ const last_names = fs
     .filter(Boolean);
 
 const names = {
-
     init(c: Client): void {
         client = c;
     },
@@ -40,9 +39,13 @@ const names = {
     // returns the user's alias in game
     async getAlias(userId: string): Promise<string> {
         try {
-            const mainGuild: Guild = await client.guilds.fetch(config.guilds.main);
+            const mainGuild: Guild = await client.guilds.fetch(
+                config.guilds.main
+            );
             const member = await mainGuild.members.fetch(userId);
-            return member.displayName.replace(/\*/g, "").replace(/\s*\(IPP\)$/, "");
+            return member.displayName
+                .replace(/\*/g, "")
+                .replace(/\s*\(IPP\)$/, "");
         } catch (err) {
             console.warn(`Failed to get alias for user ${userId}`);
             return "";
@@ -51,20 +54,25 @@ const names = {
 
     // sets the user's nickname to the supplied nickname in all game guilds
     async setNick(userId: string, nickname: string): Promise<void> {
-        const promises = Object.entries(config.guilds).map(async ([name, id]) => {
-            try {
-                const guild = await client.guilds.fetch(id);
-                const member = await guild.members.fetch(userId);
-                await member.setNickname(nickname);
-            } catch (err) {
-                console.warn(`Failed to set nickname in guild ${name}:`, err);
+        const promises = Object.entries(config.guilds).map(
+            async ([name, id]) => {
+                try {
+                    const guild = await client.guilds.fetch(id);
+                    const member = await guild.members.fetch(userId);
+                    await member.setNickname(nickname);
+                } catch (err) {
+                    console.warn(
+                        `Failed to set nickname in guild ${name}:`,
+                        err
+                    );
+                }
             }
-        });
+        );
         await Promise.all(promises);
     },
 
     // converts a name to a readable, presentable format.
-    toReadable(name: string): string{
+    toReadable(name: string): string {
         return name
             .toLowerCase()
             .trim() // remove leading/trailing spaces and newlines
@@ -74,14 +82,13 @@ const names = {
     },
 
     // converts a name to an internal format (lowercase, no special characters)
-    toInternal(name: string): string{
+    toInternal(name: string): string {
         return name
             .replace(/[^a-zA-Z\s]/g, "")
             .toLowerCase()
             .trim()
             .replace(/\s+/g, " ");
-    }
-    
+    },
 };
 
 export default names;

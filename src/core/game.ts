@@ -1,22 +1,15 @@
 import { Client, Guild, Role } from "discord.js";
 import names from "./names";
-import fs from "fs";
-import config from "../../gameconfig.json";
+import { config } from "../configs/config";
 import access from "./access";
 import notebooks from "./notebooks";
 
 import Player, { GameRole } from "../models/playerts";
 import Notebook from "../models/notebookts";
 import contacting from "./contacting";
+import playerAbilities from "./playerAbilities";
 
 let client: Client;
-
-interface Game {
-    // contacting
-    addLoungeHider: (userId: string, reason: string) => Promise<void>,
-    removeLoungeHider: (userId: string, reason: string) => Promise<void>,
-    contact: (userId: string, targetId: string) => Promise<void>,
-};
 
 const game = {
 
@@ -38,7 +31,7 @@ const game = {
                 userId,
                 role,
                 trueName: names.toInternal(name),
-                contactTokens: config.dailyTokens,
+                contactTokens: config.dailyContactTokens,
             });
 
             await user.send(`Your true name is ${names.toReadable(name)}`);
@@ -58,27 +51,25 @@ const game = {
         }
 
         // restricts access to all guilds except main (this is called no matter what because your role could change even while alive.)
-        // remove all old role abilities
-        await removeOldAbilities(targetUser);
         await access.revokeAll(userId);
 
         // grants access to role guilds and abilities
-        await grantRoleAbilities(targetUser, role);
+        await playerAbilities.giveRoleAbilities(userId);
         await access.grantRole(userId);
 
         await contacting.removeLoungeHider(userId, "dead");
 
         // roles
-        const mainGuild = await client.guilds.fetch(config.guildIds.main);
+        const mainGuild = await client.guilds.fetch(config.guilds.main);
         const member = await mainGuild.members
             .fetch(userId)
             .catch(() => null);
         if (member) {
             await member.roles
-                .add(config.roleIds.Civilian)
+                .add(config.discordRoles.Civilian)
                 .catch(console.error);
             await member.roles
-                .remove(config.roleIds.Shinigami)
+                .remove(config.discordRoles.Shinigami)
                 .catch(console.error);
         }
     },

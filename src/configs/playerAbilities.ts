@@ -1,0 +1,61 @@
+import type { PlayerAbility } from "./types";
+
+export const playerAbilities = {
+    autopsy: {
+        charges: 1,
+        cooldown: 0,
+        bypasses: [],
+    },
+    bug: {
+        charges: 1,
+        cooldown: 1,
+        bypasses: [],
+    },
+    pseudocide: {
+        charges: [1, 2],
+        cooldown: 1,
+        bypasses: [],
+    },
+    nameReveal: {
+        charges: [1, 2],
+        cooldown: 0,
+        bypasses: ["custody"],
+    },
+    notebookReveal: {
+        charges: 1,
+        cooldown: 0,
+        bypasses: ["custody"],
+    },
+    underTheRadar: {
+        charges: 1,
+        cooldown: 999,
+        bypasses: [],
+    },
+    anonymousAnnouncement: {
+        charges: 3,
+        cooldown: 0,
+        bypasses: [],
+    },
+    ipp: {
+        charges: [1, 2],
+        cooldown: 1,
+        bypasses: [],
+    },
+    anonymousContact: {
+        charges: 2,
+        cooldown: 0,
+        bypasses: [],
+    },
+    civilianArrest: {
+        charges: 1,
+        cooldown: 1,
+        bypasses: [],
+    },
+    anonymousProsecution: {
+        charges: 1,
+        cooldown: 999,
+        bypasses: [],
+    },
+} as const satisfies { [abilityName: string]: PlayerAbility };
+
+export type PlayerAbilityName = keyof typeof playerAbilities;
