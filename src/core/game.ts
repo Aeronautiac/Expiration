@@ -1,4 +1,4 @@
-import { Client, Guild, Role } from "discord.js";
+import { Channel, ChannelType, Client, Guild, Role } from "discord.js";
 import names from "./names";
 import { config } from "../configs/config";
 import access from "./access";
@@ -11,8 +11,24 @@ import playerAbilities from "./playerAbilities";
 import { RoleName } from "../configs/roles";
 import Season, { SeasonFlag } from "../models/seasonts";
 import { Result, success, failure } from "../types/Result";
+import mongoose from "mongoose";
+import Bug from "../models/bug";
+import { CategoryPrefixName } from "../configs/categoryPrefixes";
+import util from "./util";
 
 let client: Client;
+
+async function resetDatabase() {
+    const collections = await mongoose.connection.db
+        .listCollections()
+        .toArray();
+
+    for (const collection of collections) {
+        if (collection.name !== "config") {
+            await mongoose.connection.dropCollection(collection.name);
+        }
+    }
+}
 
 const game = {
     init: function (newClient: Client) {
@@ -93,12 +109,15 @@ const game = {
 
         await Season.create({});
 
-        return success("Successfully created a new season. Run /startseason to begin.")
+        return success(
+            "Successfully created a new season. Run /startseason to begin."
+        );
     },
 
     async startSeason() {
         const season = await Season.findOne({});
-        if (!season) return failure("No season exists. Create one with /newseason.");
+        if (!season)
+            return failure("No season exists. Create one with /newseason.");
 
         season.flags.set("active", true);
         await season.save();
@@ -108,17 +127,28 @@ const game = {
 
     async endSeason() {
         const season = await Season.findOne({});
-        if (!season) return failure("No season exists. Create one with /newseason.");
-        
+        if (!season)
+            return failure("No season exists. Create one with /newseason.");
+
         season.flags.set("active", false);
         await season.save();
 
-        return success("Season ended. Run /cleanslate to clear all data, messages, and channels that are associated with the season.");
+        return success(
+            "Season ended. Run /cleanslate to clear all data, messages, and channels that are associated with the season."
+        );
     },
 
-    async cleanSlate() {},
+    async cleanSlate() {
+        await resetDatabase();
+
+        return success(
+            "The season has been cleared. You may now create a new season with /newseason."
+        );
+    },
 
     async createDefaultOrganisations() {},
+
+    async resetContactTokens() {},
 
     async startBlackout() {},
 
@@ -136,19 +166,72 @@ const game = {
 
     async announce() {},
 
-    async applyIncarcerated() {},
+    async incarcerate() {},
 
     async removeIncarcerated() {},
 
-    async applyKidnapped() {},
+    async kidnap() {},
 
-    async removeKidnapped() {},
+    async releaseKidnap() {},
 
     async removeIPPs() {},
 
-    async removeBugs() {},
+    async bug(
+        targetId: string,
+        source: string,
+        buggedBy?: string
+    ): Promise<void> {
+        const target = await client.users.fetch(targetId);
 
-    async resetContactTokens() {}
+        const newBug = await Bug.create({
+            buggedBy,
+            targetId,
+            source,
+        });
+
+        const alias = await names.getAlias(targetId);
+        const newChannelName = `${source}-${alias}`;
+
+        const logChannelWatari = await util.createTemporaryChannel(
+            config.guilds.lwatari,
+            newChannelName,
+            config.categoryPrefixes.buglog
+        );
+        if (source === "bug") {
+            const logChannelStolen = await util.createTemporaryChannel(
+                config.guilds.watarilaptop,
+                newChannelName,
+                config.categoryPrefixes.stolenbuglog
+            );
+            newBug.channelIds.set("stolen", logChannelStolen.id);
+        }
+        newBug.channelIds.set("watari", logChannelWatari.id);
+        await newBug.save();
+
+        let notifierMessage = (() => {
+            if (source === "bug") return `You have been bugged.`;
+            if (source === "custody")
+                return `You have been placed into custody.`;
+            return "";
+        })();
+        let viewableBy = (() => {
+            if (source === "bug") return "the person who bugged you";
+            if (source === "custody") return "L and Watari";
+            return "";
+        })();
+        notifierMessage += `\nAs a result, anything you send in shared channels will be viewable by ${viewableBy}.
+    \nA shared channel is any channel which is not solely visible to you at all times.`;
+
+        try {
+            await target.send(notifierMessage);
+        } catch (err) {
+            console.log("Failed to notify user of bug.", err);
+        }
+    },
+
+    async removeBugs() {
+
+    },
 };
 
 export default game;
