@@ -1,13 +1,13 @@
 import { Document, Schema, Model, model } from "mongoose";
+import { RoleName } from "../configs/roles";
 
 export type PlayerFlag = "ipp" | "custody" | "incarcerated" | "underTheRadar" | "notebookUnlocked" | "alive";
-export type GameRole = "Kira" | "2nd Kira" | "Civilian" | "News Anchor" | "Rogue Civilian" | "Beyond Birthday" | "Private Investigator" | "L" | "Watari"
 
 // Interface representing a player
 export interface IPlayer {
     userId: string;
     trueName: string;
-    role: GameRole;
+    role: RoleName;
     loungeChannelIds: string[];
     contactTokens: number;
     monologueChannelId?: string;

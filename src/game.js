@@ -633,17 +633,6 @@ async function deathMessage(
     }
 }
 
-// adds a cooldown to a player's data
-async function addCooldown(user, ability, cooldown) {
-    const playerData = await getPlayerData(user);
-
-    const newCds = playerData.cooldowns;
-    newCds.set(ability, cooldown);
-    await updatePlayerData(user, {
-        cooldowns: newCds,
-    });
-}
-
 async function addOrganisationCooldown(organisationName, ability, cooldown) {
     const orgData = await getOrganisationData(organisationName);
 

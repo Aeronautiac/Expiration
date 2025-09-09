@@ -16,7 +16,7 @@ const notebooks = {
     // grants and revokes guild access as necessary.
     // if temporary is true, then instead of current owner being changed, temporary owner is changed. notebooks with temporary owners
     // are sent back to their current owners when the next day begins even if the temporary owner died with it.
-    async set(guildId: string, ownerId: string, temporary?: boolean): Promise<void> {
+    async setOwner(guildId: string, ownerId: string, temporary?: boolean): Promise<void> {
         const existingBook = await Notebook.findOne({ guildId });
 
         if (existingBook) {
@@ -83,6 +83,9 @@ const notebooks = {
         await playerData.save();
     },
     
+    async writeName() {
+        
+    }
 };
 
 export default notebooks;
