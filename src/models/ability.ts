@@ -1,18 +1,18 @@
 import { Document, Schema, Model, model } from "mongoose";
 
 export interface IAbility extends Document {
-  persistsThroughRoleChange: boolean;
   usedToday: boolean;
   ownerId: string;
   ability: string;
   cooldown: number;
   charges?: number;
+  roleRestriction?: string;
 }
 
 export interface IAbilityDocument extends IAbility, Document {}
 
 const abilitySchema = new Schema<IAbility>({
-    persistsThroughRoleChange: { type: Boolean, required: true, default: false },
+    roleRestriction: String, // only allow ability to be used while the player has this role.
     usedToday: { type: Boolean, required: true, default: false },
     ownerId: { type: String, required: true }, // abilities may only be used by their owner. each player may only own one copy of an ability at a time.
     ability: { type: String, required: true },

@@ -9,7 +9,6 @@
     "dailyTokens": 5,
     "maxGroupChatMembers": 5,
     "maxGroupChats": 3,
-    "underTheRadarCharges": 1,
 
     "HRS_CIVILIAN_ARREST_VOTE_DURATION": 6,
     "HRS_BLACKOUT_DURATION": 24,

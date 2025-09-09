@@ -1,4 +1,18 @@
 {
+    "dailyContactTokens": 5,
+    "maxChannelsPerCategory": 50,
+    "maxGroupChatMembers": 5,
+    "maxGameGroupChats": 3,
+
+    "categoryPrefixes": {
+        "monologue": "Monologues ",
+        "lounge": "Private Messages ",
+        "groupchat": "Group Chats ",
+        "kidnap": "Kidnapped ",
+        "buglog": "Bug & Custody Logs ",
+        "stolenbuglog": "Bug Logs "
+    },
+
     "guilds": {
         "main": "1406115825844359314",
         "kira": "1406119060227231784",
@@ -12,5 +26,321 @@
         "notebook2": "1406302376083722270",
         "notebook3": "1406302628450930708",
         "watarilaptop": "1412998755430432788"
+    },
+
+    "channels": {
+        "wataridescription": "placeholder",
+        "ldescription": "placeholder",
+        "legacyledgers": "placeholder",
+        "hostLogs": "1406169333280804885",
+        "watariContactLogs": "1406120605001973862",
+        "news": "1412595133756608644",
+        "bugLogs": "1411117992204570664",
+        "autopsyLogs": "1413357498974601316",
+        "courtroom": "1412595089858887743",
+        "tapinLogs": "1412595345481011240",
+        "stolenContactLogs": "1412998755795599376"
+    },
+
+    "discordRoles": {
+        "Spectator": "1406115825844359315",
+        "Shinigami": "1406115825886167046",
+        "Private Investigator": "1406115825957732546",
+        "Beyond Birthday": "1406115825957732547",
+        "L": "1406115825957732552",
+        "Watari": "1406115825957732548",
+        "Kira": "1406115825957732553",
+        "2nd Kira": "1406115825957732551",
+        "Civilian": "1406115825886167047",
+        "Rogue Civilian": "1406115825928376365",
+        "News Anchor": "1406115825928376364",
+        "Kira's Kingdom": "1406115825928376368",
+        "Task Force": "1406115825928376367",
+        "Incarcerated": "1412394267556446228",
+        "Prosecutor": "1406115825928376361",
+        "Custody": "1406115825907269651",
+        "Kidnapped": "1406115825928376362"
+    },
+
+    "roles": {
+        "Kira": {
+            "abilities": [
+                "underTheRadar",
+                "anonymousAnnouncement"
+            ],
+            "abilityOverrides": {
+                "example": {
+                    "cooldown": 1,
+                    "charges": [
+                        1,
+                        2,
+                        3
+                    ],
+                    "bypasses": [
+                        "custody"
+                    ]
+                }
+            },
+            "guilds": [
+                "kira"
+            ],
+            "guildChannels": {
+                "kira": [
+                    "example"
+                ]
+            }
+        },
+        "Beyond Birthday": {
+            "abilities": [
+                "pseudocide",
+                "nameReveal",
+                "notebookReveal"
+            ],
+            "abilityOverrides": {},
+            "guilds": [
+                "bb"
+            ],
+            "guildChannels": {}
+        },
+        "Watari": {
+            "abilities": [
+                "bug",
+                "anonymousContact"
+            ],
+            "abilityOverrides": {},
+            "guilds": [
+                "lwatari"
+            ],
+            "guildChannels": {
+                "lwatari": [
+                    "wataridescription"
+                ]
+            }
+        },
+        "L": {
+            "abilities": [
+                "anonymousAnnouncement",
+                "anonymousProsecution"
+            ],
+            "abilityOverrides": {},
+            "guilds": [
+                "lwatari"
+            ],
+            "guildChannels": {
+                "lwatari": [
+                    "ldescription",
+                    "legacyledgers"
+                ]
+            }
+        },
+        "Private Investigator": {
+            "abilities": [
+                "autopsy",
+                "ipp",
+                "anonymousContact"
+            ],
+            "abilityOverrides": {},
+            "guilds": [
+                "pi"
+            ],
+            "guildChannels": {}
+        },
+        "2nd Kira": {
+            "abilities": [
+                "nameReveal",
+                "notebookReveal",
+                "underTheRadar",
+                "anonymousAnnouncement"
+            ],
+            "abilityOverrides": {},
+            "guilds": [
+                "2kira"
+            ],
+            "guildChannels": {}
+        },
+        "News Anchor": {
+            "abilities": [
+                "civilianArrest"
+            ],
+            "abilityOverrides": {},
+            "guilds": [],
+            "guildChannels": {
+                "main": "news"
+            }
+        },
+        "Civilian": {
+            "abilities": [],
+            "abilityOverrides": {},
+            "guilds": [],
+            "guildChannels": {}
+        },
+        "Rogue Civilian": {
+            "abilities": [],
+            "abilityOverrides": {},
+            "guilds": [],
+            "guildChannels": {}
+        }
+    },
+
+    "playerStates": {
+        "custody": {
+            "hidesLounges": false,
+            "restrictsNotebookWriting": true,
+            "restrictsNotebookPassing": true,
+            "restrictsAbilities": true
+        },
+        "kidnapped": {
+            "hidesLounges": true,
+            "restrictsNotebookWriting": false,
+            "restrictsNotebookPassing": true,
+            "restrictsAbilities": true
+        },
+        "incarcerated": {
+            "hidesLounges": true,
+            "restrictsNotebookWriting": false,
+            "restrictsNotebookPassing:": true,
+            "restrictsAbilities": true
+        }
+    },
+
+    "playerAbilities": {
+        "autopsy": {
+            "charges": 1,
+            "cooldown": 0,
+            "bypasses": []
+        },
+        "bug": {
+            "charges": 1,
+            "cooldown": 1,
+            "bypasses": []
+        },
+        "pseudocide": {
+            "charges": [
+                1,
+                2
+            ],
+            "cooldown": 1,
+            "bypasses": []
+        },
+        "nameReveal": {
+            "charges": [
+                1,
+                2
+            ],
+            "cooldown": 0,
+            "bypasses": [
+                "custody"
+            ]
+        },
+        "notebookDetect": {
+            "charges": 1,
+            "cooldown": 0,
+            "bypasses": [
+                "custody"
+            ]
+        },
+        "underTheRadar": {
+            "charges": 1,
+            "cooldown": 999,
+            "bypasses": []
+        },
+        "anonymousMessage": {
+            "charges": 3,
+            "cooldown": 0,
+            "bypasses": []
+        },
+        "ipp": {
+            "charges": [
+                1,
+                2
+            ],
+            "cooldown": 1,
+            "bypasses": []
+        },
+        "anonymousContact": {
+            "charges": 2,
+            "cooldown": 0,
+            "bypasses": []
+        },
+        "civilianArrest": {
+            "charges": 1,
+            "cooldown": 1,
+            "bypasses": []
+        }
+    },
+
+    "organisations": {
+        "Task Force": {
+            "abilities": [
+                "Background Check",
+                "Civilian Arrest",
+                "Unlawful Arrest"
+            ]
+        },
+        "Kira's Kingdom": {
+            "abilities": [
+                "Blackout",
+                "Public Kidnap",
+                "Anonymous Kidnap",
+                "Tap In"
+            ]
+        }
+    },
+
+    "organisationAbilities": {
+        "Blackout": {
+            "cooldown": 999,
+            "organisation": "Kira's Kingdom",
+            "membersRequired": 5,
+            "duration": 24
+        },
+        "Public Kidnap": {
+            "cooldown": 1,
+            "organisation": "Kira's Kingdom",
+            "membersRequired": 3,
+            "duration": 24
+        },
+        "Anonymous Kidnap": {
+            "cooldown": 2,
+            "organisation": "Kira's Kingdom",
+            "membersRequired": 5,
+            "duration": 24
+        },
+        "2nd Kira+Kira Anonymous Kidnap": {
+            "cooldown": 2,
+            "organisation": "Kira's Kingdom",
+            "rolesRequiredInOrganisation": [
+                "2nd Kira",
+                "Kira"
+            ]
+        },
+        "Tap In": {
+            "cooldown": 1,
+            "organisation": "Kira's Kingdom",
+            "membersRequired": 4
+        },
+        "Background Check": {
+            "cooldown": 1,
+            "organisation": "Task Force",
+            "membersRequired": 3
+        },
+        "Civilian Arrest": {
+            "cooldown": 1,
+            "organisation": "Task Force",
+            "membersRequired": 4,
+        },
+        "Unlawful Arrest": {
+            "cooldown": 2,
+            "organisation": "Task Force",
+            "membersRequired": 5,
+        },
+        "PI+Watari Unlawful Arrest": {
+            "cooldown": 2,
+            "organisation": "Task Force",
+            "rolesRequiredInOrganisation": [
+                "PI",
+                "Watari"
+            ]
+        }
     }
 }

@@ -3,6 +3,7 @@
         "resolveJsonModule": true,
         "esModuleInterop": true,
         // "strict": true
-        "downlevelIteration": true
+        "downlevelIteration": true,
+        "lib": ["ES7", "DOM"]
     }
 }
