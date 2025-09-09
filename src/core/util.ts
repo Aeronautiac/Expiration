@@ -1,8 +1,13 @@
-import { Channel, ChannelType, Client, NewsChannel, PermissionsBitField, StageChannel, TextChannel, VoiceChannel } from "discord.js";
+import { Channel, ChannelType, Client, NewsChannel, PermissionOverwriteOptions, PermissionOverwrites, PermissionsBitField, StageChannel, TextChannel, VoiceChannel } from "discord.js";
 import Season from "../models/seasonts";
 import { config } from "../configs/config";
 
 let client: Client;
+
+export type ChannelPerms = {
+    ids: string[],
+    perms: PermissionOverwriteOptions
+}
 
 const util = {
     init: function (newClient: Client) {
@@ -16,7 +21,8 @@ const util = {
     async createTemporaryChannel(
         guildId: string,
         name: string,
-        categoryPrefix: string
+        categoryPrefix: string,
+        perms: ChannelPerms[] = []
     ): Promise<Channel> {
         const season = await Season.findOne({});
         if (!season) throw new Error("No season exists.");
@@ -65,13 +71,16 @@ const util = {
             chosenCategory = newCategory;
         }
 
+        // add perms
+        await util.addPermissionsToChannel(newChannel.id, perms);
+
         season.temporaryChannels.push(newChannel.id);
         await season.save();
 
         return newChannel;
     },
 
-    async addPermissionsToChannel(channelId: string, permissions: [{ ids: string[], allow: bigint[]}]) {
+    async addPermissionsToChannel(channelId: string, permissions: ChannelPerms[]) {
         const channel = await client.channels.fetch(channelId);
         if (
             !channel ||
@@ -81,12 +90,31 @@ const util = {
             channel instanceof StageChannel)
         ) throw new Error("Channel is not a text, news, voice, or stage channel.");
 
-        for (const perm of permissions) {
-            for (const id of perm.ids) {
-                await channel.permissionOverwrites.create(id, );
+        const overwrites = channel.permissionOverwrites;
+        const promises = permissions.map(async (entry) => {
+            for (const id of entry.ids) {
+                await overwrites.create(id, entry.perms);
             }
-        }
+        })
+        await Promise.allSettled(promises);
+    },
+
+    async deletePermissionsToChannel(channelId: string, ids: string[]) {
+        const channel = await client.channels.fetch(channelId);
+        if (
+            !channel ||
+            !(channel instanceof TextChannel ||
+            channel instanceof NewsChannel ||
+            channel instanceof VoiceChannel ||
+            channel instanceof StageChannel)
+        ) throw new Error("Channel is not a text, news, voice, or stage channel.");
+
+        const overwrites = channel.permissionOverwrites;
+        const promises = ids.map(async (id) => {
+            await overwrites.delete(id);
+        });
+        await Promise.all(promises);
     }
 };
 
-export default util;
+export default util;

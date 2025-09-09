@@ -71,6 +71,12 @@ const names = {
         await Promise.all(promises);
     },
 
+    async getDisplay(userId: string) {
+        const mainGuild = await client.guilds.fetch(config.guilds.main);
+        const member = await mainGuild.members.fetch(userId);
+        return member?.displayName;
+    },
+
     // converts a name to a readable, presentable format.
     toReadable(name: string): string {
         return name

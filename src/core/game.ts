@@ -1,10 +1,10 @@
-import { Channel, ChannelType, Client, Guild, Role } from "discord.js";
+import { Channel, ChannelType, Client, Guild, PermissionOverwriteOptions, Role, User } from "discord.js";
 import names from "./names";
 import { config } from "../configs/config";
 import access from "./access";
 import notebooks from "./notebooks";
 
-import Player from "../models/playerts";
+import Player, { IPlayerDocument } from "../models/playerts";
 import Notebook from "../models/notebookts";
 import contacting from "./contacting";
 import playerAbilities from "./playerAbilities";
@@ -14,7 +14,8 @@ import { Result, success, failure } from "../types/Result";
 import mongoose from "mongoose";
 import Bug from "../models/bug";
 import { CategoryPrefixName } from "../configs/categoryPrefixes";
-import util from "./util";
+import util, { ChannelPerms } from "./util";
+import Ability from "../models/ability";
 
 let client: Client;
 
@@ -55,10 +56,12 @@ const game = {
                 role,
                 trueName: names.toInternal(name),
                 contactTokens: config.dailyContactTokens,
+                flags: new Map([["alive", true]]),
             });
 
             await user.send(`Your true name is ${names.toReadable(name)}`);
         } else {
+            // revive them
             await Player.updateOne(
                 { userId },
                 {
@@ -146,35 +149,84 @@ const game = {
         );
     },
 
-    async createDefaultOrganisations() {},
+    async createDefaultOrganisations() { },
 
-    async resetContactTokens() {},
+    async resetContactTokens() {
+        await Player.updateMany({}, {
+            contactTokens: config.dailyContactTokens
+        });
+    },
 
-    async startBlackout() {},
+    async startBlackout() { },
 
-    async stopBlackout() {},
+    async stopBlackout() { },
 
-    async nextDay() {},
+    async nextDay() {
+        await game.resetContactTokens();
+        await game.removeExplicitBugs();
+        await Season.updateOne({}, {
+            $inc: { day: 1 }
+        });
+    },
 
-    async kill() {},
+    // if there is a killer, then handle stuff that should be done when someone kills someone else.
+    // if there is a death message, then use that instead of the default "They died from a sudden heart attack." message.
+    // if dontSendDeathAnnouncement is true, then don't send the death announcement.
+    async kill(userId: string, args: {
+        killerId?: string,
+        deathMessage?: string,
+        dontSendDeathAnnouncement?: boolean,
+    }) {
+        const userData = await Player.findOne({ userId });
+        const bugAbility = await Ability.findOne({ ownerId: userId, ability: "bug" });
+        const ownedNotebooks = await Notebook.find({ currentOwner: userId });
 
-    async deathMessage() {},
 
-    async applyCustody() {},
+        // handle player kill
+        if (args.killerId) {
 
-    async removeCustody() {},
+        }
 
-    async announce() {},
+        // death announcement
+        if (!args.dontSendDeathAnnouncement) {
+            await game.announceDeath(userId, {
+                wasKilledByPlayer: args.killerId !== undefined && args.killerId !== null,
+                deathMessage: args.deathMessage,
+                ownedANotebook: ownedNotebooks.length > 0,
+                ownedBugAbility: bugAbility !== undefined && bugAbility !== null,
+                role: userData.role,
+                affiliations: userData.affiliations,
+            })
+        }
+    },
 
-    async incarcerate() {},
+    async announceDeath(userId: string, args: {
+        wasKilledByPlayer?: boolean,
+        deathMessage?: string,
+        ownedANotebook?: boolean,
+        ownedBugAbility?: boolean,
+        trueName: string,
+        role: RoleName,
+        affiliations?: string[]
+    }) {
 
-    async removeIncarcerated() {},
+    },
 
-    async kidnap() {},
+    async applyCustody() { },
 
-    async releaseKidnap() {},
+    async removeCustody() { },
 
-    async removeIPPs() {},
+    async announce() { },
+
+    async incarcerate() { },
+
+    async removeIncarcerated() { },
+
+    async kidnap() { },
+
+    async releaseKidnap() { },
+
+    async removeIPPs() { },
 
     async bug(
         targetId: string,
@@ -192,16 +244,31 @@ const game = {
         const alias = await names.getAlias(targetId);
         const newChannelName = `${source}-${alias}`;
 
+        const bugLogPerms: PermissionOverwriteOptions = {
+            ViewChannel: true,
+            SendMessages: false,
+        }
+
+        const lwatariGuild = await client.guilds.fetch(config.guilds.lwatari);
         const logChannelWatari = await util.createTemporaryChannel(
             config.guilds.lwatari,
             newChannelName,
-            config.categoryPrefixes.buglog
+            config.categoryPrefixes.buglog,
+            [{
+                ids: [lwatariGuild.roles.everyone.id],
+                perms: bugLogPerms,
+            }]
         );
         if (source === "bug") {
+            const watarisStolenLaptopGuild = await client.guilds.fetch(config.guilds.watarilaptop);
             const logChannelStolen = await util.createTemporaryChannel(
                 config.guilds.watarilaptop,
                 newChannelName,
-                config.categoryPrefixes.stolenbuglog
+                config.categoryPrefixes.stolenbuglog,
+                [{
+                    ids: [watarisStolenLaptopGuild.roles.everyone.id],
+                    perms: bugLogPerms,
+                }]
             );
             newBug.channelIds.set("stolen", logChannelStolen.id);
         }
@@ -229,8 +296,29 @@ const game = {
         }
     },
 
-    async removeBugs() {
+    async removeExplicitBugs() {
+        const bugs = await Bug.find({
+            source: "bug",
+        });
+        const buggedPlayers: IPlayerDocument[] = [];
 
+        // find bugged players (to remove asterisk later)
+        for (const log of bugs) {
+            const player = await Player.findOne({ userId: log.targetId });
+            if (player && !buggedPlayers.find((p) => p.userId === player.userId))
+                buggedPlayers.push(player);
+        }
+
+        // delete bug data entries
+        await Bug.deleteMany({ source: "bug" });
+
+        // remove asterisks
+        const promises = buggedPlayers.map(async (player) => {
+            const display = await names.getDisplay(player.userId);
+            const cleanName = display.replace(/\*/g, "");
+            await names.setNick(player.userId, cleanName);
+        });
+        await Promise.allSettled(promises);
     },
 };
 

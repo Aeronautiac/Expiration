@@ -1,9 +1,10 @@
 import { Document, Schema, Model, model } from "mongoose";
+import { PlayerAbilityName } from "../configs/playerAbilities";
 
 export interface IAbility extends Document {
   usedToday: boolean;
   ownerId: string;
-  ability: string;
+  ability: PlayerAbilityName;
   cooldown: number;
   charges?: number;
   roleRestriction?: string;
