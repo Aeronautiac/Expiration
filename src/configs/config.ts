@@ -13,6 +13,7 @@ export const config = {
     dailyContactTokens: 5,
     maxChannelsPerCategory: 50,
     maxGroupChatSize: 5,
+    groupChatTokenCost: 5,
     maxGroupChatsInGame: 3,
     announcementDelay: 5, // in seconds
 

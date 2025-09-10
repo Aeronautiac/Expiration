@@ -46,6 +46,7 @@ export interface Config {
     dailyContactTokens: number;
     maxChannelsPerCategory: number;
     maxGroupChatSize: number;
+    groupChatTokenCost: number;
     maxGroupChatsInGame: number;
     announcementDelay: number; // in seconds
 

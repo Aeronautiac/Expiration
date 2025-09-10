@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { ChatInputCommandInteraction, CommandInteraction, Interaction, SlashCommandBuilder, User } from "discord.js";
 import game from "../../game";
 import { interaction } from "../../types";
 
@@ -19,10 +19,11 @@ export default {
                     "Whether this should be an anonymous contact or not"
                 )
         ),
-    async execute(interaction: interaction) {
+    async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
         });
+
 
         const reply = await game.contact(
             interaction.client,
@@ -33,7 +34,6 @@ export default {
 
         await interaction.editReply({
             content: reply,
-            ephemeral: true,
         });
     },
 };

@@ -16,6 +16,7 @@ import { PlayerStateName } from "../configs/playerStates";
 import Player from "../models/player";
 import contacting from "./contacting";
 import { DiscordRoleName } from "../configs/discordRoles";
+import { RoleName } from "../configs/roles";
 
 let client: Client;
 
@@ -201,6 +202,12 @@ const util = {
                 .add(config.discordRoles[roleName])
                 .catch(console.error);
         }
+    },
+
+    roleMention(r: RoleName) {
+        // Try to find role id from config, fallback to plain text
+        const id = config.discordRoles[r];
+        return id ? `<@&${id}>` : r;
     },
 
     hrsToMs(hrs: number) {

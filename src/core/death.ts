@@ -151,12 +151,6 @@ const death = {
         let revealMsg = "";
         const affiliations = args.affiliations ?? [];
 
-        // Helpers for mention formatting
-        const roleMention = (r: RoleName) => {
-            // Try to find role id from config, fallback to plain text
-            const id = config.discordRoles[r];
-            return id ? `<@&${id}>` : r;
-        };
         const orgMention = (org: OrganisationName) => {
             const id = config.discordRoles[org];
             return id ? `<@&${id}>` : org;
@@ -172,18 +166,18 @@ const death = {
             ["Beyond Birthday", "They were the enigmatic figure known as "],
             [
                 "Watari",
-                `They were the genius inventor and ${roleMention(
+                `They were the genius inventor and ${util.roleMention(
                     "L"
                 )}'s loyal handler, `,
             ],
             [
                 "2nd Kira",
-                `They were ${roleMention("Kira")}'s most devoted supporter, `,
+                `They were ${util.roleMention("Kira")}'s most devoted supporter, `,
             ],
         ]);
 
         const roleAddition = revealMessages.get(role) ?? "They were ";
-        revealMsg += roleAddition + roleMention(role);
+        revealMsg += roleAddition + util.roleMention(role);
 
         const chiefs = affiliations.filter((a) => a.endsWith("Chief"));
         const orgs = affiliations.filter(
