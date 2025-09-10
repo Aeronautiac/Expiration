@@ -1,7 +1,9 @@
-const { SlashCommandBuilder } = require("discord.js");
-const gameConfig = require("../../../gameconfig.json");
-const Player = require("../../models/player");
-const game = require("../../game");
+import { SlashCommandBuilder } from "discord.js";
+import game from "../../game";
+import { interaction, channel } from "../../types";
+import gameConfig from "../../../gameconfig.json";
+import Player from "../../models/player";
+import { createDiscordInteractionChoice, hrsToMs } from "../../util";
 
 const abilitiesThatRequireAUserTarget = [
     "Public Kidnap",
@@ -12,18 +14,45 @@ const abilitiesThatRequireAUserTarget = [
 ];
 const abilitiesThatRequireAKidnapper = ["Public Kidnap"];
 const abilitiesThatRequireAChannel = ["Tap In"];
-
-function choice(name) {
-    return { name: name, value: name };
-}
-
-function hrsToMs(hrs) {
-    return 1000 * 60 * 60 * hrs;
-}
+const CHUNK_LIMIT = 2000;
 
 const MS_TIME_BETWEEN_TAP_IN_CHUNKS = 6000;
 
-module.exports = {
+ async function sendBlock(blockName, blockLines, logChannel) {
+    if (blockLines.length === 0) return;
+    let prefix = `\`\`\`${blockName}:\`\`\`\n`;
+    let chunk = prefix;
+    for (let i = 0; i < blockLines.length; i++) {
+        let line = blockLines[i];
+        // If adding this line would exceed the limit, send the chunk and start a new one (fixes timestamp being cut off and looking very bad lol)
+        if (chunk.length + line.length > CHUNK_LIMIT) {
+            await logChannel.send(chunk);
+            await new Promise((res) =>
+                setTimeout(
+                    res,
+                    MS_TIME_BETWEEN_TAP_IN_CHUNKS
+                )
+            );
+            // Start new chunk with prefix and current line
+            chunk = prefix + line;
+        } else {
+            chunk +=
+                (chunk === prefix ? "" : "\n") + line;
+        }
+    }
+    // Send any remaining chunk
+    if (chunk.length > prefix.length) {
+        await logChannel.send(chunk);
+        await new Promise((res) =>
+            setTimeout(
+                res,
+                MS_TIME_BETWEEN_TAP_IN_CHUNKS
+            )
+        );
+    }
+}
+
+export default {
     data: new SlashCommandBuilder()
         .setName("startvote")
         .setDescription(
@@ -34,7 +63,7 @@ module.exports = {
                 .setName("action")
                 .setDescription("The action you want to vote for")
                 .addChoices(
-                    ...Object.keys(gameConfig.organisationAbilities).map(choice)
+                    ...Object.keys(gameConfig.organisationAbilities).map(createDiscordInteractionChoice)
                 )
                 .setRequired(true)
         )
@@ -471,70 +500,33 @@ module.exports = {
                             `**The <@&${gameConfig.roleIds["Kira's Kingdom"]}> have tapped into this channel. All messages before this one have been logged.**`
                         );
 
-                        const messages =
-                            await tapInTargetChannel.messages.fetch({
-                                limit: 100,
-                            });
-                        const ordered = Array.from(messages.values()).reverse();
-
                         let lastSpeakerId = null;
                         let currentBlock = [];
                         let currentBlockName = "";
-                        const CHUNK_LIMIT = 2000;
-
-                        // Send a block as chunks, ensuring no message is split
-                        async function sendBlock(blockName, blockLines) {
-                            if (blockLines.length === 0) return;
-                            let prefix = `\`\`\`${blockName}:\`\`\`\n`;
-                            let chunk = prefix;
-                            for (let i = 0; i < blockLines.length; i++) {
-                                let line = blockLines[i];
-                                // If adding this line would exceed the limit, send the chunk and start a new one (fixes timestamp being cut off and looking very bad lol)
-                                if (chunk.length + line.length > CHUNK_LIMIT) {
-                                    await logChannel.send(chunk);
-                                    await new Promise((res) =>
-                                        setTimeout(
-                                            res,
-                                            MS_TIME_BETWEEN_TAP_IN_CHUNKS
-                                        )
-                                    );
-                                    // Start new chunk with prefix and current line
-                                    chunk = prefix + line;
-                                } else {
-                                    chunk +=
-                                        (chunk === prefix ? "" : "\n") + line;
-                                }
-                            }
-                            // Send any remaining chunk
-                            if (chunk.length > prefix.length) {
-                                await logChannel.send(chunk);
-                                await new Promise((res) =>
-                                    setTimeout(
-                                        res,
-                                        MS_TIME_BETWEEN_TAP_IN_CHUNKS
-                                    )
-                                );
-                            }
-                        }
 
                         await new Promise((res) =>
                             setTimeout(res, MS_TIME_BETWEEN_TAP_IN_CHUNKS)
                         );
 
-                        for (const msg of ordered) {
-                            if (msg.author.bot) continue;
+                        const messages: channel["messages"] =
+                            await tapInTargetChannel.messages.fetch({
+                                limit: 100,
+                            });
+                        const orderedMessages = Array.from(messages.values()).reverse();
+                        for (const message of orderedMessages) {
+                            if (message.author.bot) continue;
                             // Get display name from mainGuild. This should probably be stored as a table outside this scope but apparently fetch isn't expensive? IDK LOL!
                             const mainMember = await mainGuild.members
-                                .fetch(msg.author.id)
+                                .fetch(message.author.id)
                                 .catch(() => null);
                             const displayName = mainMember
                                 ? mainMember.displayName
-                                : msg.author.username;
+                                : message.author.username;
 
                             // Check for image attachments without links (if an img is sent without a link, the bot sends an empty string as a log)
                             let imageLinks = [];
-                            if (msg.attachments && msg.attachments.size > 0) {
-                                msg.attachments.forEach((att) => {
+                            if (message.attachments && message.attachments.size > 0) {
+                                message.attachments.forEach((att) => {
                                     if (
                                         att.contentType &&
                                         att.contentType.startsWith("image/") &&
@@ -545,7 +537,7 @@ module.exports = {
                                 });
                             }
 
-                            let msgContent = msg.content;
+                            let msgContent = message.content;
                             if (imageLinks.length > 0) {
                                 msgContent +=
                                     (msgContent ? "\n" : "") +
@@ -554,17 +546,17 @@ module.exports = {
 
                             // Format line with timestamp
                             const timestamp = `<t:${Math.floor(
-                                msg.createdTimestamp / 1000
+                                message.createdTimestamp / 1000
                             )}>`;
                             const line = `"${msgContent}" ${timestamp}`;
 
-                            if (msg.author.id !== lastSpeakerId) {
+                            if (message.author.id !== lastSpeakerId) {
                                 // Send previous block if exists
                                 await sendBlock(currentBlockName, currentBlock);
                                 // Start new block
                                 currentBlock = [line];
                                 currentBlockName = displayName;
-                                lastSpeakerId = msg.author.id;
+                                lastSpeakerId = message.author.id;
                             } else {
                                 currentBlock.push(line);
                             }
@@ -601,3 +593,7 @@ module.exports = {
         });
     },
 };
+function choice(value: string, index: number, array: string[]): unknown {
+    throw new Error("Function not implemented.");
+}
+

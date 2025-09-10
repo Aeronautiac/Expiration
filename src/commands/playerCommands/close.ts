@@ -1,13 +1,14 @@
-const { SlashCommandBuilder } = require("discord.js");
-const game = require("../../game");
-const Lounge = require("../../models/lounge");
+import { SlashCommandBuilder } from "discord.js";
+import game from "../../game";
+import { interaction } from "../../types";
+import Lounge from "../../models/lounge";
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName("close")
         .setDescription("Close a lounge."),
 
-    async execute(interaction) {
+    async execute(interaction: interaction) {
         await interaction.deferReply({
             ephemeral: true,
         });

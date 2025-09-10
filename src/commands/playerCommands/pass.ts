@@ -1,8 +1,9 @@
 // creates notebook data for the channel the command is written in. the channel will behave as a death note.
-const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
-const game = require("../../game");
+import { SlashCommandBuilder } from "discord.js";
+import game from "../../game";
+import { interaction } from "../../types";
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName("pass")
         .setDescription("Pass a notebook to someone else until the next day.")
@@ -15,7 +16,7 @@ module.exports = {
                 .setRequired(true)
         ),
 
-    async execute(interaction) {
+    async execute(interaction: interaction) {
         await interaction.deferReply({
             ephemeral: true,
         });

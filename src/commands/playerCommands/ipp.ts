@@ -1,23 +1,24 @@
-const { SlashCommandBuilder } = require("discord.js");
-const game = require("../../game");
+import { SlashCommandBuilder } from "discord.js";
+import game from "../../game";
+import { interaction } from "../../types";
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
-        .setName("autopsy")
-        .setDescription("Autopsy a player.")
+        .setName("ipp")
+        .setDescription("Put a player under IPP.")
         .addUserOption((option) =>
             option
                 .setName("target")
-                .setDescription("The person to perform an autopsy on.")
+                .setDescription("The person to protect.")
                 .setRequired(true)
         ),
-    async execute(interaction) {
+    async execute(interaction: interaction) {
         await interaction.deferReply({
             ephemeral: true,
         });
 
         // do the thing here
-        const result = await game.autopsy(interaction);
+        const result = await game.ipp(interaction);
 
         if (result !== true) {
             await interaction.editReply({

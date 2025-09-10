@@ -1,7 +1,8 @@
-const { SlashCommandBuilder } = require("discord.js");
-const game = require("../../game");
+import { SlashCommandBuilder } from "discord.js";
+import game from "../../game";
+import { interaction } from "../../types";
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName("eyes")
         .setDescription("Use your shinigami eyes on someone.")
@@ -29,7 +30,7 @@ module.exports = {
                 )
         ),
 
-    async execute(interaction) {
+    async execute(interaction: interaction) {
         await interaction.deferReply({
             ephemeral: true,
         });

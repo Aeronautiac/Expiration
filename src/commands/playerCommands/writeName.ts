@@ -1,7 +1,8 @@
-const { SlashCommandBuilder } = require("discord.js");
-const game = require("../../game");
+import { SlashCommandBuilder } from "discord.js";
+import game from "../../game";
+import { interaction } from "../../types";
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName("writename")
         .setDescription("Write a name in the notebook.")
@@ -26,7 +27,7 @@ module.exports = {
                 .setRequired(false)
         ),
 
-    async execute(interaction) {
+    async execute(interaction: interaction) {
         await interaction.deferReply({});
 
         if (!(await game.guildIsNotebook(interaction.guild))) {

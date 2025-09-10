@@ -1,7 +1,8 @@
-const { SlashCommandBuilder } = require("discord.js");
-const game = require("../../game");
+import { SlashCommandBuilder } from "discord.js";
+import game from "../../game";
+import { interaction } from "../../types";
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName("groupchatcreate")
         .setDescription("Create a group chat.")
@@ -27,7 +28,7 @@ module.exports = {
                 .setName("target4")
                 .setDescription("The fourth person you want to add to the group chat")
         ),
-    async execute(interaction) {
+    async execute(interaction: interaction) {
         await interaction.deferReply({
             ephemeral: true,
         });

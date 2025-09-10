@@ -1,7 +1,8 @@
-const { SlashCommandBuilder } = require("discord.js");
-const game = require("../../game");
+import { SlashCommandBuilder } from "discord.js";
+import game from "../../game";
+import { interaction } from "../../types";
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName("groupchattransferowner")
         .setDescription("Transfer ownership of the group chat.")
@@ -11,7 +12,7 @@ module.exports = {
                 .setDescription("The new owner of the group chat")
                 .setRequired(true)
         ),
-    async execute(interaction) {
+    async execute(interaction: interaction) {
         await interaction.deferReply({
             ephemeral: true,
         });

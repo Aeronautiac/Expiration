@@ -9,7 +9,7 @@ export interface IKidnapping extends Document {
 
 export interface IKidnapDocument extends IKidnapping, Document {}
 
-const kidnappingSchema= new Schema<IKidnapping>({
+const kidnappingSchema = new Schema<IKidnapping>({
     victimId: { type: String, required: true, unique: true },
     kidnapperId: String,
     kidnapperChannelId: { type: String, required: true },

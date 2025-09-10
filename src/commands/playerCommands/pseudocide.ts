@@ -1,11 +1,9 @@
-const { SlashCommandBuilder } = require("discord.js");
-const game = require("../../game");
+import { SlashCommandBuilder } from "discord.js";
+import game from "../../game";
+import type { interaction } from "../../types";
+import { createDiscordInteractionChoice } from "../../util";
 
-function choice(name) {
-    return { name: name, value: name };
-}
-
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName("pseudocide")
         .setDescription("Pseudocide a player.")
@@ -26,17 +24,15 @@ module.exports = {
                 .setName("role")
                 .setDescription("The role to be displayed.")
                 .addChoices(
-                    choice("Civilian"),
-                    choice("Rogue Civilian"),
-                    choice("Watari"),
-                    choice("L"),
-                    choice("Kira"),
-                    choice("2nd Kira"),
-                    choice("BB"),
-                    // choice("Near"),
-                    // choice("Mello"),
-                    choice("PI"),
-                    choice("News Anchor")
+                    createDiscordInteractionChoice("Civilian"),
+                    createDiscordInteractionChoice("Rogue Civilian"),
+                    createDiscordInteractionChoice("Watari"),
+                    createDiscordInteractionChoice("L"),
+                    createDiscordInteractionChoice("Kira"),
+                    createDiscordInteractionChoice("2nd Kira"),
+                    createDiscordInteractionChoice("BB"),
+                    createDiscordInteractionChoice("PI"),
+                    createDiscordInteractionChoice("News Anchor")
                 )
                 .setRequired(true)
         )
@@ -70,7 +66,7 @@ module.exports = {
                 .setDescription("The death message to be displayed.")
                 .setRequired(false)
         ),
-    async execute(interaction) {
+    async execute(interaction: interaction) {
         await interaction.deferReply({
             ephemeral: true,
         });
