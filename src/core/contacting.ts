@@ -1,17 +1,9 @@
 import { Client } from "discord.js";
 import Player from "../models/playerts";
 import access from "./access";
+import { config } from "../configs/config";
 
 let client: Client;
-const loungePerms = {
-    ViewChannel: true,
-    SendMessages: true,
-    ReadMessageHistory: true,
-    AttachFiles: true,
-    EmbedLinks: true,
-    UseExternalEmojis: true,
-    AddReactions: true,
-}
 
 const contacting = {
     
@@ -63,7 +55,7 @@ const contacting = {
                 const lounge = await client.channels.fetch(channelId);
                 if (!lounge?.isTextBased()) return;
                 if (!("permissionOverwrites" in lounge)) return;
-                await lounge.permissionOverwrites.edit(userId, loungePerms);
+                await lounge.permissionOverwrites.edit(userId, config.loungeMemberPermissions);
             } catch (err) {
                 console.log("Failed to add channel perms:", err);
             }

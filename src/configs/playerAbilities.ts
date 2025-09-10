@@ -15,6 +15,7 @@ export const playerAbilities = {
         charges: [1, 2],
         cooldown: 1,
         bypasses: [],
+        duration: 24,
     },
     nameReveal: {
         charges: [1, 2],

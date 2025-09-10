@@ -1,4 +1,4 @@
-import { Guild } from "discord.js";
+import { Guild, PermissionOverwriteOptions } from "discord.js";
 import { ChannelName } from "./channels";
 import { GuildName } from "./guilds";
 import { OrganisationAbilityName } from "./organisationAbilities";
@@ -13,6 +13,7 @@ export interface PlayerAbility {
     charges: number | number[];
     cooldown: number;
     bypasses: PlayerStateName[]; // list of ability restrictor states that this ability bypasses
+    duration?: number; // duration in hours, if applicable
 }
 
 export interface Role {
@@ -46,6 +47,10 @@ export interface Config {
     maxChannelsPerCategory: number;
     maxGroupChatSize: number;
     maxGroupChatsInGame: number;
+
+    loungeMemberPermissions: PermissionOverwriteOptions;
+    spectatorPermissions: PermissionOverwriteOptions;
+    logChannelPermissions: PermissionOverwriteOptions;
 
     categoryPrefixes: Record<CategoryPrefixName, string>;
     guilds: Record<GuildName, string>;

@@ -15,6 +15,30 @@ export const config = {
     maxGroupChatSize: 5,
     maxGroupChatsInGame: 3,
 
+    loungeMemberPermissions: {
+        ViewChannel: true,
+        SendMessages: true,
+        ReadMessageHistory: true,
+        AttachFiles: true,
+        EmbedLinks: true,
+        UseExternalEmojis: true,
+        AddReactions: true,
+    },
+    spectatorPermissions: {
+        ViewChannel: true,
+        SendMessages: false,
+        AddReactions: false,
+        CreatePublicThreads: false,
+        CreatePrivateThreads: false,
+    },
+    logChannelPermissions: {
+        ViewChannel: true,
+        SendMessages: false,
+        CreatePublicThreads: true,
+        CreatePrivateThreads: false,
+        AddReactions: true,
+    },
+
     categoryPrefixes: categoryPrefixes,
     guilds: guilds,
     channels: channels,

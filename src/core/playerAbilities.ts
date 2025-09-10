@@ -7,13 +7,17 @@ import { config } from "../configs/config";
 import names from "./names";
 import { Result, failure, success } from "../types/Result";
 import { PlayerStateName } from "../configs/playerStates";
+import game from "./game";
+import { RoleName } from "../configs/roles";
+import agenda from "../jobs";
+import util from "./util";
 
 let client: Client;
 
 interface AbilityArgs {
     pseudocide: {
         targetId: string;
-        role: string;
+        role: RoleName;
         trueName: string;
         hasNotebook?: boolean;
         hasBugAbility?: boolean;
@@ -119,7 +123,7 @@ const module = {
         // find default ability number based on the current day
         function getChargesBasedOnDay(chargeArray: number[]): number {
             // array with index 0 corresponding to season day 1 and onward. the value in this index is the number of charges available on that day and beyond.
-            // if there is no value at the index of the current day, then the valueF is the last index in the array.
+            // if there is no value at the index of the current day, then the value is the last index in the array.
             const currentDay = season.day - 1;
             return (
                 chargeArray[currentDay] ?? chargeArray[chargeArray.length - 1]
@@ -194,25 +198,27 @@ abilities.pseudocide = async function (userId, args) {
             );
         });
 
-    // continue with pseudocide specific logic
-    // await killUser(interaction.client, target, null, true);
-    // await deathMessage(
-    //     interaction.client,
-    //     target,
-    //     message,
-    //     trueName,
-    //     role,
-    //     hasNotebook,
-    //     affiliations,
-    //     hasBugAbility
-    // );
+    // kill the target without sending a death announcement
+    await game.kill(args.targetId, {
+        dontSendDeathAnnouncement: true,
+    });
 
-    // await createDelayedAction(
-    //     interaction.client,
-    //     "onPseudocideRevival",
-    //     hrsToMs(24),
-    //     [target.id, targetData.role]
-    // );
+    // announce their death with the fake message
+    await game.announceDeath(args.targetId, {
+        deathMessage: args.message,
+        ownedANotebook: args.hasNotebook,
+        ownedBugAbility: args.hasBugAbility,
+        trueName: args.trueName,
+        role: args.role,
+        affiliations: affiliations,
+    });
+
+    // schedule their revival for after the pseudocide period
+    const reviveAt = new Date(Date.now() + util.hrsToMs(config.playerAbilities.pseudocide.duration));
+    await agenda.schedule(reviveAt, "pseudocideRevival", {
+        userId: args.targetId,
+        roleOnDeath: args.role,
+    });
 
     return success();
 };

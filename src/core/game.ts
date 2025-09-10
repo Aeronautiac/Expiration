@@ -30,6 +30,8 @@ import { OrganisationName } from "../configs/organisations";
 import { PlayerStateName } from "../configs/playerStates";
 import { GuildName } from "../configs/guilds";
 import { DiscordRoleName } from "../configs/discordRoles";
+import Kidnapping from "../models/kidnapping";
+import agenda from "../jobs";
 
 let client: Client;
 
@@ -214,7 +216,7 @@ const game = {
         await Bug.deleteMany({ targetId: userId, source: "bug" });
 
         // remove states like custody, kidnap, ipp
-        await game.releaseKidnap(userId);
+        await game.kidnapRelease(userId);
         await game.removeIncarcerated(userId);
         await game.removeCustody(userId);
 
@@ -267,6 +269,7 @@ const game = {
                 await access.revoke(userId, config.guilds.watarilaptop);
                 await access.grant(args.killerId, config.guilds.watarilaptop);
                 bugAbility.ownerId = args.killerId;
+                bugAbility.roleRestriction = undefined;
                 await bugAbility.save();
             }
 
@@ -334,7 +337,7 @@ const game = {
 
         const revealMessages: Map<RoleName, string> = new Map([
             ["Civilian", "They were just a "],
-            ["Kira", "They were the prolific serial killer known as "],
+            ["Kira", "They were the world's most prolific serial killer, "],
             ["L", "They were the world's greatest detective, "],
             ["Rogue Civilian", "They were the unpredictable "],
             ["Private Investigator", "They were the vengeful "],
@@ -513,14 +516,75 @@ const game = {
 
     async kidnap(
         userId: string,
-        kidnapperGuild: GuildName,
-        kidnapperId?: string
+        guildId: string,
+        args: {
+            duration?: number,
+            kidnapperId?: string,
+            kidnapperOrg?: OrganisationName,
+            announce?: boolean,
+        } = {},
     ) {
+        const mainGuild = await client.guilds.fetch(config.guilds.main);
+        // if there is a kidnapperId, it is a public kidnapping, otherwise it is an anonymous kidnapping
+        const anonymous = !args.kidnapperId;
+
         // add kidnapped state
         await util.addState(userId, "kidnapped");
+
+        // create channels
+        const kidnapperChannel = await util.createTemporaryChannel(
+            guildId,
+            `${await names.getAlias(userId)}-${
+                anonymous ? "anonymous" : "public"
+            }`,
+            config.categoryPrefixes.kidnap,
+            [
+                {
+                    ids: [mainGuild.roles.everyone.id],
+                    perms: config.loungeMemberPermissions,
+                },
+            ]
+        );
+        const kidnappedChannel = await util.createTemporaryChannel(
+            guildId,
+            `${await names.getAlias(userId)}-${
+                anonymous ? "anonymous" : "public"
+            }`,
+            config.categoryPrefixes.kidnap,
+            [{ ids: [userId], perms: config.loungeMemberPermissions }]
+        );
+
+        // create kidnap data entry
+        await Kidnapping.create({
+            victimId: userId,
+            kidnapperId: args.kidnapperId,
+            kidnapperChannelId: kidnapperChannel.id,
+            kidnappedChannelId: kidnappedChannel.id,
+        });
+
+        // if there is a duration, schedule their release
+        if (args.duration) {
+            const releaseAt = new Date(Date.now() + util.hrsToMs(args.duration));
+            await agenda.schedule(releaseAt, "kidnapRelease", {
+                userId,
+            });
+        }
+
+        // announcement
+        if (args.announce) {
+            let announceMessage = `@everyone <@${userId}> has been kidnapped`;
+            if (args.kidnapperOrg)
+                announceMessage += ` by @<${config.discordRoles[args.kidnapperOrg]}>`;
+            
+            announceMessage += `. Authorities have begun rescue efforts, but it may be a while before they succeed.`;
+            await game.announce(announceMessage);
+        }
     },
 
-    async releaseKidnap(userId: string) {
+    async kidnapRelease(userId: string) {
+        const userData = await Player.findOne({ userId });
+        if (!userData) throw new Error("Player does not exist.");
+
         // remove kidnapped state
         await util.removeState(userId, "kidnapped");
 
@@ -533,6 +597,25 @@ const game = {
 
         // add civilian role (only if they are still alive)
         await game.addRoleIfAlive(userId, "Civilian");
+
+        const kidnapData = await Kidnapping.findOne({ victimId: userId });
+        if (!kidnapData) return;
+
+        // delete data but save id
+        const kidnapperId = kidnapData.kidnapperId;
+        await Kidnapping.deleteOne({ victimId: userId });
+
+        // if the victim is still alive, announce their release
+        // if the kidnapping was public, then reveal the kidnapper in this announcement
+        if (!userData.flags.get("alive")) return;
+        const releaseMessage = await game.announce(`@everyone <@${userId}> has been rescued by authorities.`);
+        await util.sleep(5);
+        if (kidnapData.kidnapperId) 
+            await releaseMessage.reply(`When questioned, they identified their kidnapper as <@${kidnapperId}>.`);
+        else
+            await releaseMessage.reply(`When questioned, they were unable to identify their kidnapper.`);
+        await util.sleep(5);
+        await releaseMessage.reply(`They have been returned to society and may now resume their normal activities.`);
     },
 
     async removeIPPs() {

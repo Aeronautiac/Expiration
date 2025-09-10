@@ -22,6 +22,14 @@ agenda.define(
     }
 );
 
-agenda.start();
+agenda.define(
+    "kidnapRelease",
+    async (job: Job<{ userId: string }>) => {
+        const { userId } = job.attrs.data;
+        await game.kidnapRelease(userId);
+    }
+)
 
 export default agenda;
+
+// remember to call agenda.start() in your main file to start processing jobs
