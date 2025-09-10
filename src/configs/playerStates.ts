@@ -18,6 +18,12 @@ export const playerStates = {
         restrictsNotebookWriting: false,
         restrictsNotebookPassing: true,
         restrictsAbilities: true
+    },
+    dead: {
+        restrictsContacts: true,
+        restrictsNotebookWriting: true,
+        restrictsNotebookPassing: true,
+        restrictsAbilities: true
     }
 } as const satisfies { [stateName: string]: PlayerState };
 

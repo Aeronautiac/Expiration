@@ -81,6 +81,7 @@ const game = {
                     $set: { "flags.alive": true, role },
                 }
             );
+            await util.removeState(userId, "dead");
 
             const ownedNotebooks = await Notebook.find({
                 currentOwner: userId,
@@ -103,8 +104,6 @@ const game = {
         // grants access to role guilds and abilities
         await playerAbilities.giveRoleAbilities(userId);
         await access.grantRole(userId);
-
-        await contacting.removeLoungeHider(userId, "dead");
 
         // roles
         const mainGuild = await client.guilds.fetch(config.guilds.main);
@@ -206,11 +205,9 @@ const game = {
         if (!args.bypassIPP && userData.flags.get("ipp")) return;
 
         // mark as dead
+        await util.addState(userId, "dead");
         userData.flags.set("alive", false);
         await userData.save();
-
-        // hide their lounges
-        await contacting.addLoungeHider(userId, "dead");
 
         // delete any bugs where they were the target
         await Bug.deleteMany({ targetId: userId, source: "bug" });
