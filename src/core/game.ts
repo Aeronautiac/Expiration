@@ -601,6 +601,9 @@ const game = {
         const kidnapData = await Kidnapping.findOne({ victimId: userId });
         if (!kidnapData) return;
 
+        // if a release was scheduled, then cancel it
+        await agenda.cancel({ name: "kidnapRelease", data: { userId } });
+
         // delete data but save id
         const kidnapperId = kidnapData.kidnapperId;
         await Kidnapping.deleteOne({ victimId: userId });
