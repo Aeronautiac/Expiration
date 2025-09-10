@@ -21,5 +21,5 @@ const seasonSchema = new mongoose.Schema({
     day: { type: Number, required: true, default: 1 }, // starts day 1
 });
 
-const Season: Model<ISeasonDocument> = model("season", seasonSchema);
+const Season: Model<ISeasonDocument> = model<ISeasonDocument>("season", seasonSchema);
 export default Season;

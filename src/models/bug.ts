@@ -16,5 +16,5 @@ const bugSchema = new Schema<IBug>({
     source: { type: String, required: true },
 });
 
-const Bug: Model<IBugDocument> = model("bug", bugSchema);
+const Bug: Model<IBugDocument> = model<IBugDocument>("bug", bugSchema);
 export default Bug;

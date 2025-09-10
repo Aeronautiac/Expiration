@@ -21,5 +21,5 @@ const abilitySchema = new Schema<IAbility>({
     charges: Number, // at the end of a day, charges are removed from the ability's data.
 });
 
-const Ability: Model<IAbilityDocument> = model<IAbility>("ability", abilitySchema);
+const Ability: Model<IAbilityDocument> = model<IAbilityDocument>("ability", abilitySchema);
 export default Ability;

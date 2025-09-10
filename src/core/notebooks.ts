@@ -2,12 +2,16 @@ import { Client } from "discord.js";
 import access from "./access";
 import Notebook from "../models/notebookts";
 import Player from "../models/playerts";
+import { failure, Result, success } from "../types/Result";
+import names from "./names";
+import agenda from "../jobs";
+import util from "./util";
+import game from "./game";
 
 let client: Client;
 
 const notebooks = {
-
-    init: function(newClient: Client) {
+    init: function (newClient: Client) {
         client = newClient;
     },
 
@@ -16,7 +20,11 @@ const notebooks = {
     // grants and revokes guild access as necessary.
     // if temporary is true, then instead of current owner being changed, temporary owner is changed. notebooks with temporary owners
     // are sent back to their current owners when the next day begins even if the temporary owner died with it.
-    async setOwner(guildId: string, ownerId: string, temporary?: boolean): Promise<void> {
+    async setOwner(
+        guildId: string,
+        ownerId: string,
+        temporary?: boolean
+    ): Promise<void> {
         const existingBook = await Notebook.findOne({ guildId });
 
         if (existingBook) {
@@ -67,25 +75,186 @@ const notebooks = {
         await access.grant(ownerId, guildId);
     },
 
-    async addRestrictor(userId: string, reason: string): Promise<void> {
-        const playerData = await Player.findOne({ userId });
-        if (!playerData) return;
-    
-        playerData.notebookRestrictors.set(reason, true);
-        await playerData.save();
+    async returnNotebooks() {
+        const temporaryOwnedNotebooks = await Notebook.find({
+            temporaryOwner: { $ne: null },
+        });
+
+        await Promise.all(
+            temporaryOwnedNotebooks.map(async (notebook) => {
+                try {
+                    await notebooks.setOwner(
+                        notebook.guildId,
+                        notebook.currentOwner
+                    );
+                } catch (err) {
+                    console.log("Failed to return notebook:", err);
+                }
+            })
+        );
     },
 
-    async removeRestrictor(userId: string, reason: string): Promise<void> {
-        const playerData = await Player.findOne({ userId });
-        if (!playerData) return;
+    async write(
+        userId: string,
+        guildId: string,
+        trueName: string,
+        args: {
+            deathMessage?: string;
+            delay?: number;
+        }
+    ): Promise<Result> {
+        const notebook = await Notebook.findOne({ guildId });
+        const player = await Player.findOne({ trueName });
 
-        playerData.notebookRestrictors.delete(reason);
-        await playerData.save();
+        // is the server a death note server?
+        if (!notebook)
+            return failure("You can only use this command in a death note.");
+
+        // does the user possess the death note?
+        if (
+            notebook.currentOwner !== userId &&
+            notebook.temporaryOwner !== userId
+        )
+            return failure("You do not currently possess this death note.");
+
+        // does the user have any write restrictions?
+        if (player.notebookWriteRestrictors.size > 0)
+            return failure(
+                `You cannot use death notes right now. Reason(s): ${Array.from(
+                    player.notebookWriteRestrictors
+                )
+                    .filter(([_, value]) => value)
+                    .map(([key]) => key)
+                    .join(", ")}`
+            );
+
+        // if the user is 2nd Kira, then they cannot use their notebook until they have connected with Kira.
+        if (player.role === "2nd Kira" && !player.flags.get("kiraConnection"))
+            return failure(
+                "You cannot use your death note until you have connected with Kira."
+            );
+
+        // has the user already killed someone or scheduled someone's death with this notebook today?
+        if (notebook.usedToday.includes(userId))
+            return failure("You have already used this death note today.");
+
+        // find the target player
+        const targetPlayer = await Player.findOne({ trueName });
+
+        // if nobody has this true name, then subtract a use and return a failure.
+        if (!targetPlayer || !targetPlayer.flags.get("alive")) {
+            notebook.attemptsToday.set(
+                userId,
+                Math.max(0, (notebook.attemptsToday.get(userId) ?? 3) - 1)
+            );
+            await notebook.save();
+            return failure(
+                `There are no players with this true name. You have ${notebook.attemptsToday.get(
+                    userId
+                )} attempts remaining today.`
+            );
+        }
+
+        // have they exhausted their attempts for today?
+        if (notebook.attemptsToday.get(userId) === 0)
+            return failure(
+                "You have 0 attempts remaining. Try again tomorrow."
+            );
+
+        // beyond this point, the user has successfully used the notebook, so add them to the usedToday array
+        await Notebook.updateOne(
+            { _id: notebook._id },
+            { $push: { usedToday: userId } }
+        );
+
+        // if the user is under ipp, then return a success, but say the user survived because of IPP.
+        if (player.flags.get("ipp"))
+            return success(
+                `${names.toReadable(trueName)} was protected by IPP.`
+            );
+
+        // if the target has any deaths scheduled, then delete the scheduled death and return a success.
+        // (need to rewrite scheduled deaths using agenda)
+        // the scheduled death acts as single use kill immunity.
+        const existingScheduledDeath = await agenda.jobs({
+            name: "scheduledKill",
+            "data.userId": targetPlayer.userId,
+        });
+        if (existingScheduledDeath.length > 0) {
+            await Promise.all(
+                existingScheduledDeath.map(async (job) => {
+                    await job.remove();
+                })
+            );
+            return success(
+                `${names.toReadable(trueName)} is already scheduled to die.`
+            );
+        }
+
+        // if the user chose to schedule the death, then schedule it and return a success.
+        if (args.delay && args.delay > 0) {
+            const timeNow = Date.now();
+            const delayInMs = util.minToMs(args.delay);
+            const runAt = new Date(timeNow + delayInMs);
+
+            await agenda.schedule(runAt, "scheduledKill", {
+                userId: targetPlayer.userId,
+                deathMessage: args.deathMessage,
+                killerId: userId,
+            });
+
+            return success();
+        }
+
+        // otherwise, kill the target immediately and return a success.
+        await game.kill(targetPlayer.userId, {
+            deathMessage: args.deathMessage,
+            killerId: userId,
+        });
+        return success();
     },
-    
-    async writeName() {
-        
-    }
+
+    async pass(
+        userId: string,
+        guildId: string,
+        newOwnerId: string
+    ): Promise<Result> {
+        const notebook = await Notebook.findOne({ guildId });
+        if (!notebook) return failure("Notebook not found.");
+
+        const player = await Player.findOne({ userId });
+        if (!player) return failure("You are not a player.");
+
+        // is the user alive?
+        if (!player.flags.get("alive"))
+            return failure("You cannot pass death notes while dead.");
+
+        // does the user possess the death note?
+        if (
+            notebook.currentOwner !== userId &&
+            notebook.temporaryOwner !== userId
+        )
+            return failure("You do not currently possess this death note.");
+
+        // does the user have any pass restrictions?
+        if (player.notebookPassRestrictors.size > 0)
+            return failure(
+                `You cannot pass death notes right now. Reason(s): ${Array.from(
+                    player.notebookPassRestrictors
+                ).join(", ")}`
+            );
+
+        await notebooks.setOwner(guildId, newOwnerId, true);
+
+        return success();
+    },
+
+    async resetDailyUsage(): Promise<void> {
+        await Notebook.updateMany(
+            {},
+            { $set: { usedToday: [] }, $unset: { attemptsToday: "" } }
+        );
+    },
 };
 
 export default notebooks;
