@@ -185,6 +185,7 @@ const game = {
         await game.removeIPPs();
         await playerAbilities.progressCooldowns();
         await notebooks.returnNotebooks();
+        await notebooks.resetDailyUsage();
         await Season.updateOne(
             {},
             {
