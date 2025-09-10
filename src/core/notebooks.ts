@@ -7,6 +7,7 @@ import names from "./names";
 import agenda from "../jobs";
 import util from "./util";
 import game from "./game";
+import death from "./death";
 
 let client: Client;
 
@@ -207,7 +208,7 @@ const notebooks = {
         }
 
         // otherwise, kill the target immediately and return a success.
-        await game.kill(targetPlayer.userId, {
+        await death.kill(targetPlayer.userId, {
             deathMessage: args.deathMessage,
             killerId: userId,
         });

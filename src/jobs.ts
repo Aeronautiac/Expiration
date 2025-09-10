@@ -2,12 +2,13 @@ import Agenda, { Job } from "agenda";
 import game from "./core/game";
 import { ScheduledKillData } from "./types/ScheduledKillData";
 import { RoleName } from "./configs/roles";
+import death from "./core/death";
 
 const agenda = new Agenda({ db: { address: process.env.MONGODB_URI } });
 
 agenda.define("scheduledKill", async (job: Job<ScheduledKillData>) => {
     const { userId, deathMessage, killerId } = job.attrs.data;
-    await game.kill(userId, { deathMessage, killerId });
+    await death.kill(userId, { deathMessage, killerId });
 });
 
 agenda.define(

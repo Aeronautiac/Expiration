@@ -11,6 +11,7 @@ import game from "./game";
 import { RoleName } from "../configs/roles";
 import agenda from "../jobs";
 import util from "./util";
+import death from "./death";
 
 let client: Client;
 
@@ -199,12 +200,12 @@ abilities.pseudocide = async function (userId, args) {
         });
 
     // kill the target without sending a death announcement
-    await game.kill(args.targetId, {
+    await death.kill(args.targetId, {
         dontSendDeathAnnouncement: true,
     });
 
     // announce their death with the fake message
-    await game.announceDeath(args.targetId, {
+    await death.announce(args.targetId, {
         deathMessage: args.message,
         ownedANotebook: args.hasNotebook,
         ownedBugAbility: args.hasBugAbility,

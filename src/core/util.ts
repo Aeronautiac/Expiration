@@ -1,16 +1,28 @@
-import { Channel, ChannelType, Client, NewsChannel, PermissionOverwriteOptions, PermissionOverwrites, PermissionsBitField, StageChannel, TextChannel, VoiceChannel } from "discord.js";
+import {
+    Channel,
+    ChannelType,
+    Client,
+    NewsChannel,
+    PermissionOverwriteOptions,
+    PermissionOverwrites,
+    PermissionsBitField,
+    StageChannel,
+    TextChannel,
+    VoiceChannel,
+} from "discord.js";
 import Season from "../models/seasonts";
 import { config } from "../configs/config";
 import { PlayerStateName } from "../configs/playerStates";
 import Player from "../models/playerts";
 import contacting from "./contacting";
+import { DiscordRoleName } from "../configs/discordRoles";
 
 let client: Client;
 
 export type ChannelPerms = {
-    ids: string[],
-    perms: PermissionOverwriteOptions
-}
+    ids: string[];
+    perms: PermissionOverwriteOptions;
+};
 
 const util = {
     init: function (newClient: Client) {
@@ -83,22 +95,30 @@ const util = {
         return newChannel;
     },
 
-    async addPermissionsToChannel(channelId: string, permissions: ChannelPerms[]) {
+    async addPermissionsToChannel(
+        channelId: string,
+        permissions: ChannelPerms[]
+    ) {
         const channel = await client.channels.fetch(channelId);
         if (
             !channel ||
-            !(channel instanceof TextChannel ||
-            channel instanceof NewsChannel ||
-            channel instanceof VoiceChannel ||
-            channel instanceof StageChannel)
-        ) throw new Error("Channel is not a text, news, voice, or stage channel.");
+            !(
+                channel instanceof TextChannel ||
+                channel instanceof NewsChannel ||
+                channel instanceof VoiceChannel ||
+                channel instanceof StageChannel
+            )
+        )
+            throw new Error(
+                "Channel is not a text, news, voice, or stage channel."
+            );
 
         const overwrites = channel.permissionOverwrites;
         const promises = permissions.map(async (entry) => {
             for (const id of entry.ids) {
                 await overwrites.create(id, entry.perms);
             }
-        })
+        });
         await Promise.allSettled(promises);
     },
 
@@ -106,11 +126,16 @@ const util = {
         const channel = await client.channels.fetch(channelId);
         if (
             !channel ||
-            !(channel instanceof TextChannel ||
-            channel instanceof NewsChannel ||
-            channel instanceof VoiceChannel ||
-            channel instanceof StageChannel)
-        ) throw new Error("Channel is not a text, news, voice, or stage channel.");
+            !(
+                channel instanceof TextChannel ||
+                channel instanceof NewsChannel ||
+                channel instanceof VoiceChannel ||
+                channel instanceof StageChannel
+            )
+        )
+            throw new Error(
+                "Channel is not a text, news, voice, or stage channel."
+            );
 
         const overwrites = channel.permissionOverwrites;
         const promises = ids.map(async (id) => {
@@ -119,7 +144,7 @@ const util = {
         await Promise.all(promises);
     },
 
-        async addState(userId: string, state: PlayerStateName) {
+    async addState(userId: string, state: PlayerStateName) {
         const playerData = await Player.findOne({ userId });
         if (!playerData) throw new Error("Player does not exist.");
 
@@ -165,6 +190,19 @@ const util = {
         await playerData.save();
     },
 
+    async addRoleIfAlive(userId: string, roleName: DiscordRoleName) {
+        const userData = await Player.findOne({ userId });
+        if (!userData) throw new Error("Player does not exist.");
+        if (!userData.flags.get("alive")) return;
+        const mainGuild = await client.guilds.fetch(config.guilds.main);
+        const member = await mainGuild.members.fetch(userId).catch(() => null);
+        if (member) {
+            await member.roles
+                .add(config.discordRoles[roleName])
+                .catch(console.error);
+        }
+    },
+
     hrsToMs(hrs: number) {
         return 1000 * 60 * 60 * hrs;
     },
@@ -175,7 +213,7 @@ const util = {
 
     secToMs(sec: number) {
         return 1000 * sec;
-    }
+    },
 };
 
 export default util;
