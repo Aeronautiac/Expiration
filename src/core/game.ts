@@ -318,7 +318,7 @@ const game = {
         const deathMsg = await game.announce(output);
 
         // Wait 5 seconds before replying with the role/affiliation reveal
-        await util.sleep(5);
+        await util.sleep(config.announcementDelay);
 
         // Determine the role/affiliation reveal message
         let revealMsg = "";
@@ -409,7 +409,7 @@ const game = {
 
         // If they had a notebook, announce it
         if (args.ownedANotebook) {
-            await util.sleep(5);
+            await util.sleep(config.announcementDelay);
             await deathMsg.reply({
                 content: `Whoever is responsible has now gained possession of their death note(s).`,
             });
@@ -417,7 +417,7 @@ const game = {
 
         // If they had the bug ability, announce it
         if (args.ownedBugAbility) {
-            await util.sleep(5);
+            await util.sleep(config.announcementDelay);
             await deathMsg.reply({
                 content: `Whoever is responsible has now gained possession of their bug and contact log abilities.`,
             });
@@ -574,7 +574,7 @@ const game = {
         if (args.announce) {
             let announceMessage = `@everyone <@${userId}> has been kidnapped`;
             if (args.kidnapperOrg)
-                announceMessage += ` by @<${config.discordRoles[args.kidnapperOrg]}>`;
+                announceMessage += ` by <@&${config.discordRoles[args.kidnapperOrg]}>`;
             
             announceMessage += `. Authorities have begun rescue efforts, but it may be a while before they succeed.`;
             await game.announce(announceMessage);
@@ -612,12 +612,12 @@ const game = {
         // if the kidnapping was public, then reveal the kidnapper in this announcement
         if (!userData.flags.get("alive")) return;
         const releaseMessage = await game.announce(`@everyone <@${userId}> has been rescued by authorities.`);
-        await util.sleep(5);
+        await util.sleep(config.announcementDelay);
         if (kidnapData.kidnapperId) 
             await releaseMessage.reply(`When questioned, they identified their kidnapper as <@${kidnapperId}>.`);
         else
             await releaseMessage.reply(`When questioned, they were unable to identify their kidnapper.`);
-        await util.sleep(5);
+        await util.sleep(config.announcementDelay);
         await releaseMessage.reply(`They have been returned to society and may now resume their normal activities.`);
     },
 

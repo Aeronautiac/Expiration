@@ -14,6 +14,7 @@ export const config = {
     maxChannelsPerCategory: 50,
     maxGroupChatSize: 5,
     maxGroupChatsInGame: 3,
+    announcementDelay: 5, // in seconds
 
     loungeMemberPermissions: {
         ViewChannel: true,

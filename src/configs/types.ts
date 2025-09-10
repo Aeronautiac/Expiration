@@ -47,6 +47,7 @@ export interface Config {
     maxChannelsPerCategory: number;
     maxGroupChatSize: number;
     maxGroupChatsInGame: number;
+    announcementDelay: number; // in seconds
 
     loungeMemberPermissions: PermissionOverwriteOptions;
     spectatorPermissions: PermissionOverwriteOptions;
