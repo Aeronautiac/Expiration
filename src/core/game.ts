@@ -3,6 +3,7 @@ import {
     ChannelType,
     Client,
     Guild,
+    Message,
     PermissionOverwriteOptions,
     Role,
     TextChannel,
@@ -301,9 +302,6 @@ const game = {
             affiliations?: string[];
         }
     ) {
-        const news = (await client.channels.fetch(
-            config.channels.news
-        )) as TextChannel;
         const user = await client.users.fetch(userId);
         const alias = await names.getAlias(userId);
         const role = args.role;
@@ -314,10 +312,7 @@ const game = {
         let output = `@everyone ${user} (${alias}) has died. ${deathReason}`;
 
         // Send the initial death message
-        const deathMsg = await news.send({
-            content: output,
-            allowedMentions: { parse: ["everyone"] },
-        });
+        const deathMsg = await game.announce(output);
 
         // Wait 5 seconds before replying with the role/affiliation reveal
         await util.sleep(5);
@@ -471,12 +466,12 @@ const game = {
                 .catch(console.error);
     },
 
-    async announce(message: string) {
+    async announce(message: string): Promise<Message> {
         const mainGuild = await client.guilds.fetch(config.guilds.main);
         const channel = await mainGuild.channels.fetch(config.channels.news);
-        if (channel && channel.isTextBased()) {
-            await channel.send(message);
-        }
+        if (channel && channel.isTextBased())
+            return await channel.send(message);
+        throw new Error("News channel not found.");
     },
 
     async incarcerate(userId: string) {
