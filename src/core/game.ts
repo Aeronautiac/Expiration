@@ -164,7 +164,7 @@ const game = {
         );
     },
 
-    async createDefaultOrganisations() {},
+    async createDefaultOrganisations() { },
 
     async resetContactTokens() {
         await Player.updateMany(
@@ -175,14 +175,15 @@ const game = {
         );
     },
 
-    async startBlackout() {},
+    async startBlackout() { },
 
-    async stopBlackout() {},
+    async stopBlackout() { },
 
     async nextDay() {
         await game.resetContactTokens();
         await game.removeExplicitBugs();
         await game.removeIPPs();
+        await playerAbilities.progressCooldowns();
         await notebooks.returnNotebooks();
         await Season.updateOne(
             {},
@@ -289,8 +290,7 @@ const game = {
         // create channels
         const kidnapperChannel = await util.createTemporaryChannel(
             guildId,
-            `${await names.getAlias(userId)}-${
-                anonymous ? "anonymous" : "public"
+            `${await names.getAlias(userId)}-${anonymous ? "anonymous" : "public"
             }`,
             config.categoryPrefixes.kidnap,
             [
@@ -302,8 +302,7 @@ const game = {
         );
         const kidnappedChannel = await util.createTemporaryChannel(
             guildId,
-            `${await names.getAlias(userId)}-${
-                anonymous ? "anonymous" : "public"
+            `${await names.getAlias(userId)}-${anonymous ? "anonymous" : "public"
             }`,
             config.categoryPrefixes.kidnap,
             [{ ids: [userId], perms: config.loungeMemberPermissions }]
@@ -330,7 +329,7 @@ const game = {
             let announceMessage = `@everyone <@${userId}> has been kidnapped`;
             if (args.kidnapperOrg)
                 announceMessage += ` by <@&${config.discordRoles[args.kidnapperOrg]}>`;
-            
+
             announceMessage += `. Authorities have begun rescue efforts, but it may be a while before they succeed.`;
             await game.announce(announceMessage);
         }
@@ -368,7 +367,7 @@ const game = {
         if (!userData.flags.get("alive")) return;
         const releaseMessage = await game.announce(`@everyone <@${userId}> has been rescued by authorities.`);
         await util.sleep(config.announcementDelay);
-        if (kidnapData.kidnapperId) 
+        if (kidnapData.kidnapperId)
             await releaseMessage.reply(`When questioned, they identified their kidnapper as <@${kidnapperId}>.`);
         else
             await releaseMessage.reply(`When questioned, they were unable to identify their kidnapper.`);

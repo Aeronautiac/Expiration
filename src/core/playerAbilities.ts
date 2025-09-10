@@ -143,7 +143,9 @@ const module = {
             abilityData.charges = Math.max(0, abilityData.charges - 1);
         }
 
-        abilityData.usedToday = true;
+        // set the cooldown to whatever their cooldown for this ability should be at this moment
+        // later need to implement overrides
+        abilityData.queuedCooldown = abilityConfig.cooldown;
         await abilityData.save();
 
         return success(
@@ -176,6 +178,24 @@ const module = {
             });
         }
     },
+
+    // decrements any existing cooldowns and applies end of day cooldowns
+    async progressCooldowns() {
+        // decrement any existing cds
+        await Ability.updateMany(
+            { cooldown: { $gt: 0 } },
+            { $inc: { cooldown: -1 } }
+        );
+        // apply end of day cds
+        const queuedCdAbilities = await Ability.find({ queuedCooldown: { $exists: true } });
+        const promises = queuedCdAbilities.map(async (ability) => {
+            await Ability.updateOne({ _id: ability._id }, {
+                $set: { cooldown: ability.queuedCooldown },
+                $unset: { queuedCooldown: "" },
+            });
+        })
+        await Promise.all(promises);
+    }
 };
 
 abilities.pseudocide = async function (userId, args) {
