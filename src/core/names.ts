@@ -1,7 +1,7 @@
 import { Client, Guild } from "discord.js";
 import fs from "fs";
 import { config } from "../configs/config";
-import Player from "../models/playerts";
+import Player from "../models/player";
 
 let client: Client;
 const first_names = fs

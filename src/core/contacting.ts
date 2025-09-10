@@ -1,5 +1,5 @@
 import { Client } from "discord.js";
-import Player from "../models/playerts";
+import Player from "../models/player";
 import access from "./access";
 import { config } from "../configs/config";
 

@@ -1,7 +1,7 @@
 import { Client } from "discord.js";
 import config from "../../gameconfig.json";
 
-import Player from "../models/playerts";
+import Player from "../models/player";
 
 let client: Client;
 

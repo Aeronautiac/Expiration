@@ -1,8 +1,8 @@
 import { Client } from "discord.js";
 
-import Player from "../models/playerts";
+import Player from "../models/player";
 import Ability from "../models/ability";
-import Season from "../models/season";
+import Season from "../oldModels/season";
 import { config } from "../configs/config";
 import names from "./names";
 import { Result, failure, success } from "../types/Result";

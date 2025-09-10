@@ -14,12 +14,12 @@ import { config } from "../configs/config";
 import access from "./access";
 import notebooks from "./notebooks";
 
-import Player, { IPlayerDocument, PlayerFlag } from "../models/playerts";
-import Notebook from "../models/notebookts";
+import Player, { IPlayerDocument, PlayerFlag } from "../models/player";
+import Notebook from "../models/notebook";
 import contacting from "./contacting";
 import playerAbilities from "./playerAbilities";
 import { RoleName } from "../configs/roles";
-import Season, { SeasonFlag } from "../models/seasonts";
+import Season, { SeasonFlag } from "../models/season";
 import { Result, success, failure } from "../types/Result";
 import mongoose, { ObjectId, Schema } from "mongoose";
 import Bug, { IBugDocument } from "../models/bug";

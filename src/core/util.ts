@@ -10,10 +10,10 @@ import {
     TextChannel,
     VoiceChannel,
 } from "discord.js";
-import Season from "../models/seasonts";
+import Season from "../models/season";
 import { config } from "../configs/config";
 import { PlayerStateName } from "../configs/playerStates";
-import Player from "../models/playerts";
+import Player from "../models/player";
 import contacting from "./contacting";
 import { DiscordRoleName } from "../configs/discordRoles";
 

@@ -1,7 +1,7 @@
 import { Client } from "discord.js";
 import access from "./access";
-import Notebook from "../models/notebookts";
-import Player from "../models/playerts";
+import Notebook from "../models/notebook";
+import Player from "../models/player";
 import { failure, Result, success } from "../types/Result";
 import names from "./names";
 import agenda from "../jobs";
