@@ -8,7 +8,6 @@ import util from "./util";
 import GroupChat from "../models/groupChat";
 import names from "./names";
 import contact from "../commands/playerCommands/contact";
-import underTheRadar from "../commands/playerCommands/underTheRadar";
 
 let client: Client;
 
@@ -96,11 +95,13 @@ const contacting = {
 
         // create channels
         const channels: Channel[] = [];
-        const contactorChannel = await util.createTemporaryChannel(config.guilds.main, channelName, config.categoryPrefixes.lounge, [{ ids: [userId], perms: config.loungeMemberPermissions }]);
+        const contactorChannel = await util.createTemporaryChannel(config.guilds.main, channelName, config.categoryPrefixes.lounge,
+            [{ ids: [userId], perms: config.loungeMemberPermissions }, { ids: [config.discordRoles.Spectator], perms: config.spectatorPermissions }]);
         channels.push(contactorChannel);
 
         if (anonymous) {
-            const contactedChannel = await util.createTemporaryChannel(config.guilds.main, channelName, config.categoryPrefixes.lounge, [{ ids: [targetId], perms: config.loungeMemberPermissions }]);
+            const contactedChannel = await util.createTemporaryChannel(config.guilds.main, channelName, config.categoryPrefixes.lounge,
+                [{ ids: [targetId], perms: config.loungeMemberPermissions }, { ids: [config.discordRoles.Spectator], perms: config.spectatorPermissions }]);
             channels.push(contactedChannel);
             // if it's anonymous, then both players have a different channel for this lounge
             targetData.loungeChannelIds.push(contactedChannel.id);
@@ -327,6 +328,58 @@ const contacting = {
             await channel.setName(newName).catch(() => { });
 
         return success(`Successfully changed the groupchat name to ${newName}.`);
+    },
+
+    async closeLounge(userId: string, loungeId: number) {
+        // if lounge id is not actually a lounge, return
+        const lounge = await Lounge.findOne({ loungeId });
+        if (!lounge) return;
+
+        // if the user has no data, return
+        const userData = await Player.findOne({ userId });
+
+        // if the user is not a member of the lounge, return
+        if (lounge.contactorId !== userId && lounge.contactedId !== userId) return;
+
+        // find closer alias (don't want to leak them if the lounge was anonymous)
+        const alias = lounge.anonymous && lounge.contactorId === userId ? userData.role : await names.getAlias(userId);
+
+        // remove the user's perms from all of the lounge's channels and remove the channel id from the user's data
+        // also send the notification message
+        for (const channelId of lounge.channelIds) {
+            await util.deletePermissionsToChannel(channelId, [userId]);
+            await Player.updateOne({ userId }, { $pull: { loungeChannelIds: channelId } });
+            const channel = await client.channels.fetch(channelId);
+            if (channel.isSendable()) await channel.send(`**${alias}** has closed the lounge.`);
+        }
+    },
+
+    async leaveGroupchat(userId: string, channelId: string) {
+        // if groupchat is not actually a groupchat, return
+        const groupchat = await GroupChat.findOne({ channelId });
+        if (!groupchat) return;
+
+        // if the user has no data, return
+        const userData = await Player.findOne({ userId });
+        if (!userData) return;
+
+        // if the user is not a member of the group chat, return
+        if (!groupchat.memberIds.includes(userId)) return;
+
+        // get alias for leave message
+        const alias = await names.getAlias(userId);
+
+        // remove the user's perms from all of the gc's channel and remove the channel id from the user's data
+        // also send the notification message
+        await util.deletePermissionsToChannel(channelId, [userId]);
+        await Player.updateOne({ userId }, { $pull: { loungeChannelIds: channelId } });
+        const channel = await client.channels.fetch(channelId);
+        if (channel.isSendable()) await channel.send(`**${alias}** has left the groupchat.`);
+
+        // log it
+        const timeString = `<t:${Math.floor(Date.now() / 1000)}:F>`;
+        const logMessage = `**${alias}** left a group chat at ${timeString}`;
+        await contacting.sendLogMessage(logMessage, userData.flags.get("underTheRadar"));
     },
 
     async sendLogMessage(logMessage: string, underTheRadar: boolean) {

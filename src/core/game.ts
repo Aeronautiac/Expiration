@@ -180,18 +180,18 @@ const game = {
     async stopBlackout() { },
 
     async nextDay() {
-        await game.resetContactTokens();
         await game.removeExplicitBugs();
+        await Player.updateMany({ "flags.underTheRadar": true }, { $unset: { "flags.underTheRadar": "" } });
+        await game.resetContactTokens();
         await game.removeIPPs();
         await playerAbilities.progressCooldowns();
-        await notebooks.returnNotebooks();
         await notebooks.resetDailyUsage();
-        await Season.updateOne(
-            {},
-            {
-                $inc: { day: 1 },
-            }
-        );
+        await notebooks.returnNotebooks();
+        await Season.updateOne({}, { $inc: { day: 1 }, });
+    },
+
+    async unlock2ndKira() {
+        await Player.updateMany({ role: "2nd Kira" }, { $set: { "flags.kiraConnection": true } });
     },
 
     async custody(userId: string) {

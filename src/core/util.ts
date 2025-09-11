@@ -17,6 +17,7 @@ import Player from "../models/player";
 import contacting from "./contacting";
 import { DiscordRoleName } from "../configs/discordRoles";
 import { RoleName } from "../configs/roles";
+import { Promise } from "mongoose";
 
 let client: Client;
 
@@ -202,6 +203,18 @@ const util = {
                 .add(config.discordRoles[roleName])
                 .catch(console.error);
         }
+    },
+
+    async deleteTemporaryChannels() {
+        const season = await Season.findOne({});
+        if (!season) return;
+
+        const promises = season.temporaryChannels.map(async(channelId) => {
+            const channel = await client.channels.fetch(channelId);
+            await channel?.delete();
+        })
+        
+        await Promise.allSettled(promises);
     },
 
     roleMention(r: RoleName) {
