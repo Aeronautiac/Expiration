@@ -17,7 +17,8 @@ import Player from "../models/player";
 import contacting from "./contacting";
 import { DiscordRoleName } from "../configs/discordRoles";
 import { RoleName } from "../configs/roles";
-import { Promise } from "mongoose";
+import { failure, Result, success } from "../types/Result";
+import { fail } from "agenda/dist/job/fail";
 
 let client: Client;
 
@@ -209,12 +210,41 @@ const util = {
         const season = await Season.findOne({});
         if (!season) return;
 
-        const promises = season.temporaryChannels.map(async(channelId) => {
+        const promises = season.temporaryChannels.map(async (channelId) => {
             const channel = await client.channels.fetch(channelId);
             await channel?.delete();
-        })
-        
+        });
+
         await Promise.allSettled(promises);
+    },
+
+    async setChannelLoggable(
+        channelId: string,
+        toggle: boolean = true
+    ): Promise<Result> {
+        const season = await Season.findOne({});
+        if (!season)
+            return failure(
+                "Currently, no season exists. A season needs to exist in order for a channel to be made loggable."
+            );
+
+        if (toggle) {
+            if (season.messageLoggedChannels.includes(channelId))
+                return failure("Channel is already considered loggable.");
+            await Season.updateOne(
+                {},
+                { $addToSet: { messageLoggedChannels: channelId } }
+            );
+            return success("This channel is now loggable.");
+        } else {
+            if (!season.messageLoggedChannels.includes(channelId))
+                return failure("Channel is already unloggable.");
+            await Season.updateOne(
+                {},
+                { $pull: { messageLoggedChannels: channelId } }
+            );
+            return success("This channel is now unloggable.");
+        }
     },
 
     roleMention(r: RoleName) {

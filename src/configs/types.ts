@@ -53,6 +53,7 @@ export interface Config {
     loungeMemberPermissions: PermissionOverwriteOptions;
     spectatorPermissions: PermissionOverwriteOptions;
     logChannelPermissions: PermissionOverwriteOptions;
+    monologueChannelPermissions: PermissionOverwriteOptions;
 
     categoryPrefixes: Record<CategoryPrefixName, string>;
     guilds: Record<GuildName, string>;

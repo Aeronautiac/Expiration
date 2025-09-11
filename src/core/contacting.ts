@@ -126,6 +126,12 @@ const contacting = {
         await Promise.allSettled(sendPromises);
 
         const channelIds = channels.map((channel: Channel) => channel.id);
+        // set channels loggable
+        const setLoggablePromises = channelIds.map(async(channelId) => {
+            await util.setChannelLoggable(channelId, true);
+        })
+        await Promise.all(setLoggablePromises);
+
         await Lounge.create({
             anonymous,
             channelIds,
@@ -200,6 +206,9 @@ const contacting = {
             config.categoryPrefixes.groupchat,
             [{ ids: allMembers, perms: config.loungeMemberPermissions }]
         );
+
+        // set the channel loggable
+        await util.setChannelLoggable(groupchatChannel.id);
 
         // add the channel id to each member's lounge channel ids array, update all member's data
         const promises = [];

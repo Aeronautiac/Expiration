@@ -11,7 +11,7 @@ export interface IOrganisationDocument extends IOrganisation, Document {}
 const organisationSchema = new Schema<IOrganisationDocument>({
     name: { type: String, required: true },
     leaderId: String,
-    memberIds: { type: [String], required: true },
+    memberIds: { type: [String], required: true, default: [] },
 });
 
 const Organisation: Model<IOrganisationDocument> = model<IOrganisationDocument>("Organisation", organisationSchema);

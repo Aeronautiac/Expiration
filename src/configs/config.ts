@@ -40,6 +40,17 @@ export const config = {
         CreatePrivateThreads: false,
         AddReactions: true,
     },
+    monologueChannelPermissions: {
+        ViewChannel: true,
+        SendMessages: true,
+        ReadMessageHistory: true,
+        AttachFiles: true,
+        EmbedLinks: true,
+        UseExternalEmojis: true,
+        AddReactions: true,
+        CreatePublicThreads: true,
+        CreatePrivateThreads: true,
+    },
 
     categoryPrefixes: categoryPrefixes,
     guilds: guilds,

@@ -1,14 +1,4 @@
-import {
-    Channel,
-    ChannelType,
-    Client,
-    Guild,
-    Message,
-    PermissionOverwriteOptions,
-    Role,
-    TextChannel,
-    User,
-} from "discord.js";
+import { Client, Message, PermissionOverwriteOptions } from "discord.js";
 import names from "./names";
 import { config } from "../configs/config";
 import access from "./access";
@@ -16,22 +6,17 @@ import notebooks from "./notebooks";
 
 import Player, { IPlayerDocument, PlayerFlag } from "../models/player";
 import Notebook from "../models/notebook";
-import contacting from "./contacting";
 import playerAbilities from "./playerAbilities";
 import { RoleName } from "../configs/roles";
 import Season, { SeasonFlag } from "../models/season";
 import { Result, success, failure } from "../types/Result";
 import mongoose, { ObjectId, Schema } from "mongoose";
 import Bug, { IBugDocument } from "../models/bug";
-import { CategoryPrefixName } from "../configs/categoryPrefixes";
 import util, { ChannelPerms } from "./util";
-import Ability from "../models/ability";
-import { OrganisationName } from "../configs/organisations";
-import { PlayerStateName } from "../configs/playerStates";
-import { GuildName } from "../configs/guilds";
-import { DiscordRoleName } from "../configs/discordRoles";
+import { OrganisationName, organisations } from "../configs/organisations";
 import Kidnapping from "../models/kidnapping";
 import agenda from "../jobs";
+import orgs from "./orgs";
 
 let client: Client;
 
@@ -75,7 +60,10 @@ const game = {
                 flags: new Map([["alive", true]]),
             });
 
-            await user.send(`Your true name is ${names.toReadable(name)}`);
+            await user.send(`Your true name is **${names.toReadable(name)}**`);
+
+            // create monologue
+            await game.createMonologue(userId);
         } else {
             // revive them
             await Player.updateOne(
@@ -126,6 +114,7 @@ const game = {
         if (existingSeason) return failure("A season already exists.");
 
         await Season.create({});
+        await orgs.createDefaults();
 
         return success(
             "Successfully created a new season. Run /startseason to begin."
@@ -137,8 +126,7 @@ const game = {
         if (!season)
             return failure("No season exists. Create one with /newseason.");
 
-        season.flags.set("active", true);
-        await season.save();
+        await Season.updateOne({}, { "flags.active": true });
 
         return success("Season started. Run /endseason to end.");
     },
@@ -148,8 +136,7 @@ const game = {
         if (!season)
             return failure("No season exists. Create one with /newseason.");
 
-        season.flags.set("active", false);
-        await season.save();
+        await Season.updateOne({}, { "flags.active": false });
 
         return success(
             "Season ended. Run /cleanslate to clear all data, messages, and channels that are associated with the season."
@@ -164,34 +151,75 @@ const game = {
         );
     },
 
-    async createDefaultOrganisations() { },
+    async createMonologue(userId: string) {
+        const userData = await Player.findOne({ userId });
+        if (!userData) throw new Error("Player does not exist.");
+
+        // if they already have a monologue for some reason then don't dont make another
+        if (userData.monologueChannelId) return;
+
+        const monologueChannel = await util.createTemporaryChannel(
+            config.guilds.main,
+            `${await names.getDisplay(userId)}-monologue`,
+            config.categoryPrefixes.monologue,
+            [
+                {
+                    ids: [userId],
+                    perms: config.monologueChannelPermissions,
+                },
+                {
+                    ids: [config.discordRoles.Spectator],
+                    perms: config.spectatorPermissions,
+                },
+            ]
+        );
+
+        // add it to their data
+        await Player.updateOne(
+            { userId },
+            { monologueChannelId: monologueChannel.id }
+        );
+
+        // send monologue intro message
+        if (monologueChannel.isSendable())
+            await monologueChannel.send(
+                `<@${userId}> this is your monologue channel. It is a completely private channel where you can 
+                write down your thoughts or store any information you might find useful. You may do whatever you wish with it.
+                You can ask a host to make messages sent in this channel loggable (meaning bug and autopsy will log messages sent here).
+                You may also ask them to make it unloggable if it had previously been made loggable.`
+            );
+    },
 
     async resetContactTokens() {
         await Player.updateMany(
             {},
-            {
-                contactTokens: config.dailyContactTokens,
-            }
+            { contactTokens: config.dailyContactTokens }
         );
     },
 
-    async startBlackout() { },
+    async startBlackout() {},
 
-    async stopBlackout() { },
+    async stopBlackout() {},
 
     async nextDay() {
         await game.removeExplicitBugs();
-        await Player.updateMany({ "flags.underTheRadar": true }, { $unset: { "flags.underTheRadar": "" } });
+        await Player.updateMany(
+            { "flags.underTheRadar": true },
+            { $unset: { "flags.underTheRadar": "" } }
+        );
         await game.resetContactTokens();
         await game.removeIPPs();
         await playerAbilities.progressCooldowns();
         await notebooks.resetDailyUsage();
         await notebooks.returnNotebooks();
-        await Season.updateOne({}, { $inc: { day: 1 }, });
+        await Season.updateOne({}, { $inc: { day: 1 } });
     },
 
     async unlock2ndKira() {
-        await Player.updateMany({ role: "2nd Kira" }, { $set: { "flags.kiraConnection": true } });
+        await Player.updateMany(
+            { role: "2nd Kira" },
+            { $set: { "flags.kiraConnection": true } }
+        );
     },
 
     async custody(userId: string) {
@@ -234,9 +262,17 @@ const game = {
         throw new Error("News channel not found.");
     },
 
-    async incarcerate(userId: string) {
+    async incarcerate(userId: string, duration?: number) {
         // add incarcerated state
         await util.addState(userId, "incarcerated");
+
+        // if there is a duration, schedule their release
+        if (duration) {
+            const releaseAt = new Date(Date.now() + util.hrsToMs(duration));
+            await agenda.schedule(releaseAt, "releaseIncarcerated", {
+                userId,
+            });
+        }
 
         // add incarcerated role and remove civilian role
         const mainGuild = await client.guilds.fetch(config.guilds.main);
@@ -257,6 +293,9 @@ const game = {
         // remove incarcerated state
         await util.removeState(userId, "incarcerated");
 
+        // if a release was scheduled, then cancel it
+        await agenda.cancel({ name: "releaseIncarcerated", data: { userId } });
+
         // remove incarcerated role and add civilian role
         const mainGuild = await client.guilds.fetch(config.guilds.main);
         const member = await mainGuild.members.fetch(userId).catch(() => null);
@@ -275,11 +314,11 @@ const game = {
         userId: string,
         guildId: string,
         args: {
-            duration?: number,
-            kidnapperId?: string,
-            kidnapperOrg?: OrganisationName,
-            announce?: boolean,
-        } = {},
+            duration?: number;
+            kidnapperId?: string;
+            kidnapperOrg?: OrganisationName;
+            announce?: boolean;
+        } = {}
     ) {
         const mainGuild = await client.guilds.fetch(config.guilds.main);
         // if there is a kidnapperId, it is a public kidnapping, otherwise it is an anonymous kidnapping
@@ -288,10 +327,11 @@ const game = {
         // add kidnapped state
         await util.addState(userId, "kidnapped");
 
-        // create channels
+        // create channels and set loggable
         const kidnapperChannel = await util.createTemporaryChannel(
             guildId,
-            `${await names.getAlias(userId)}-${anonymous ? "anonymous" : "public"
+            `${await names.getAlias(userId)}-${
+                anonymous ? "anonymous" : "public"
             }`,
             config.categoryPrefixes.kidnap,
             [
@@ -301,13 +341,16 @@ const game = {
                 },
             ]
         );
+        await util.setChannelLoggable(kidnapperChannel.id);
         const kidnappedChannel = await util.createTemporaryChannel(
             guildId,
-            `${await names.getAlias(userId)}-${anonymous ? "anonymous" : "public"
+            `${await names.getAlias(userId)}-${
+                anonymous ? "anonymous" : "public"
             }`,
             config.categoryPrefixes.kidnap,
             [{ ids: [userId], perms: config.loungeMemberPermissions }]
         );
+        await util.setChannelLoggable(kidnappedChannel.id);
 
         // create kidnap data entry
         await Kidnapping.create({
@@ -319,7 +362,9 @@ const game = {
 
         // if there is a duration, schedule their release
         if (args.duration) {
-            const releaseAt = new Date(Date.now() + util.hrsToMs(args.duration));
+            const releaseAt = new Date(
+                Date.now() + util.hrsToMs(args.duration)
+            );
             await agenda.schedule(releaseAt, "kidnapRelease", {
                 userId,
             });
@@ -329,7 +374,9 @@ const game = {
         if (args.announce) {
             let announceMessage = `@everyone <@${userId}> has been kidnapped`;
             if (args.kidnapperOrg)
-                announceMessage += ` by <@&${config.discordRoles[args.kidnapperOrg]}>`;
+                announceMessage += ` by <@&${
+                    config.discordRoles[args.kidnapperOrg]
+                }>`;
 
             announceMessage += `. Authorities have begun rescue efforts, but it may be a while before they succeed.`;
             await game.announce(announceMessage);
@@ -366,14 +413,22 @@ const game = {
         // if the victim is still alive, announce their release
         // if the kidnapping was public, then reveal the kidnapper in this announcement
         if (!userData.flags.get("alive")) return;
-        const releaseMessage = await game.announce(`@everyone <@${userId}> has been rescued by authorities.`);
+        const releaseMessage = await game.announce(
+            `@everyone <@${userId}> has been rescued by authorities.`
+        );
         await util.sleep(config.announcementDelay);
         if (kidnapData.kidnapperId)
-            await releaseMessage.reply(`When questioned, they identified their kidnapper as <@${kidnapperId}>.`);
+            await releaseMessage.reply(
+                `When questioned, they identified their kidnapper as <@${kidnapperId}>.`
+            );
         else
-            await releaseMessage.reply(`When questioned, they were unable to identify their kidnapper.`);
+            await releaseMessage.reply(
+                `When questioned, they were unable to identify their kidnapper.`
+            );
         await util.sleep(config.announcementDelay);
-        await releaseMessage.reply(`They have been returned to society and may now resume their normal activities.`);
+        await releaseMessage.reply(
+            `They have been returned to society and may now resume their normal activities.`
+        );
     },
 
     async removeIPPs() {

@@ -31,6 +31,14 @@ agenda.define(
     }
 )
 
+agenda.define(
+    "releaseIncarcerated",
+    async (job: Job<{ userId: string }>) => {
+        const { userId } = job.attrs.data;
+        await game.removeIncarcerated(userId);
+    }
+)
+
 export default agenda;
 
 // remember to call agenda.start() in your main file to start processing jobs
