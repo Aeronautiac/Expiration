@@ -6,7 +6,7 @@ import notebooks from "./notebooks";
 
 import Player, { IPlayerDocument, PlayerFlag } from "../models/player";
 import Notebook from "../models/notebook";
-import playerAbilities from "./playerAbilities";
+import playerAbilities from "./abilities";
 import { RoleName } from "../configs/roles";
 import Season, { SeasonFlag } from "../models/season";
 import { Result, success, failure } from "../types/Result";

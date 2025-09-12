@@ -9,12 +9,6 @@ import { CategoryPrefixName } from "./categoryPrefixes";
 import { DiscordRoleName } from "./discordRoles";
 import { OrganisationName } from "./organisations";
 
-export interface PlayerAbility {
-    charges: number | number[];
-    cooldown: number;
-    bypasses: PlayerStateName[]; // list of ability restrictor states that this ability bypasses
-    duration?: number; // duration in hours, if applicable
-}
 
 export interface Role {
     abilities: PlayerAbilityName[]; // list of ability names that are granted to players with this role
@@ -35,11 +29,19 @@ export interface Organisation {
     abilities: OrganisationAbilityName[]; // list of organisation abilities that this organisation has access to
 }
 
-export interface OrganisationAbility {
+export interface BaseAbility {
     cooldown: number;
+    charges: number | number[];
+    duration?: number; // duration in hours, if applicable
+}
+
+export interface OrganisationAbility extends BaseAbility {
     membersRequired: number;
     rolesRequired: RoleName[]; // list of role names required to use this ability
-    duration?: number;
+}
+
+export interface PlayerAbility extends BaseAbility {
+    bypasses: PlayerStateName[]; // list of ability restrictor states that this ability bypasses
 }
 
 export interface Config {
