@@ -2,6 +2,7 @@ import {
     Channel,
     ChannelType,
     Client,
+    Message,
     NewsChannel,
     PermissionOverwriteOptions,
     PermissionOverwrites,
@@ -245,6 +246,10 @@ const util = {
             );
             return success("This channel is now unloggable.");
         }
+    },
+
+    async relayMessage(message: Message, channels: Channel[], prefix: string = "") {
+
     },
 
     roleMention(r: RoleName) {

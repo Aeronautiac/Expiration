@@ -22,6 +22,7 @@ import {
 } from "../configs/abilityArgs";
 import { OrganisationAbilityName } from "../configs/organisationAbilities";
 import { PlayerAbilityName } from "../configs/playerAbilities";
+import { OrganisationName, organisations } from "../configs/organisations";
 
 let client: Client;
 
@@ -74,7 +75,9 @@ const module = {
 
         // the ability does not exist
         const orgAbilityConfig: OrganisationAbility | undefined =
-            config.organisationAbilities[abilityName as OrganisationAbilityName];
+            config.organisationAbilities[
+                abilityName as OrganisationAbilityName
+            ];
         const playerAbilityConfig: PlayerAbility | undefined =
             config.playerAbilities[abilityName as PlayerAbilityName];
         if (!playerAbilityConfig && !orgAbilityConfig)
@@ -111,7 +114,9 @@ const module = {
                     }
                 }
             );
-            const rolesInOrg = (await Promise.all(rolesInOrgPromises)).filter(x => x !== undefined);
+            const rolesInOrg = (await Promise.all(rolesInOrgPromises)).filter(
+                (x) => x !== undefined
+            );
 
             if (memberCount < orgAbilityConfig.membersRequired)
                 return failure(
@@ -215,15 +220,40 @@ const module = {
             if (!abilityConfig) continue;
             // dont give the ability if they already have it
             const existingAbility = await Ability.findOne({
-                ownerId: userId,
+                owner: userId,
                 ability: abilityName,
             });
             if (existingAbility) continue;
             // give the ability
             await Ability.create({
-                ownerId: userId,
+                owner: userId,
                 ability: abilityName,
-                roleRestriction: playerData.role,
+                roleRestrictions: [playerData.role],
+            });
+        }
+    },
+
+    async initializeOrganisationAbilities(name: OrganisationName) {
+        const orgData = await Organisation.findOne({ name });
+        if (!orgData) return;
+
+        const abilitiesToGive = organisations[name].abilities;
+        for (const abilityName of abilitiesToGive) {
+            // if the ability does not exist, skip it
+            const abilityConfig = config.playerAbilities[abilityName];
+            if (!abilityConfig) continue;
+            // dont give the ability if they already have it
+            const existingAbility = await Ability.findOne({
+                owner: name,
+                ability: abilityName,
+            });
+            if (existingAbility) continue;
+            // give the ability
+            await Ability.create({
+                owner: name,
+                ability: abilityName,
+                roleRestrictions:
+                    config.organisationAbilities[abilityName].rolesRequired,
             });
         }
     },

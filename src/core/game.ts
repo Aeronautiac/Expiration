@@ -6,7 +6,7 @@ import notebooks from "./notebooks";
 
 import Player, { IPlayerDocument, PlayerFlag } from "../models/player";
 import Notebook from "../models/notebook";
-import playerAbilities from "./abilities";
+import abilities from "./abilities";
 import { RoleName } from "../configs/roles";
 import Season, { SeasonFlag } from "../models/season";
 import { Result, success, failure } from "../types/Result";
@@ -93,7 +93,7 @@ const game = {
         await access.revokeAll(userId);
 
         // grants access to role guilds and abilities
-        await playerAbilities.giveRoleAbilities(userId);
+        await abilities.giveRoleAbilities(userId);
         await access.grantRole(userId);
 
         // roles
@@ -209,7 +209,7 @@ const game = {
         );
         await game.resetContactTokens();
         await game.removeIPPs();
-        await playerAbilities.progressCooldowns();
+        await abilities.progressCooldowns();
         await notebooks.resetDailyUsage();
         await notebooks.returnNotebooks();
         await Season.updateOne({}, { $inc: { day: 1 } });

@@ -6,6 +6,7 @@ import Player from "../models/player";
 import access from "./access";
 import { config } from "../configs/config"
 import { GuildName } from "../configs/guilds";
+import abilities from "./abilities";
 
 let client: Client;
 
@@ -17,6 +18,8 @@ const orgs = {
     async createDefaults() {
         await Organisation.create({ name: "Task Force" });
         await Organisation.create({ name: "Kira's Kingdom" });
+        await abilities.initializeOrganisationAbilities("Task Force");
+        await abilities.initializeOrganisationAbilities("Kira's Kingdom");
     },
 
     async addToOrg(
