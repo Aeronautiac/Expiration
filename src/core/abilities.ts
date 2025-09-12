@@ -31,7 +31,6 @@ const module = {
         client = c;
     },
 
-    // NEED TO IMPLEMENT ABILITY OVERRIDES SYSTEM
     async useAbility<K extends AbilityName>(
         owner: string,
         abilityName: K,
@@ -39,7 +38,8 @@ const module = {
             ? PlayerAbilityArgs[K]
             : K extends keyof OrganisationAbilityArgs
             ? OrganisationAbilityArgs[K]
-            : never
+            : never,
+        checkOnly?: boolean
     ) {
         // abilities can only be used when a season is active
         const season = await Season.findOne({});
@@ -74,14 +74,15 @@ const module = {
         }
 
         // the ability does not exist
-        const orgAbilityConfig: OrganisationAbility | undefined =
-            config.organisationAbilities[
-                abilityName as OrganisationAbilityName
-            ];
-        const playerAbilityConfig: PlayerAbility | undefined =
-            config.playerAbilities[abilityName as PlayerAbilityName];
-        if (!playerAbilityConfig && !orgAbilityConfig)
-            return failure("Ability does not exist.");
+        const orgBase: OrganisationAbility = config.organisationAbilities[abilityName as OrganisationAbilityName];
+        const playerBase: PlayerAbility = config.playerAbilities[abilityName as PlayerAbilityName];
+        if (!orgBase && !playerBase) return failure("Ability does not exist.");
+
+        // if there are overrides, apply them here
+        const orgOverrides = config.organisations[owner as OrganisationName]?.abilityOverrides[abilityName as OrganisationAbilityName];
+        const orgAbilityConfig = orgBase ?  Object.assign({}, orgBase, orgOverrides) : null;
+        const roleOverrides = config.roles[userData?.role]?.abilityOverrides[abilityName as PlayerAbilityName];
+        const playerAbilityConfig = playerBase ?  Object.assign({}, playerBase, roleOverrides) : null;
 
         // the ability exists, but the function is not implemented
         const callbackSource =
@@ -155,10 +156,14 @@ const module = {
         if (cd > 0)
             return failure(`This ability is on cooldown for ${cd} day(s).`);
 
+        // if we're only checking if the ability can be used, this will be the final bit
         // try to use the ability. if it rejects, then reject with the same reasoning.
-        // if this check is passed, then the ability was used successfully
-        const result = await abilityCallback(owner, args);
+        // if this check is passed, then the ability was/can be used successfully
+        const result = await abilityCallback(owner, args, checkOnly);
         if (!result.success) return result;
+
+        // end before the ability use logic is executed if we're only checking if we can use the ability
+        if (checkOnly) return success();
 
         // log ability usage
         const timeString = `<t:${Math.floor(Date.now() / 1000)}:F>`;
@@ -205,6 +210,19 @@ const module = {
         return success(
             `Successfully used ${abilityName}. Charges remaining: ${abilityData.charges}`
         );
+    },
+
+    // just an alias
+    async canUseAbility<K extends AbilityName>(
+        owner: string,
+        abilityName: K,
+        args: K extends keyof PlayerAbilityArgs
+            ? PlayerAbilityArgs[K]
+            : K extends keyof OrganisationAbilityArgs
+            ? OrganisationAbilityArgs[K]
+            : never
+    ) {
+        return module.useAbility(owner, abilityName, args, true);
     },
 
     async giveRoleAbilities(userId: string): Promise<void> {

@@ -18,7 +18,11 @@ const module = {
         client = c;
     },
 
-    async pseudocide(userId: string, args: PlayerAbilityArgs["pseudocide"]) {
+    async pseudocide(
+        userId: string,
+        args: PlayerAbilityArgs["pseudocide"],
+        checkOnly?: boolean
+    ) {
         const targetData = await Player.findOne({ userId: args.targetId });
         if (!targetData)
             return failure("This user is not registered as a player.");
@@ -26,6 +30,8 @@ const module = {
             return failure("This user is dead.");
         if (targetData.flags.get("ipp"))
             return failure("This user is under IPP.");
+
+        if (checkOnly) return success();
 
         let affiliations = [];
         if (args.affiliationsString)
@@ -70,7 +76,11 @@ const module = {
         return success();
     },
 
-    async ipp(userId: string, args: PlayerAbilityArgs["ipp"]) {
+    async ipp(
+        userId: string,
+        args: PlayerAbilityArgs["ipp"],
+        checkOnly?: boolean
+    ) {
         const targetData = await Player.findOne({ userId: args.targetId });
         if (!targetData) return failure("This user has no data.");
         if (!targetData.flags.get("alive"))
@@ -78,24 +88,23 @@ const module = {
         if (targetData.flags.get("ipp"))
             return failure("This user is already under IPP.");
 
-        const mainGuild = await client.guilds.fetch(config.guilds.main);
-        const targetMember = await mainGuild.members
-            .fetch(args.targetId)
-            .catch(() => null);
-        if (!targetMember)
-            return failure("Target is not in the main Discord server.");
+        if (checkOnly) return success();
 
         targetData.flags.set("ipp", true);
         await targetData.save();
 
-        names.setNick(args.targetId, `${targetMember.displayName} (IPP)`);
+        names.setNick(
+            args.targetId,
+            `${names.getDisplay(args.targetId)} (IPP)`
+        );
 
         return success();
     },
 
     async underTheRadar(
         userId: string,
-        args: PlayerAbilityArgs["underTheRadar"]
+        args: PlayerAbilityArgs["underTheRadar"],
+        checkOnly?: boolean
     ) {
         await Player.findOneAndUpdate(
             { userId },
@@ -104,11 +113,13 @@ const module = {
         return success();
     },
 
-    async bug(userId: string, args: PlayerAbilityArgs["bug"]) {
+    async bug(userId: string, args: PlayerAbilityArgs["bug"], checkOnly?: boolean) {
         const targetData = await Player.findOne({ userId: args.targetId });
         if (!targetData) return failure("This user has no data.");
         if (!targetData.flags.get("alive"))
             return failure("This user is dead.");
+
+        if (checkOnly) return success();
 
         await game.bug(args.targetId, "bug", userId);
 
@@ -117,20 +128,22 @@ const module = {
 
     async anonymousAnnouncement(
         userId: string,
-        args: PlayerAbilityArgs["anonymousAnnouncement"]
+        args: PlayerAbilityArgs["anonymousAnnouncement"],
+        checkOnly?: boolean
     ) {
+        if (checkOnly) return success();
         await game.announce(`@everyone **???:** ${args.message}`);
         return success();
     },
 
     async anonymousContact(
         userId: string,
-        args: PlayerAbilityArgs["anonymousContact"]
+        args: PlayerAbilityArgs["anonymousContact"],
+        checkOnly?: boolean
     ) {
+        if (checkOnly) return success();
         return await contacting.contact(userId, args.targetId, true);
     },
-
-    
 };
 
 export default module;

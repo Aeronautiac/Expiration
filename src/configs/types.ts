@@ -1,4 +1,4 @@
-import { Guild, PermissionOverwriteOptions } from "discord.js";
+import { Base, Guild, PermissionOverwriteOptions } from "discord.js";
 import { ChannelName } from "./channels";
 import { GuildName } from "./guilds";
 import { OrganisationAbilityName } from "./organisationAbilities";
@@ -9,10 +9,9 @@ import { CategoryPrefixName } from "./categoryPrefixes";
 import { DiscordRoleName } from "./discordRoles";
 import { OrganisationName } from "./organisations";
 
-
 export interface Role {
     abilities: PlayerAbilityName[]; // list of ability names that are granted to players with this role
-    abilityOverrides: Partial<Record<PlayerAbilityName, Partial<PlayerAbility>>>; // ability overrides for abilities granted by this role
+    abilityOverrides: AbilityOverrides; // ability overrides for abilities granted by this role
     guilds: GuildName[]; // list of guild names that players with this role should have access to
     guildChannels: Partial<Record<GuildName, ChannelName[]>>; // list of channel names that players with this role should have access to in each guild
 }
@@ -26,8 +25,13 @@ export interface PlayerState {
 
 export interface Organisation {
     guilds: GuildName[]; // list of guild names that members of this organisation should have access to
+    abilityOverrides: AbilityOverrides;
     abilities: OrganisationAbilityName[]; // list of organisation abilities that this organisation has access to
 }
+
+export type AbilityOverrides = Partial<
+    Record<PlayerAbilityName | OrganisationAbilityName, Partial<BaseAbility>>
+>;
 
 export interface BaseAbility {
     cooldown: number;

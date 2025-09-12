@@ -1,6 +1,19 @@
 import type { PlayerAbility } from "./types";
 
-export const playerAbilities = {
+export type PlayerAbilityName =
+    | "autopsy"
+    | "bug"
+    | "pseudocide"
+    | "nameReveal"
+    | "notebookReveal"
+    | "underTheRadar"
+    | "anonymousAnnouncement"
+    | "ipp"
+    | "anonymousContact"
+    | "civilianArrest"
+    | "anonymousProsecution";
+
+export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
     autopsy: {
         charges: 1,
         cooldown: 0,
@@ -57,6 +70,4 @@ export const playerAbilities = {
         cooldown: 999,
         bypasses: [],
     },
-} as const satisfies { [abilityName: string]: PlayerAbility };
-
-export type PlayerAbilityName = keyof typeof playerAbilities;
+};

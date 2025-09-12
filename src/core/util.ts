@@ -261,10 +261,6 @@ const util = {
         await Promise.allSettled(channelSendPromises);
     },
 
-    async createPoll() {
-        
-    },
-
     roleMention(r: RoleName) {
         // Try to find role id from config, fallback to plain text
         const id = config.discordRoles[r];

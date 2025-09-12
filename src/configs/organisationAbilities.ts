@@ -4,7 +4,21 @@ const KIDNAP_DURATION = 24; // hours
 const ARREST_DURATION = 24;
 const BLACKOUT_DURATION = 24;
 
-export const organisationAbilities = {
+export type OrganisationAbilityName =
+    | "Blackout"
+    | "Public Kidnap"
+    | "Anonymous Kidnap"
+    | "2nd Kira+Kira Anonymous Kidnap"
+    | "Tap In"
+    | "Background Check"
+    | "Civilian Arrest"
+    | "Unlawful Arrest"
+    | "PI+Watari Unlawful Arrest";
+
+export const organisationAbilities: Record<
+    OrganisationAbilityName,
+    OrganisationAbility
+> = {
     Blackout: {
         charges: 1,
         cooldown: 999,
@@ -65,6 +79,4 @@ export const organisationAbilities = {
         rolesRequired: ["Private Investigator", "Watari"],
         duration: ARREST_DURATION,
     },
-} as const satisfies { [abilityName: string]: OrganisationAbility };
-
-export type OrganisationAbilityName = keyof typeof organisationAbilities;
+};
