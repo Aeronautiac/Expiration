@@ -8,6 +8,8 @@ import { failure, success } from "../types/Result";
 import names from "./names";
 import { RoleName } from "../configs/roles";
 import { PlayerAbilityArgs } from "../configs/abilityArgs";
+import game from "./game";
+import contacting from "./contacting";
 
 let client: Client;
 
@@ -16,10 +18,7 @@ const module = {
         client = c;
     },
 
-    async pseudocide(
-        userId: string,
-        args: PlayerAbilityArgs["pseudocide"]
-    ) {
+    async pseudocide(userId: string, args: PlayerAbilityArgs["pseudocide"]) {
         const targetData = await Player.findOne({ userId: args.targetId });
         if (!targetData)
             return failure("This user is not registered as a player.");
@@ -71,10 +70,7 @@ const module = {
         return success();
     },
 
-    async ipp(
-        userId: string,
-        args: PlayerAbilityArgs["ipp"]
-    ) {
+    async ipp(userId: string, args: PlayerAbilityArgs["ipp"]) {
         const targetData = await Player.findOne({ userId: args.targetId });
         if (!targetData) return failure("This user has no data.");
         if (!targetData.flags.get("alive"))
@@ -96,6 +92,45 @@ const module = {
 
         return success();
     },
+
+    async underTheRadar(
+        userId: string,
+        args: PlayerAbilityArgs["underTheRadar"]
+    ) {
+        await Player.findOneAndUpdate(
+            { userId },
+            { $set: { "flags.underTheRadar": true } }
+        );
+        return success();
+    },
+
+    async bug(userId: string, args: PlayerAbilityArgs["bug"]) {
+        const targetData = await Player.findOne({ userId: args.targetId });
+        if (!targetData) return failure("This user has no data.");
+        if (!targetData.flags.get("alive"))
+            return failure("This user is dead.");
+
+        await game.bug(args.targetId, "bug", userId);
+
+        return success();
+    },
+
+    async anonymousAnnouncement(
+        userId: string,
+        args: PlayerAbilityArgs["anonymousAnnouncement"]
+    ) {
+        await game.announce(`@everyone **???:** ${args.message}`);
+        return success();
+    },
+
+    async anonymousContact(
+        userId: string,
+        args: PlayerAbilityArgs["anonymousContact"]
+    ) {
+        return await contacting.contact(userId, args.targetId, true);
+    },
+
+    
 };
 
 export default module;

@@ -249,7 +249,16 @@ const util = {
     },
 
     async relayMessage(message: Message, channels: Channel[], prefix: string = "") {
-
+        const content = `${prefix}${message.content}`;
+        const channelSendPromises = channels.map(async(channel) => {
+            if (channel.isSendable()) {
+                await channel.send({
+                    content,
+                    files: [...message.attachments.values()],
+                })
+            }
+        });
+        await Promise.allSettled(channelSendPromises);
     },
 
     roleMention(r: RoleName) {

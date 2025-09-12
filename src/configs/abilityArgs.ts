@@ -1,4 +1,3 @@
-import { Result } from "../types/Result";
 import { RoleName } from "./roles";
 
 export interface PlayerAbilityArgs {
@@ -15,7 +14,21 @@ export interface PlayerAbilityArgs {
     ipp: {
         targetId: string;
     };
-}
+
+    underTheRadar: {};
+
+    bug: {
+        targetId: string;
+    };
+
+    anonymousAnnouncement: {
+        message: string;
+    };
+
+    anonymousContact: {
+        targetId: string;
+    };
+};
 
 export interface OrganisationAbilityArgs {}
 

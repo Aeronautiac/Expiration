@@ -448,6 +448,19 @@ const game = {
         );
     },
 
+    async addBugAsterisk(userId: string) {
+        const displayName = await names.getDisplay(userId);
+        let newName: string;
+        if (displayName.includes("*")) return displayName; // prevent double asterisk
+        const match = displayName.match(/\s\([^)]+\)$/);
+        if (match) {
+            newName = displayName.replace(match[0], `*${match[0]}`);
+        } else {
+            newName = displayName + "*";
+        }
+        await names.setNick(userId, newName);
+    },
+
     async bug(
         targetId: string,
         source: string,
@@ -504,6 +517,9 @@ const game = {
             const buggedByData = await Player.findOne({ userId: buggedBy });
             if (buggedByData.role === "Watari")
                 newBug.channelIds.set("watari", logChannelWatari.id);
+
+            // add a bug asterisk to the target's name
+            await game.addBugAsterisk(targetId).catch(console.error);
         }
 
         // always relay to L and Watari even if Watari is dead if it's a custody bug
