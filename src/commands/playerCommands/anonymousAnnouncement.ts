@@ -29,9 +29,9 @@ export default {
                 content:
                     result.message || "Failed to use anonymous announcement.",
             });
-
-        await interaction.editReply({
-            content: "Successfully announced.",
-        });
+        else
+            await interaction.editReply({
+                content: "Successfully announced.",
+            });
     },
 };

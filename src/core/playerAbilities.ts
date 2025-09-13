@@ -6,11 +6,11 @@ import { config } from "../configs/config";
 import Player from "../models/player";
 import { failure, success } from "../types/Result";
 import names from "./names";
-import { RoleName } from "../configs/roles";
 import { PlayerAbilityArgs } from "../configs/abilityArgs";
 import game from "./game";
 import contacting from "./contacting";
 import Season from "../models/season";
+import Notebook from "../models/notebook";
 
 let client: Client;
 
@@ -149,6 +149,82 @@ const module = {
     ) {
         if (checkOnly) return success();
         return await contacting.contact(userId, args.targetId, true);
+    },
+
+    async nameReveal(
+        userId: string,
+        args: PlayerAbilityArgs["nameReveal"],
+        checkOnly?: boolean
+    ) {
+        const userData = await Player.findOne({ userId });
+        const targetData = await Player.findOne({ userId: args.targetId });
+        if (!targetData) return failure("This player has no data.");
+        if (!targetData.flags.get("alive"))
+            return failure("This player is dead.");
+        if (userData.role === "Beyond Birthday" && userData.eyes <= 0)
+            return failure("You no longer possess shinigami eyes.");
+
+        const user = await client.users.fetch(userId);
+        await user.send(
+            `The true name of **${await names.getDisplay(
+                args.targetId
+            )}** is **${targetData.trueName}**.`
+        );
+
+        return success();
+    },
+
+    async notebookReveal(
+        userId: string,
+        args: PlayerAbilityArgs["notebookReveal"],
+        checkOnly?: boolean
+    ) {
+        const targetData = await Player.findOne({ userId: args.targetId });
+        const userData = await Player.findOne({ userId });
+
+        if (!targetData) return failure("This player has no data.");
+        if (!targetData.flags.get("alive"))
+            return failure("This player is dead.");
+        if (userData.role === "Beyond Birthday" && userData.eyes <= 0)
+            return failure("You no longer possess shinigami eyes.");
+
+        // need to check if the target is currently holding a notebook. for all notebooks which they are the currentOwner of,
+        // check if there is a temporary owner. if there is a temporary owner, they do not hold that notebook.
+        // also, if the target is the temporary owner of any notebook, then they currently hold a notebook.
+        const temporaryOwner = await Notebook.findOne({
+            temporaryOwner: args.targetId,
+        });
+
+        let notebooksNotPassed = 0;
+        const notebooksOwned = await Notebook.find({
+            currentOwner: args.targetId,
+        });
+        for (const notebook of notebooksOwned) {
+            // if temporary owner, target does not hold this notebook
+            if (notebook.temporaryOwner) {
+                continue;
+            }
+            // else, they do hold the notebook
+            notebooksNotPassed++;
+        }
+
+        const user = await client.users.fetch(userId);
+        if (temporaryOwner || notebooksNotPassed > 0) {
+            await user.send(
+                `**<@${args.targetId}>** currently possesses a notebook.`
+            );
+        } else {
+            if (userData.role === "Beyond Birthday")
+                await Player.updateOne(
+                    { userId: user.id },
+                    { $inc: { eyes: -1 } }
+                );
+            await user.send(
+                `**<@${args.targetId}>** does not currently possess a notebook.`
+            );
+        }
+
+        return success();
     },
 
     async autopsy(

@@ -1,28 +1,35 @@
-import { SlashCommandBuilder } from "discord.js";
-import game from "../../game";
-import { interaction } from "../../types";
+import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
+import contacting from "../../core/contacting";
 
 export default {
     data: new SlashCommandBuilder()
-        .setName("groupchatnamechange")
-        .setDescription("Change the name of the group chat.")
+        .setName("setgroupchatname")
+        .setDescription("Change the name of a group chat.")
         .addStringOption((option) =>
             option
-                .setName("newname")
+                .setName("name")
                 .setDescription("The new name for the group chat")
                 .setRequired(true)
         ),
-    async execute(interaction: interaction) {
+        
+    async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
         });
 
-        const newName = interaction.options.getString("newname");
-        const reply = await game.changeGroupChatName(interaction.client, interaction.user, interaction.channel, newName);
-
-        await interaction.editReply({
-            content: reply,
-            ephemeral: true,
-        });
+        const result = await contacting.setGroupchatName(
+            interaction.user.id,
+            interaction.options.getString("name"),
+            interaction.channel.id
+        );
+        if (!result.success)
+            await interaction.editReply({
+                content:
+                    result.message || "Failed to change name of group chat.",
+            });
+        else
+            await interaction.editReply({
+                content: result.message || "Success.",
+            });
     },
 };

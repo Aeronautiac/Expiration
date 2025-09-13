@@ -1,6 +1,5 @@
-import { SlashCommandBuilder } from "discord.js";
-import game from "../../game";
-import { interaction } from "../../types";
+import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
+import contacting from "../../core/contacting";
 
 export default {
     data: new SlashCommandBuilder()
@@ -12,17 +11,23 @@ export default {
                 .setDescription("The person you want to add to the group chat")
                 .setRequired(true)
         ),
-    async execute(interaction: interaction) {
+    async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
         });
 
-        const target = interaction.options.getUser("target");
-        const reply = await game.addUserToGroupChat(interaction.client, interaction.user, target, interaction.channel);
-
-        await interaction.editReply({
-            content: reply,
-            ephemeral: true,
-        });
+        const result = await contacting.addToGroupchat(
+            interaction.user.id,
+            interaction.options.getUser("target").id,
+            interaction.channel.id
+        );
+        if (!result.success)
+            await interaction.editReply({
+                content: result.message || "Failed to add user to group chat.",
+            });
+        else
+            await interaction.editReply({
+                content: result.message || "Success.",
+            });
     },
 };

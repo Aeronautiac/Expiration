@@ -1,15 +1,14 @@
-import { SlashCommandBuilder } from "discord.js";
-import game from "../../game";
-import { interaction } from "../../types";
+import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
+import notebooks from "../../core/notebooks";
 
 export default {
     data: new SlashCommandBuilder()
-        .setName("writename")
+        .setName("write")
         .setDescription("Write a name in the notebook.")
         .addStringOption((option) =>
             option
                 .setName("name")
-                .setDescription("The name you want to write")
+                .setDescription("The name you want to write.")
                 .setRequired(true)
         )
         .addNumberOption((option) =>
@@ -27,31 +26,34 @@ export default {
                 .setRequired(false)
         ),
 
-    async execute(interaction: interaction) {
+    async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({});
 
-        if (!(await game.guildIsNotebook(interaction.guild))) {
-            await interaction.editReply({
-                content: "You must use this command inside of a death note.",
-            });
-            return;
-        }
-
-        const result = await game.writeName(interaction);
-
         const name = interaction.options.getString("name");
-        const message = interaction.options.getString("message");
+        const deathMessage = interaction.options.getString("message");
         const delay = interaction.options.getNumber("delay");
 
         let relayed = `${name}`;
         if (delay) relayed = relayed.concat(`, dies in ${delay} minutes`);
-        if (message) relayed = relayed.concat(`, ${message}`);
+        if (deathMessage) relayed = relayed.concat(`, ${deathMessage}`);
 
-        if (result === true) {
+        const result = await notebooks.write(
+            interaction.user.id,
+            interaction.guildId,
+            name,
+            {
+                deathMessage,
+                delay,
+            }
+        );
+
+        if (result.success) {
             await interaction.editReply({ content: relayed });
         } else {
             await interaction.editReply({ content: relayed });
-            await interaction.followUp({ content: result });
+            await interaction.followUp({
+                content: result.message || "Failed to use write name.",
+            });
         }
     },
 };

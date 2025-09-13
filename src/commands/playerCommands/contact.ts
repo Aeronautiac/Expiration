@@ -42,9 +42,9 @@ export default {
                         "target"
                     )}`,
             });
-
-        await interaction.editReply({
-            content: result.message,
-        });
+        else
+            await interaction.editReply({
+                content: result.message,
+            });
     },
 };

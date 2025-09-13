@@ -46,9 +46,9 @@ export default {
             await interaction.editReply({
                 content: result.message || "Failed to use eyes.",
             });
-
-        await interaction.editReply({
-            content: "Success.",
-        });
+        else
+            await interaction.editReply({
+                content: "Success.",
+            });
     },
 };

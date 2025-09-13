@@ -1,7 +1,13 @@
-import { SlashCommandBuilder } from "discord.js";
-import game from "../../game";
-import type { interaction } from "../../types";
-import { createDiscordInteractionChoice } from "../../util";
+import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
+import abilities from "../../core/abilities";
+import { RoleName } from "../../configs/roles";
+
+function choice(name: string) {
+    return {
+        name: name,
+        value: name,
+    };
+}
 
 export default {
     data: new SlashCommandBuilder()
@@ -24,15 +30,15 @@ export default {
                 .setName("role")
                 .setDescription("The role to be displayed.")
                 .addChoices(
-                    createDiscordInteractionChoice("Civilian"),
-                    createDiscordInteractionChoice("Rogue Civilian"),
-                    createDiscordInteractionChoice("Watari"),
-                    createDiscordInteractionChoice("L"),
-                    createDiscordInteractionChoice("Kira"),
-                    createDiscordInteractionChoice("2nd Kira"),
-                    createDiscordInteractionChoice("BB"),
-                    createDiscordInteractionChoice("PI"),
-                    createDiscordInteractionChoice("News Anchor")
+                    choice("Civilian"),
+                    choice("Rogue Civilian"),
+                    choice("Watari"),
+                    choice("L"),
+                    choice("Kira"),
+                    choice("2nd Kira"),
+                    choice("BB"),
+                    choice("PI"),
+                    choice("News Anchor")
                 )
                 .setRequired(true)
         )
@@ -40,7 +46,7 @@ export default {
             option
                 .setName("affiliations")
                 .setDescription(
-                    "The affiliations to be displayed. Separate with commas. Example: TF Chief, KK, SPK"
+                    "The affiliations to be displayed. Separate with commas. Example: Task Force, Kira's Kingdom, Task Force Chief (These are also the only options)"
                 )
                 .setRequired(false)
         )
@@ -66,24 +72,34 @@ export default {
                 .setDescription("The death message to be displayed.")
                 .setRequired(false)
         ),
-    async execute(interaction: interaction) {
+    async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
         });
 
-        // do the thing here
-        const result = await game.pseudocide(interaction);
+        const options = interaction.options;
+        const role = options.getString("role") as RoleName;
 
-        if (result !== true) {
+        const result = await abilities.useAbility(
+            interaction.user.id,
+            "pseudocide",
+            {
+                targetId: options.getUser("target").id,
+                role: role,
+                trueName: options.getString("trueName"),
+                hasBugAbility: options.getBoolean("hasbugability"),
+                hasNotebook: options.getBoolean("hasnotebook"),
+                message: options.getString("deathmessage"),
+                affiliationsString: options.getString("affiliations"),
+            }
+        );
+        if (!result.success)
             await interaction.editReply({
-                content: result,
-                ephemeral: true,
+                content: result.message || "Failed to use pseudocide.",
             });
-        } else {
+        else
             await interaction.editReply({
                 content: "Success.",
-                ephemeral: true,
             });
-        }
     },
 };

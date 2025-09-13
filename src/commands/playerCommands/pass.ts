@@ -1,7 +1,5 @@
-// creates notebook data for the channel the command is written in. the channel will behave as a death note.
-import { SlashCommandBuilder } from "discord.js";
-import game from "../../game";
-import { interaction } from "../../types";
+import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
+import notebooks from "../../core/notebooks";
 
 export default {
     data: new SlashCommandBuilder()
@@ -16,29 +14,23 @@ export default {
                 .setRequired(true)
         ),
 
-    async execute(interaction: interaction) {
+    async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
         });
 
-        const result = await game.passNotebook(
-            interaction.client,
-            interaction.guild,
+        const result = await notebooks.pass(
             interaction.user.id,
+            interaction.guild.id,
             interaction.options.getString("userid")
         );
-
-        if (result !== true) {
+        if (!result.success)
             await interaction.editReply({
-                content: result,
-                ephemeral: true,
+                content: result.message || "Failed to pass notebook.",
             });
-            return;
-        }
-
-        await interaction.editReply({
-            content: "Success.",
-            ephemeral: true,
-        });
+        else
+            await interaction.editReply({
+                content: "Success.",
+            });
     },
 };

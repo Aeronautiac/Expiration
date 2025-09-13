@@ -466,7 +466,7 @@ const contacting = {
 
         // construct info strings
         const contactorStr = `**${await names.getAlias(userId)}**`;
-        const contactedStrs = originalMembers.map(async (targetId) => `**${await names.getAlias(targetId)}**`);
+        const contactedStrs = await Promise.all(originalMembers.map(async (targetId) => `**${await names.getAlias(targetId)}**`));
         const timeString = `<t:${Math.floor(Date.now() / 1000)}:F>`;
         const logMessage = `${contactorStr} created a group chat with ${contactedStrs.join(", ")} at ${timeString}`;
 
