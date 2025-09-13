@@ -248,9 +248,10 @@ const util = {
         }
     },
 
-    async relayMessage(message: Message, channels: Channel[], prefix: string = "") {
+    async relayMessage(message: Message, channelIds: string[], prefix: string = "") {
         const content = `${prefix}${message.content}`;
-        const channelSendPromises = channels.map(async(channel) => {
+        const channelSendPromises = channelIds.map(async(channelId) => {
+            const channel = await client.channels.fetch(channelId);
             if (channel.isSendable()) {
                 await channel.send({
                     content,
