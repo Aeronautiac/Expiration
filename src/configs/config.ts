@@ -16,6 +16,9 @@ export const config = {
     groupChatTokenCost: 5,
     maxGroupChatsInGame: 3,
     announcementDelay: 5, // in seconds
+    pollUpdateRate: 5,
+    pollYesEmoji: `✅`,
+    pollNoEmoji: `❌`,
 
     loungeMemberPermissions: {
         ViewChannel: true,

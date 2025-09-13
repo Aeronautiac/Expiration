@@ -1,7 +1,15 @@
 const module = {
-    resolutions: {
+    resolve: {
         
-    }
+    },
+
+    filter: {
+
+    },
+
+    threshold: {
+
+    },
 }
 
 export default module;

@@ -55,6 +55,9 @@ export interface Config {
     groupChatTokenCost: number;
     maxGroupChatsInGame: number;
     announcementDelay: number; // in seconds
+    pollUpdateRate: number; // in secs
+    pollYesEmoji: string;
+    pollNoEmoji: string;
 
     loungeMemberPermissions: PermissionOverwriteOptions;
     spectatorPermissions: PermissionOverwriteOptions;
