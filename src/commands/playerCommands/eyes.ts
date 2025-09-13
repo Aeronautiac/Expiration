@@ -1,6 +1,6 @@
-import { SlashCommandBuilder } from "discord.js";
-import game from "../../game";
-import { interaction } from "../../types";
+import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
+import abilities from "../../core/abilities";
+import { AbilityName } from "../../configs/abilityArgs";
 
 export default {
     data: new SlashCommandBuilder()
@@ -22,32 +22,33 @@ export default {
                 )
                 .setRequired(true)
                 .addChoices(
-                    { name: "Reveal a player's true name.", value: "name" },
+                    {
+                        name: "Reveal a player's true name.",
+                        value: "nameReveal",
+                    },
                     {
                         name: "Check if a player currently posesses a notebook.",
-                        value: "notebook",
+                        value: "notebookReveal",
                     }
                 )
         ),
 
-    async execute(interaction: interaction) {
+    async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
         });
 
-        // do the thing here
-        const result = await game.eyes(interaction);
+        const useFor = interaction.options.getString("usefor") as AbilityName;
+        const result = await abilities.useAbility(interaction.user.id, useFor, {
+            targetId: interaction.options.getUser("target").id,
+        });
+        if (!result.success)
+            await interaction.editReply({
+                content: result.message || "Failed to use eyes.",
+            });
 
-        if (result !== true) {
-            await interaction.editReply({
-                content: result,
-                ephemeral: true,
-            });
-        } else {
-            await interaction.editReply({
-                content: "Success.",
-                ephemeral: true,
-            });
-        }
+        await interaction.editReply({
+            content: "Success.",
+        });
     },
 };

@@ -1,4 +1,4 @@
-import type { Organisation } from "./types";
+import type { Organisation } from "../types/configTypes";
 
 export const organisations = {
     "Task Force": {

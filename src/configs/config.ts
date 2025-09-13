@@ -1,4 +1,4 @@
-import type { Config } from "./types";
+import type { Config } from "../types/configTypes";
 import { categoryPrefixes } from "./categoryPrefixes";
 import { guilds } from "./guilds";
 import { channels } from "./channels";

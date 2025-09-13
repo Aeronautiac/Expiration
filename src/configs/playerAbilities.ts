@@ -1,4 +1,4 @@
-import type { PlayerAbility } from "./types";
+import type { PlayerAbility } from "../types/configTypes";
 
 export type PlayerAbilityName =
     | "autopsy"

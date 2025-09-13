@@ -1,6 +1,5 @@
-import { SlashCommandBuilder } from "discord.js";
-import game from "../../game";
-import { interaction } from "../../types";
+import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
+import abilities from "../../core/abilities";
 
 export default {
     data: new SlashCommandBuilder()
@@ -12,24 +11,21 @@ export default {
                 .setDescription("The person to bug.")
                 .setRequired(true)
         ),
-    async execute(interaction: interaction) {
+    async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
         });
 
-        // do the thing here
-        const result = await game.bug(interaction);
+        const result = await abilities.useAbility(interaction.user.id, "bug", {
+            targetId: interaction.options.getUser("target").id,
+        });
+        if (!result.success)
+            await interaction.editReply({
+                content: result.message || "Failed to use bug.",
+            });
 
-        if (result !== true) {
-            await interaction.editReply({
-                content: result,
-                ephemeral: true,
-            });
-        } else {
-            await interaction.editReply({
-                content: "Success.",
-                ephemeral: true,
-            });
-        }
+        await interaction.editReply({
+            content: "Success.",
+        });
     },
 };

@@ -1,6 +1,5 @@
-import { SlashCommandBuilder } from "discord.js";
-import game from "../../game";
-import { interaction } from "../../types";
+import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
+import abilities from "../../core/abilities";
 
 export default {
     data: new SlashCommandBuilder()
@@ -13,23 +12,26 @@ export default {
                 .setRequired(true)
         ),
 
-    async execute(interaction: interaction) {
+    async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
         });
 
-        const result = await game.anonymousAnnouncement(interaction);
-        if (result !== true) {
+        const result = await abilities.useAbility(
+            interaction.user.id,
+            "anonymousAnnouncement",
+            {
+                message: interaction.options.getString("message"),
+            }
+        );
+        if (!result.success)
             await interaction.editReply({
-                content: result,
-                ephemeral: true,
+                content:
+                    result.message || "Failed to use anonymous announcement.",
             });
-            return;
-        }
 
         await interaction.editReply({
             content: "Successfully announced.",
-            ephemeral: true,
         });
     },
 };

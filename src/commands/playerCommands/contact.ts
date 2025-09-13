@@ -1,6 +1,11 @@
-import { ChatInputCommandInteraction, CommandInteraction, Interaction, SlashCommandBuilder, User } from "discord.js";
-import game from "../../game";
-import { interaction } from "../../types";
+import {
+    ChatInputCommandInteraction,
+    CommandInteraction,
+    Interaction,
+    SlashCommandBuilder,
+    User,
+} from "discord.js";
+import contacting from "../../core/contacting";
 
 export default {
     data: new SlashCommandBuilder()
@@ -24,16 +29,22 @@ export default {
             ephemeral: true,
         });
 
-
-        const reply = await game.contact(
-            interaction.client,
-            interaction.user,
-            interaction.options.getUser("target"),
+        const result = await contacting.contact(
+            interaction.user.id,
+            interaction.options.getUser("target").id,
             interaction.options.getBoolean("anonymous")
         );
+        if (!result.success)
+            await interaction.editReply({
+                content:
+                    result.message ||
+                    `Failed to contact ${interaction.options.getUser(
+                        "target"
+                    )}`,
+            });
 
         await interaction.editReply({
-            content: reply,
+            content: result.message,
         });
     },
 };

@@ -95,8 +95,8 @@ const death = {
                 // transfer bug ability
                 await access.revoke(userId, config.guilds.watarilaptop);
                 await access.grant(args.killerId, config.guilds.watarilaptop);
-                bugAbility.ownerId = args.killerId;
-                bugAbility.roleRestriction = undefined;
+                bugAbility.owner = args.killerId;
+                bugAbility.roleRestrictions = [];
                 await bugAbility.save();
             }
 

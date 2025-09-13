@@ -5,8 +5,6 @@ import {
     Message,
     NewsChannel,
     PermissionOverwriteOptions,
-    PermissionOverwrites,
-    PermissionsBitField,
     StageChannel,
     TextChannel,
     VoiceChannel,
@@ -19,7 +17,6 @@ import contacting from "./contacting";
 import { DiscordRoleName } from "../configs/discordRoles";
 import { RoleName } from "../configs/roles";
 import { failure, Result, success } from "../types/Result";
-import { fail } from "agenda/dist/job/fail";
 
 let client: Client;
 
@@ -248,18 +245,64 @@ const util = {
         }
     },
 
-    async relayMessage(message: Message, channelIds: string[], prefix: string = "") {
+    async relayMessage(
+        message: Message,
+        channelIds: string[],
+        prefix: string = ""
+    ) {
         const content = `${prefix}${message.content}`;
-        const channelSendPromises = channelIds.map(async(channelId) => {
+        const channelSendPromises = channelIds.map(async (channelId) => {
             const channel = await client.channels.fetch(channelId);
             if (channel.isSendable()) {
                 await channel.send({
                     content,
                     files: [...message.attachments.values()],
-                })
+                });
             }
         });
         await Promise.allSettled(channelSendPromises);
+    },
+
+    async fetchAllMessages(
+        channelId: string,
+        earliestTimestamp: number,
+        predicate: (msg: Message) => boolean = () => true
+    ) {
+        const channel = await client.channels.fetch(channelId);
+        if (!channel.isTextBased())
+            throw new Error(
+                "Channel must be text based in order to fetch messages."
+            );
+
+        let allMessages = [];
+        let lastId: string;
+        let done = false;
+
+        while (!done) {
+            const options: {
+                limit: number;
+                before: string;
+            } = {
+                limit: 100,
+                before: null,
+            };
+            if (lastId) options.before = lastId;
+
+            const messages = await channel.messages.fetch(options);
+            if (messages.size === 0) break;
+
+            for (const msg of Array.from(messages.values())) {
+                if (msg.createdTimestamp < earliestTimestamp) {
+                    done = true; // all remaining messages are too old
+                    break;
+                }
+                if (predicate(msg)) allMessages.push(msg);
+            }
+
+            lastId = messages.last().id;
+        }
+
+        return allMessages;
     },
 
     roleMention(r: RoleName) {

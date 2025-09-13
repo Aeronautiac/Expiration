@@ -1,4 +1,4 @@
-import type { PlayerState } from "./types";
+import type { PlayerState } from "../types/configTypes";
 
 export const playerStates = {
     custody: {

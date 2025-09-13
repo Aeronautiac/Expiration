@@ -1,35 +1,32 @@
-import { SlashCommandBuilder } from "discord.js";
-import game from "../../game";
-import { interaction } from "../../types";
+import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 import Lounge from "../../models/lounge";
+import contacting from "../../core/contacting";
 
 export default {
     data: new SlashCommandBuilder()
         .setName("close")
         .setDescription("Close a lounge."),
 
-    async execute(interaction: interaction) {
+    async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
         });
 
-        const lounges = await Lounge.find({
+        const lounge = await Lounge.findOne({
             channelIds: interaction.channel.id,
         });
 
-        if (lounges.length === 0) {
+        if (!lounge) {
             interaction.editReply({
                 content: "This is not a lounge channel.",
-                ephemeral: true,
             });
             return;
         }
 
-        await game.closeLounge(interaction.user, interaction.channel);
+        await contacting.closeLounge(interaction.user.id, lounge.loungeId);
 
         await interaction.editReply({
             content: "Successfully closed lounge.",
-            ephemeral: true,
         });
     },
 };

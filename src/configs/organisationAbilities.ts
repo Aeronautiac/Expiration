@@ -1,4 +1,4 @@
-import { OrganisationAbility } from "./types";
+import { OrganisationAbility } from "../types/configTypes";
 
 const KIDNAP_DURATION = 24; // hours
 const ARREST_DURATION = 24;

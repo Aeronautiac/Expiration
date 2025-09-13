@@ -28,7 +28,19 @@ export interface PlayerAbilityArgs {
     anonymousContact: {
         targetId: string;
     };
-};
+
+    autopsy: {
+        targetId: string;
+    };
+
+    nameReveal: {
+        targetId: string;
+    };
+
+    notebookReveal: {
+        targetId: string;
+    };
+}
 
 export interface OrganisationAbilityArgs {}
 

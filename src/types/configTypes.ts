@@ -1,13 +1,14 @@
-import { Base, Guild, PermissionOverwriteOptions } from "discord.js";
-import { ChannelName } from "./channels";
-import { GuildName } from "./guilds";
-import { OrganisationAbilityName } from "./organisationAbilities";
-import { PlayerAbilityName } from "./playerAbilities";
-import { PlayerStateName } from "./playerStates";
-import { RoleName } from "./roles";
-import { CategoryPrefixName } from "./categoryPrefixes";
-import { DiscordRoleName } from "./discordRoles";
-import { OrganisationName } from "./organisations";
+import { PermissionOverwriteOptions } from "discord.js";
+import { ChannelName } from "../configs/channels";
+import { GuildName } from "../configs/guilds";
+import { OrganisationAbilityName } from "../configs/organisationAbilities";
+import { PlayerAbilityName } from "../configs/playerAbilities";
+import { PlayerStateName } from "../configs/playerStates";
+import { RoleName } from "../configs/roles";
+import { CategoryPrefixName } from "../configs/categoryPrefixes";
+import { DiscordRoleName } from "../configs/discordRoles";
+import { OrganisationName } from "../configs/organisations";
+import { AbilityName } from "../configs/abilityArgs";
 
 export interface Role {
     abilities: PlayerAbilityName[]; // list of ability names that are granted to players with this role
@@ -34,6 +35,14 @@ export type AbilityOverrides = Partial<
 >;
 
 export interface BaseAbility {
+    linkedAbilities?: Partial<
+        Record<
+            AbilityName,
+            {
+                useCharges: number;
+            }
+        >
+    >;
     cooldown: number;
     charges: number | number[];
     duration?: number; // duration in hours, if applicable

@@ -1,6 +1,6 @@
 import { Document, Schema, Model, model } from "mongoose";
 import { RoleName } from "../configs/roles";
-import { PlayerState } from "../configs/types";
+import { PlayerState } from "../types/configTypes";
 import { PlayerStateName } from "../configs/playerStates";
 
 export type ExtraPlayerFlag = "ipp" | "underTheRadar" | "kiraConnection" | "alive";

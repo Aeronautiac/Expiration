@@ -1,8 +1,8 @@
 import { Client } from "discord.js";
 
 import Player, { IPlayer } from "../models/player";
-import Ability from "../models/ability";
-import Season from "../oldModels/season";
+import Ability, { IAbility } from "../models/ability";
+import Season, { ISeason } from "../models/season";
 import { config } from "../configs/config";
 import names from "./names";
 import { Result, failure, success } from "../types/Result";
@@ -13,7 +13,7 @@ import {
     BaseAbility,
     OrganisationAbility,
     PlayerAbility,
-} from "../configs/types";
+} from "../types/configTypes";
 import { PlayerStateName } from "../configs/playerStates";
 import {
     AbilityName,
@@ -25,6 +25,39 @@ import { PlayerAbilityName } from "../configs/playerAbilities";
 import { OrganisationName, organisations } from "../configs/organisations";
 
 let client: Client;
+
+async function applyUsageConsequences(
+    season: ISeason,
+    abilityData: IAbility,
+    abilityConfig: BaseAbility,
+    subtractCharges: number,
+) {
+    // charges
+    // find default ability number based on the current day
+    function getChargesBasedOnDay(chargeArray: number[]): number {
+        // array with index 0 corresponding to season day 1 and onward. the value in this index is the number of charges available on that day and beyond.
+        // if there is no value at the index of the current day, then the value is the last index in the array.
+        const currentDay = season.day - 1;
+        return chargeArray[currentDay] ?? chargeArray[chargeArray.length - 1];
+    }
+
+    const defaultCharges = Array.isArray(abilityConfig.charges)
+        ? getChargesBasedOnDay(abilityConfig.charges)
+        : abilityConfig.charges;
+
+    // if their charges for this ability have not been initialized today, initialize them.
+    // if they have, then subtract 1 and clamp to 0.
+    if (abilityData.charges === null || abilityData.charges === undefined) {
+        abilityData.charges = Math.max(0, defaultCharges - subtractCharges);
+    } else {
+        abilityData.charges = Math.max(0, abilityData.charges - subtractCharges);
+    }
+
+    // set the cooldown to whatever their cooldown for this ability should be at this moment
+    // later need to implement overrides
+    abilityData.queuedCooldown = abilityConfig.cooldown;
+    await abilityData.save();
+}
 
 const module = {
     init(c: Client) {
@@ -40,10 +73,10 @@ const module = {
             ? OrganisationAbilityArgs[K]
             : never,
         checkOnly?: boolean
-    ) {
+    ): Promise<Result> {
         // abilities can only be used when a season is active
         const season = await Season.findOne({});
-        if (!season || !season.active)
+        if (!season || !season.flags.get("active"))
             return failure("The season is not yet active.");
 
         // abilities can only be used by a player/organisation that possesses the ability
@@ -74,15 +107,29 @@ const module = {
         }
 
         // the ability does not exist
-        const orgBase: OrganisationAbility = config.organisationAbilities[abilityName as OrganisationAbilityName];
-        const playerBase: PlayerAbility = config.playerAbilities[abilityName as PlayerAbilityName];
+        const orgBase: OrganisationAbility =
+            config.organisationAbilities[
+                abilityName as OrganisationAbilityName
+            ];
+        const playerBase: PlayerAbility =
+            config.playerAbilities[abilityName as PlayerAbilityName];
         if (!orgBase && !playerBase) return failure("Ability does not exist.");
 
         // if there are overrides, apply them here
-        const orgOverrides = config.organisations[owner as OrganisationName]?.abilityOverrides[abilityName as OrganisationAbilityName];
-        const orgAbilityConfig = orgBase ?  Object.assign({}, orgBase, orgOverrides) : null;
-        const roleOverrides = config.roles[userData?.role]?.abilityOverrides[abilityName as PlayerAbilityName];
-        const playerAbilityConfig = playerBase ?  Object.assign({}, playerBase, roleOverrides) : null;
+        const orgOverrides =
+            config.organisations[owner as OrganisationName]?.abilityOverrides[
+                abilityName as OrganisationAbilityName
+            ];
+        const orgAbilityConfig = orgBase
+            ? Object.assign({}, orgBase, orgOverrides)
+            : null;
+        const roleOverrides =
+            config.roles[userData?.role]?.abilityOverrides[
+                abilityName as PlayerAbilityName
+            ];
+        const playerAbilityConfig = playerBase
+            ? Object.assign({}, playerBase, roleOverrides)
+            : null;
 
         // the ability exists, but the function is not implemented
         const callbackSource =
@@ -177,35 +224,26 @@ const module = {
         const hostLogs = await client.channels.fetch(config.channels.hostLogs);
         if (hostLogs && hostLogs.isSendable()) await hostLogs.send(logMessage);
 
-        // charges
-        // find default ability number based on the current day
-        function getChargesBasedOnDay(chargeArray: number[]): number {
-            // array with index 0 corresponding to season day 1 and onward. the value in this index is the number of charges available on that day and beyond.
-            // if there is no value at the index of the current day, then the value is the last index in the array.
-            const currentDay = season.day - 1;
-            return (
-                chargeArray[currentDay] ?? chargeArray[chargeArray.length - 1]
-            );
-        }
-
         const abilityConfig: BaseAbility =
             orgAbilityConfig ?? playerAbilityConfig;
-        const defaultCharges = Array.isArray(abilityConfig.charges)
-            ? getChargesBasedOnDay(abilityConfig.charges)
-            : abilityConfig.charges;
 
-        // if their charges for this ability have not been initialized today, initialize them.
-        // if they have, then subtract 1 and clamp to 0.
-        if (abilityData.charges === null || abilityData.charges === undefined) {
-            abilityData.charges = Math.max(0, defaultCharges - 1);
-        } else {
-            abilityData.charges = Math.max(0, abilityData.charges - 1);
+        // main ability usage
+        await applyUsageConsequences(season, abilityData, abilityConfig, 1);
+        
+        // handle linked abilities
+        // might need to handle override system here too later, but not important right now
+        if (abilityConfig.linkedAbilities) {
+            for (const [name, info] of Object.entries(abilityConfig.linkedAbilities)) {
+                const linkedAbilityConfig: BaseAbility =
+                    config.organisationAbilities[name] ?? config.playerAbilities[name];
+                const linkedAbilityData = await Ability.findOne({
+                    owner,
+                    ability: name,
+                });
+                if (linkedAbilityData)
+                    await applyUsageConsequences(season, linkedAbilityData, linkedAbilityConfig, info.useCharges);
+            }
         }
-
-        // set the cooldown to whatever their cooldown for this ability should be at this moment
-        // later need to implement overrides
-        abilityData.queuedCooldown = abilityConfig.cooldown;
-        await abilityData.save();
 
         return success(
             `Successfully used ${abilityName}. Charges remaining: ${abilityData.charges}`
@@ -221,7 +259,7 @@ const module = {
             : K extends keyof OrganisationAbilityArgs
             ? OrganisationAbilityArgs[K]
             : never
-    ) {
+    ): Promise<Result> {
         return module.useAbility(owner, abilityName, args, true);
     },
 
