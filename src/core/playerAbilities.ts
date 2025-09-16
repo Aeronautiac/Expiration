@@ -34,10 +34,6 @@ const playerAbilities = {
 
         if (checkOnly) return success();
 
-        let affiliations = [];
-        if (args.affiliationsString)
-            affiliations = args.affiliationsString.split(", ");
-
         const target = await client.users.fetch(args.targetId);
         await target
             .send(
@@ -61,7 +57,7 @@ const playerAbilities = {
             ownedBugAbility: args.hasBugAbility,
             trueName: args.trueName,
             role: args.role,
-            affiliations: affiliations,
+            memberObjects: args.memberObjects,
         });
 
         // schedule their revival for after the pseudocide period

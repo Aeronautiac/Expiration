@@ -43,7 +43,7 @@ export default {
             option
                 .setName("organisations")
                 .setDescription(
-                    "The orgs to be displayed: Task Force, Kira's Kingdom. If they are to be the leader, start with L_: L_Task Force"
+                    `Separate with "," (Task Force, Kira's Kingdom). If leader, start with L_ (L_Task Force)`
                 )
                 .setRequired(false)
         )
