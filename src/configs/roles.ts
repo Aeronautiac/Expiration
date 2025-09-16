@@ -10,16 +10,7 @@ export const roles = {
     "Beyond Birthday": {
         abilities: ["pseudocide", "nameReveal", "notebookReveal"],
         guilds: ["bb"],
-        abilityOverrides: {
-            "nameReveal": {
-                charges: 1,
-                linkedAbilities: {}
-            },
-            "notebookReveal": {
-                charges: 1,
-                linkedAbilities: {}
-            },
-        },
+        abilityOverrides: {},
         guildChannels: {},
     },
     Watari: {
@@ -52,7 +43,11 @@ export const roles = {
             "anonymousAnnouncement",
         ],
         guilds: ["2kira"],
-        abilityOverrides: {},
+        abilityOverrides: {
+            "nameReveal": {
+                charges: [1, 2]
+            }
+        },
         guildChannels: {},
     },
     "News Anchor": {

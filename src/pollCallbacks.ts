@@ -10,6 +10,10 @@ const pollCallbacks = {
     threshold: {
 
     },
+
+    canContinue: {
+        
+    }
 }
 
 export default pollCallbacks;

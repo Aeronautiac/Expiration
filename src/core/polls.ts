@@ -10,7 +10,7 @@ import util from "./util";
 import { config } from "../configs/config";
 import pollCallbacks from "../pollCallbacks";
 
-export type Resolution = "inconclusive" | "success" | "failure";
+export type Resolution = "inconclusive" | "success" | "failure" | "cancelled";
 
 let client: Client;
 
@@ -41,6 +41,13 @@ const polls = {
             pollCallbacks.threshold[poll.callbacks.threshold];
         const resolveCallback = pollCallbacks.resolve[poll.callbacks.resolve];
         const filterCallback = pollCallbacks.filter[poll.callbacks.filter];
+        const canContinueCallback = pollCallbacks.canContinue[poll.callbacks.canContinue];
+        
+        // if the poll cannot continue, return a failure
+        if (!canContinueCallback(poll)) {
+            await resolveCallback(poll, "cancelled");
+            return;
+        }
 
         // find the poll's current threshold using the threshold callback
         const threshold = await thresholdCallback(poll);

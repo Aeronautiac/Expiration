@@ -7,13 +7,6 @@ import { OrgMember } from "../../types/OrgMember";
 import { Organisation } from "../../types/configTypes";
 import { OrganisationName } from "../../configs/organisations";
 
-function choice(name: string) {
-    return {
-        name: name,
-        value: name,
-    };
-}
-
 export default {
     data: new SlashCommandBuilder()
         .setName("pseudocide")

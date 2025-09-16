@@ -5,6 +5,7 @@ export type PollCallbacks = {
     threshold: string;
     resolve: string;
     filter: string;
+    canContinue: string;
 };
 export type PollResolutionRules = {
     prioritizeInconclusive: boolean; // if the poll times out and this value is false, then it will return inconclusive without checking votes
@@ -36,6 +37,7 @@ const pollSchema = new Schema<IPoll>({
             threshold: { type: String, required: true },
             resolve: { type: String, required: true },
             filter: { type: String, required: true },
+            canContinue: { type: String, required: true },
         },
         required: true,
     },
