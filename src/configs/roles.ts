@@ -10,7 +10,16 @@ export const roles = {
     "Beyond Birthday": {
         abilities: ["pseudocide", "nameReveal", "notebookReveal"],
         guilds: ["bb"],
-        abilityOverrides: {},
+        abilityOverrides: {
+            "nameReveal": {
+                charges: 1,
+                linkedAbilities: {}
+            },
+            "notebookReveal": {
+                charges: 1,
+                linkedAbilities: {}
+            },
+        },
         guildChannels: {},
     },
     Watari: {
@@ -32,7 +41,7 @@ export const roles = {
     "Private Investigator": {
         abilities: ["autopsy", "ipp", "anonymousContact"],
         guilds: ["pi"],
-            abilityOverrides: {},
+        abilityOverrides: {},
         guildChannels: {},
     },
     "2nd Kira": {

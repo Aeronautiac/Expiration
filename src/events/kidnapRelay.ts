@@ -6,7 +6,7 @@ import names from "../core/names";
 import Kidnapping from "../models/kidnapping";
 import Player from "../models/player";
 
-module.exports = {
+export default {
     name: Events.MessageCreate,
 
     async execute(message: Message) {

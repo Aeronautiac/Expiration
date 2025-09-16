@@ -25,7 +25,7 @@ export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
         bypasses: [],
     },
     pseudocide: {
-        charges: [1, 2],
+        charges: 1,
         cooldown: 1,
         bypasses: [],
         duration: 24,
@@ -33,11 +33,21 @@ export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
     nameReveal: {
         charges: [1, 2],
         cooldown: 0,
+        linkedAbilities: {
+            notebookReveal: {
+                useCharges: 2,
+            },
+        },
         bypasses: ["custody"],
     },
     notebookReveal: {
         charges: 1,
         cooldown: 0,
+        linkedAbilities: {
+            nameReveal: {
+                useCharges: 2,
+            },
+        },
         bypasses: ["custody"],
     },
     underTheRadar: {

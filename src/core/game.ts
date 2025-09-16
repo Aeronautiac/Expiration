@@ -49,8 +49,9 @@ const game = {
         const user = await client.users.fetch(userId);
 
         if (!playerData) {
-            const name =
-                names.toReadable(trueName) ?? (await names.getUnique());
+            const name = trueName
+                ? names.toReadable(trueName)
+                : await names.getUnique();
 
             playerData = await Player.create({
                 userId,
@@ -74,9 +75,19 @@ const game = {
             );
             await util.removeState(userId, "dead");
 
-            const ownedNotebooks = await Notebook.find({
+            // if there is a temporary owner, the notebook should be returned by the end of the day, so we ignore these types of notebooks
+            const ownedNotebooks = [];
+            const currOwnerNotebooks = await Notebook.find({
                 currentOwner: userId,
+                temporaryOwner: { $in: [null, "", undefined] },
             });
+
+            // if they still have a temporary book for some reason then give that back as well
+            const tempOwnerNotebooks = await Notebook.find({
+                temporaryOwner: userId,
+            });
+
+            ownedNotebooks.push(...currOwnerNotebooks, ...tempOwnerNotebooks);
             for (const notebook of ownedNotebooks) {
                 try {
                     await notebooks.setOwner(notebook.guildId, userId);
@@ -98,7 +109,9 @@ const game = {
 
         // roles
         const mainGuild = await client.guilds.fetch(config.guilds.main);
-        const member = await mainGuild.members.fetch(userId).catch(() => null);
+        const member = await mainGuild.members
+            .fetch(userId)
+            .catch(console.error);
         if (member) {
             await member.roles
                 .add(config.discordRoles.Civilian)
@@ -171,7 +184,8 @@ const game = {
                     ids: [config.discordRoles.Spectator],
                     perms: config.spectatorPermissions,
                 },
-            ]
+            ],
+            true
         );
 
         // add it to their data
@@ -183,10 +197,7 @@ const game = {
         // send monologue intro message
         if (monologueChannel.isSendable())
             await monologueChannel.send(
-                `<@${userId}> this is your monologue channel. It is a completely private channel where you can 
-                write down your thoughts or store any information you might find useful. You may do whatever you wish with it.
-                You can ask a host to make messages sent in this channel loggable (meaning bug and autopsy will log messages sent here).
-                You may also ask them to make it unloggable if it had previously been made loggable.`
+                `<@${userId}> this is your monologue channel. It is a completely private channel where you can write down your thoughts or store any information you might find useful. You may do whatever you wish with it.`
             );
     },
 
@@ -348,7 +359,8 @@ const game = {
                 anonymous ? "anonymous" : "public"
             }`,
             config.categoryPrefixes.kidnap,
-            [{ ids: [userId], perms: config.loungeMemberPermissions }]
+            [{ ids: [userId], perms: config.loungeMemberPermissions }],
+            true
         );
         await util.setChannelLoggable(kidnappedChannel.id);
 
@@ -539,8 +551,8 @@ const game = {
             if (source === "custody") return "L and Watari";
             return "";
         })();
-        notifierMessage += `\nAs a result, anything you send in shared channels will be viewable by ${viewableBy}.
-    \nA shared channel is any channel which is not solely visible to you at all times.`;
+        notifierMessage += `\nAs a result, anything you send in shared channels will be viewable by ${viewableBy}.`;
+        notifierMessage += `\nA shared channel is any channel which is not solely visible to you at all times.`;
 
         try {
             await target.send(notifierMessage);

@@ -1,9 +1,16 @@
 {
     "compilerOptions": {
+        "target": "ES2023",
+        "module": "CommonJS",
+        "rootDir": "src",
+        "outDir": "dist",
         "resolveJsonModule": true,
         "esModuleInterop": true,
-        // "strict": true
         "downlevelIteration": true,
-        "lib": ["ES7", "DOM"]
-    }
+        "lib": ["ES2023", "DOM"],
+        "skipLibCheck": true,
+        "allowJs": true
+    },
+    "include": ["src", "src/watchdog.ts"],
+    "exclude": ["node_modules", "dist"]
 }

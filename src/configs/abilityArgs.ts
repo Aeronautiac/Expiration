@@ -1,3 +1,4 @@
+import { OrgMember } from "../types/OrgMember";
 import { RoleName } from "./roles";
 
 export interface PlayerAbilityArgs {
@@ -5,10 +6,10 @@ export interface PlayerAbilityArgs {
         targetId: string;
         role: RoleName;
         trueName: string;
+        memberObjects: OrgMember[];
         hasNotebook?: boolean;
         hasBugAbility?: boolean;
         message?: string;
-        affiliationsString?: string;
     };
 
     ipp: {

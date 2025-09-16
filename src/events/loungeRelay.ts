@@ -5,7 +5,7 @@ import names from "../core/names";
 import Player from "../models/player";
 import Lounge from "../models/lounge";
 
-module.exports = {
+export default {
     name: Events.MessageCreate,
 
     async execute(message: Message) {

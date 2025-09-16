@@ -16,28 +16,21 @@ agenda.define(
     async (job: Job<{ userId: string; roleOnDeath: RoleName }>) => {
         const { userId, roleOnDeath } = job.attrs.data;
         await game.role(userId, roleOnDeath);
-        await game.announce(`It appears that <@${userId}> never actually died! They were found half-naked and unconscious in the middle of a crowded street in Tokyo.\n
-        When questioned, they claimed to have no recollection of how they arrived there.\n
-        Their death appears to have been staged using an uncanny replica dummy.\n
-        Authorities have now deemed them “sufficiently reintegrated into society.”`);
+        await game.announce(
+            `@everyone It appears that <@${userId}> never actually died! They were found half-naked and unconscious in the middle of a crowded street in Tokyo.\nWhen questioned, they claimed to have no recollection of how they arrived there.\nTheir death appears to have been staged using an uncanny replica dummy.\nAuthorities have now allowed them to re-enter society.`
+        );
     }
 );
 
-agenda.define(
-    "kidnapRelease",
-    async (job: Job<{ userId: string }>) => {
-        const { userId } = job.attrs.data;
-        await game.kidnapRelease(userId);
-    }
-)
+agenda.define("kidnapRelease", async (job: Job<{ userId: string }>) => {
+    const { userId } = job.attrs.data;
+    await game.kidnapRelease(userId);
+});
 
-agenda.define(
-    "releaseIncarcerated",
-    async (job: Job<{ userId: string }>) => {
-        const { userId } = job.attrs.data;
-        await game.removeIncarcerated(userId);
-    }
-)
+agenda.define("releaseIncarcerated", async (job: Job<{ userId: string }>) => {
+    const { userId } = job.attrs.data;
+    await game.removeIncarcerated(userId);
+});
 
 export default agenda;
 

@@ -1,7 +1,7 @@
 import { Events, GuildMember } from "discord.js";
 import names from "../core/names";
 
-module.exports = {
+export default {
     name: Events.GuildMemberAdd,
 
     async execute(member: GuildMember) {

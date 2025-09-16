@@ -1,4 +1,4 @@
-const module = {
+const pollCallbacks = {
     resolve: {
         
     },
@@ -12,4 +12,4 @@ const module = {
     },
 }
 
-export default module;
+export default pollCallbacks;

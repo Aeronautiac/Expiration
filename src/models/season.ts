@@ -1,4 +1,4 @@
-const { mongoose } = require("../mongoose");import { Document, Schema, Model, model } from "mongoose";
+import { Document, Schema, Model, model } from "mongoose";
 
 export type SeasonFlag = "active" | "blackout";
 
@@ -11,7 +11,7 @@ export interface ISeason extends Document {
 
 // will hold game state like channels that were dynamically created during the season, blackout, etc...
 // there will only be one of these at a time
-const seasonSchema = new mongoose.Schema({
+const seasonSchema = new Schema<ISeason>({
     _id: { type: String, default: "season" },
     flags: { type: Map, of: Boolean, required: true, default: {} },
     temporaryChannels: { type: [String], required: true, default: [] },

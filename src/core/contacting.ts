@@ -8,11 +8,11 @@ import util from "./util";
 import GroupChat from "../models/groupChat";
 import names from "./names";
 import contact from "../commands/playerCommands/contact";
+import abilities from "./abilities";
 
 let client: Client;
 
 const contacting = {
-
     init: function (newClient: Client) {
         client = newClient;
     },
@@ -61,7 +61,10 @@ const contacting = {
                 const lounge = await client.channels.fetch(channelId);
                 if (!lounge?.isTextBased()) return;
                 if (!("permissionOverwrites" in lounge)) return;
-                await lounge.permissionOverwrites.edit(userId, config.loungeMemberPermissions);
+                await lounge.permissionOverwrites.edit(
+                    userId,
+                    config.loungeMemberPermissions
+                );
             } catch (err) {
                 console.log("Failed to add channel perms:", err);
             }
@@ -70,7 +73,11 @@ const contacting = {
         await access.grantGroup(userId);
     },
 
-    async contact(userId: string, targetId: string, anonymous?: boolean): Promise<Result> {
+    async contact(
+        userId: string,
+        targetId: string,
+        anonymous?: boolean
+    ): Promise<Result> {
         const userData = await Player.findOne({ userId });
         const targetData = await Player.findOne({ userId: targetId });
 
@@ -83,10 +90,14 @@ const contacting = {
         if (!targetCanContactResult.success) return targetCanContactResult;
 
         // if the player is also the target, return a failure
-        if (userId == targetId && !anonymous) return failure("You cannot contact yourself if it is not anonymous.");
+        if (userId == targetId && !anonymous)
+            return failure(
+                "You cannot contact yourself if it is not anonymous."
+            );
 
         // if the player is out of contact tokens, return a failure
-        if (!userData.contactTokens) return failure("You are out of contact tokens.");
+        if (!userData.contactTokens)
+            return failure("You are out of contact tokens.");
 
         // the contact was permitted, continue with contact logic
         // create the lounge
@@ -95,13 +106,35 @@ const contacting = {
 
         // create channels
         const channels: Channel[] = [];
-        const contactorChannel = await util.createTemporaryChannel(config.guilds.main, channelName, config.categoryPrefixes.lounge,
-            [{ ids: [userId], perms: config.loungeMemberPermissions }, { ids: [config.discordRoles.Spectator], perms: config.spectatorPermissions }]);
+        const contactorChannel = await util.createTemporaryChannel(
+            config.guilds.main,
+            channelName,
+            config.categoryPrefixes.lounge,
+            [
+                { ids: [userId], perms: config.loungeMemberPermissions },
+                {
+                    ids: [config.discordRoles.Spectator],
+                    perms: config.spectatorPermissions,
+                },
+            ],
+            true
+        );
         channels.push(contactorChannel);
 
         if (anonymous) {
-            const contactedChannel = await util.createTemporaryChannel(config.guilds.main, channelName, config.categoryPrefixes.lounge,
-                [{ ids: [targetId], perms: config.loungeMemberPermissions }, { ids: [config.discordRoles.Spectator], perms: config.spectatorPermissions }]);
+            const contactedChannel = await util.createTemporaryChannel(
+                config.guilds.main,
+                channelName,
+                config.categoryPrefixes.lounge,
+                [
+                    { ids: [targetId], perms: config.loungeMemberPermissions },
+                    {
+                        ids: [config.discordRoles.Spectator],
+                        perms: config.spectatorPermissions,
+                    },
+                ], 
+                true
+            );
             channels.push(contactedChannel);
             // if it's anonymous, then both players have a different channel for this lounge
             targetData.loungeChannelIds.push(contactedChannel.id);
@@ -117,7 +150,9 @@ const contacting = {
         await targetData.save();
         await userData.save();
 
-        const contactorStr = anonymous ? util.roleMention(userData.role) : `<@${userId}>`;
+        const contactorStr = anonymous
+            ? util.roleMention(userData.role)
+            : `<@${userId}>`;
         const contactedStr = `<@${targetId}>`;
         const sendPromises = channels.map(async (channel) => {
             if (channel.isSendable())
@@ -127,9 +162,9 @@ const contacting = {
 
         const channelIds = channels.map((channel: Channel) => channel.id);
         // set channels loggable
-        const setLoggablePromises = channelIds.map(async(channelId) => {
+        const setLoggablePromises = channelIds.map(async (channelId) => {
             await util.setChannelLoggable(channelId, true);
-        })
+        });
         await Promise.all(setLoggablePromises);
 
         await Lounge.create({
@@ -137,16 +172,21 @@ const contacting = {
             channelIds,
             contactorId: userId,
             contactedId: userId,
-            loungeId
+            loungeId,
         });
 
         // log contact
         await contacting.logContact(userId, targetId, anonymous);
 
-        return success(`Successfully created lounge channel: ${contactorChannel}`);
+        return success(
+            `Successfully created lounge channel: ${contactorChannel}`
+        );
     },
 
-    async canDoGroupchatAction(userId: string, groupchatId: string): Promise<Result> {
+    async canDoGroupchatAction(
+        userId: string,
+        groupchatId: string
+    ): Promise<Result> {
         // if the player cannot contact, return a failure
         const canContactResult = await contacting.canContact(userId);
         if (!canContactResult.success) return canContactResult;
@@ -156,7 +196,8 @@ const contacting = {
         if (!groupchat) return failure("This channel is not a group chat.");
 
         // if the player is not the owner of the group chat, return a failure
-        if (groupchat.ownerId !== userId) return failure("You are not the owner of this group chat.");
+        if (groupchat.ownerId !== userId)
+            return failure("You are not the owner of this group chat.");
 
         return success();
     },
@@ -169,15 +210,23 @@ const contacting = {
 
         // if the player has any lounge restrictors, return a failure
         if (playerData.loungeHiders.size > 0)
-            return failure(`You cannot do this action right now. Reasons: ${Array.from(playerData.loungeHiders.keys()).join(`, `)}`);
+            return failure(
+                `You cannot do this action right now. Reasons: ${Array.from(
+                    playerData.loungeHiders.keys()
+                ).join(`, `)}`
+            );
 
         return success();
     },
 
-    async createGroupchat(userId: string, originalMembers: string[]): Promise<Result> {
+    async createGroupchat(
+        userId: string,
+        originalMembers: string[]
+    ): Promise<Result> {
         // if too many groupchats already exist, return a failure
         const count = await GroupChat.countDocuments({});
-        if (count >= config.maxGroupChatsInGame) return failure("The maximum number of groupchats already exist.");
+        if (count >= config.maxGroupChatsInGame)
+            return failure("The maximum number of groupchats already exist.");
 
         // if the player cannot contact, return a failure
         const canContactResult = await contacting.canContact(userId);
@@ -185,17 +234,26 @@ const contacting = {
 
         // if there are duplicate members, return a failure
         if (new Set(originalMembers).size !== originalMembers.length)
-            return failure("A group chat must be created with at least 3 initial members.");
+            return failure(
+                "A group chat must be created with at least 3 initial members."
+            );
 
         // if the player does not have enough contact tokens, return a failure
         const playerData = await Player.findOne({ userId });
         if (playerData.contactTokens < config.groupChatTokenCost)
-            return failure("You do not have enough contact tokens to create a group chat.");
+            return failure(
+                "You do not have enough contact tokens to create a group chat."
+            );
 
         // if at least one of the original members cannot contact, return a failure
         for (const memberId of originalMembers) {
-            const memberCanContactResult = await contacting.canContact(memberId);
-            if (!memberCanContactResult.success) return failure(`You cannot create a group chat with <@${memberId}>. Reason: ${memberCanContactResult.message}`);
+            const memberCanContactResult = await contacting.canContact(
+                memberId
+            );
+            if (!memberCanContactResult.success)
+                return failure(
+                    `You cannot create a group chat with <@${memberId}>. Reason: ${memberCanContactResult.message}`
+                );
         }
 
         // create the groupchat
@@ -204,7 +262,8 @@ const contacting = {
             config.guilds.main,
             `groupchat-${count + 1}`,
             config.categoryPrefixes.groupchat,
-            [{ ids: allMembers, perms: config.loungeMemberPermissions }]
+            [{ ids: allMembers, perms: config.loungeMemberPermissions }],
+            true
         );
 
         // set the channel loggable
@@ -213,16 +272,25 @@ const contacting = {
         // add the channel id to each member's lounge channel ids array, update all member's data
         const promises = [];
         for (const memberId of allMembers)
-            promises.push((async () => {
-                const memberData = await Player.findOne({ userId: memberId });
-                if (!memberData) return;
-                memberData.loungeChannelIds.push(groupchatChannel.id);
-                await memberData.save();
-            })());
-        promises.push((async () => {
-            playerData.contactTokens = Math.max(0, playerData.contactTokens - config.groupChatTokenCost);
-            await playerData.save();
-        })());
+            promises.push(
+                (async () => {
+                    const memberData = await Player.findOne({
+                        userId: memberId,
+                    });
+                    if (!memberData) return;
+                    memberData.loungeChannelIds.push(groupchatChannel.id);
+                    await memberData.save();
+                })()
+            );
+        promises.push(
+            (async () => {
+                playerData.contactTokens = Math.max(
+                    0,
+                    playerData.contactTokens - config.groupChatTokenCost
+                );
+                await playerData.save();
+            })()
+        );
         await Promise.all(promises);
 
         await GroupChat.create({
@@ -233,8 +301,12 @@ const contacting = {
 
         // send the creation messages
         if (groupchatChannel.isSendable()) {
-            await groupchatChannel.send(`**Groupchat created by <@${userId}>.**`);
-            await groupchatChannel.send(allMembers.map(id => `<@${id}>`).join(" "));
+            await groupchatChannel.send(
+                `**Groupchat created by <@${userId}>.**`
+            );
+            await groupchatChannel.send(
+                allMembers.map((id) => `<@${id}>`).join(" ")
+            );
         }
 
         // log the creation
@@ -242,10 +314,16 @@ const contacting = {
         return success(`Groupchat created successfully: ${groupchatChannel}`);
     },
 
-    async addToGroupchat(userId: string, targetId: string, groupchatId: string): Promise<Result> {
+    async addToGroupchat(
+        userId: string,
+        targetId: string,
+        groupchatId: string
+    ): Promise<Result> {
         // if the player cannot do a groupchat action, return a failure
-        const canDoGroupchatActionResult = await contacting.canDoGroupchatAction(userId, groupchatId);
-        if (!canDoGroupchatActionResult.success) return canDoGroupchatActionResult;
+        const canDoGroupchatActionResult =
+            await contacting.canDoGroupchatAction(userId, groupchatId);
+        if (!canDoGroupchatActionResult.success)
+            return canDoGroupchatActionResult;
 
         // if the target cannot contact, return a failure
         const targetCanContactResult = await contacting.canContact(targetId);
@@ -253,90 +331,134 @@ const contacting = {
 
         // if the target is already in the group chat, return a failure
         const groupchat = await GroupChat.findOne({ channelId: groupchatId });
-        if (groupchat.memberIds.includes(targetId)) return failure("This person is already in the group chat.");
+        if (groupchat.memberIds.includes(targetId))
+            return failure("This person is already in the group chat.");
 
         // add the target to the group chat
-        await util.addPermissionsToChannel(groupchatId, [{
-            ids: [targetId],
-            perms: config.loungeMemberPermissions
-        }]);
+        await util.addPermissionsToChannel(groupchatId, [
+            {
+                ids: [targetId],
+                perms: config.loungeMemberPermissions,
+            },
+        ]);
 
         // update the target's data and the group chat's data
-        await Player.findOneAndUpdate({ userId: targetId }, { $push: { loungeChannelIds: groupchatId } });
+        await Player.findOneAndUpdate(
+            { userId: targetId },
+            { $push: { loungeChannelIds: groupchatId } }
+        );
         groupchat.memberIds.push(targetId);
         await groupchat.save();
 
         // send the addition message
         const channel = await client.channels.fetch(groupchatId);
         if (channel.isSendable())
-            await channel.send(`**<@${targetId}> has been added to the groupchat.**`);
+            await channel.send(
+                `**<@${targetId}> has been added to the groupchat.**`
+            );
 
         // log the addition
 
         return success(`Successfully added <@${targetId}> to the groupchat.`);
     },
 
-    async removeFromGroupchat(userId: string, targetId: string, channelId: string): Promise<Result> {
+    async removeFromGroupchat(
+        userId: string,
+        targetId: string,
+        channelId: string
+    ): Promise<Result> {
         // if the player cannot do a group chat action, return a failure
-        const canDoGroupchatActionResult = await contacting.canDoGroupchatAction(userId, channelId);
-        if (!canDoGroupchatActionResult.success) return canDoGroupchatActionResult;
+        const canDoGroupchatActionResult =
+            await contacting.canDoGroupchatAction(userId, channelId);
+        if (!canDoGroupchatActionResult.success)
+            return canDoGroupchatActionResult;
 
         // if the target is not in the group chat, return a failure
         const groupchat = await GroupChat.findOne({ channelId });
-        if (!groupchat.memberIds.includes(targetId)) return failure("This person is not in the group chat.");
+        if (!groupchat.memberIds.includes(targetId))
+            return failure("This person is not in the group chat.");
 
         // remove the target from the group chat
         await util.deletePermissionsToChannel(channelId, [targetId]);
-        await Player.findOneAndUpdate({ userId: targetId }, { $pull: { loungeChannelIds: channelId } });
-        await GroupChat.updateOne({ channelId: channelId }, { $pull: { memberIds: targetId } });
+        await Player.findOneAndUpdate(
+            { userId: targetId },
+            { $pull: { loungeChannelIds: channelId } }
+        );
+        await GroupChat.updateOne(
+            { channelId: channelId },
+            { $pull: { memberIds: targetId } }
+        );
 
         // send the removal message
         const channel = await client.channels.fetch(channelId);
         if (channel.isSendable())
-            await channel.send(`**<@${targetId}> has been removed from the groupchat.**`);
+            await channel.send(
+                `**<@${targetId}> has been removed from the groupchat.**`
+            );
 
         // log the removal
 
-        return success(`Successfully removed <@${targetId}> from the groupchat.`);
+        return success(
+            `Successfully removed <@${targetId}> from the groupchat.`
+        );
     },
 
-    async changeGroupchatOwner(userId: string, targetId: string, channelId: string): Promise<Result> {
+    async changeGroupchatOwner(
+        userId: string,
+        targetId: string,
+        channelId: string
+    ): Promise<Result> {
         // if the channel is not a group chat, return a failure
         const groupchat = await GroupChat.findById(channelId);
         if (!groupchat) return failure("This channel is not a group chat.");
 
         // if the player is not the owner of the group chat, return a failure
-        if (groupchat.ownerId !== userId) return failure("You are not the owner of this group chat.");
+        if (groupchat.ownerId !== userId)
+            return failure("You are not the owner of this group chat.");
 
         // if the target is not in the group chat, return a failure
-        if (!groupchat.memberIds.includes(targetId)) return failure("This person is not in the group chat.");
+        if (!groupchat.memberIds.includes(targetId))
+            return failure("This person is not in the group chat.");
 
         // if the player is trying to make themself the owner, return a failure
-        if (targetId === userId) return failure("You are already the owner of this group chat.");
+        if (targetId === userId)
+            return failure("You are already the owner of this group chat.");
 
         await GroupChat.updateOne({ channelId }, { ownerId: targetId });
 
         // send the ownership change message
         const channel = await client.channels.fetch(channelId);
         if (channel.isSendable())
-            await channel.send(`**<@${targetId}> is now the owner of the groupchat.**`);
+            await channel.send(
+                `**<@${targetId}> is now the owner of the groupchat.**`
+            );
 
         // log the ownership change
 
-        return success(`Successfully made <@${targetId}> the new owner of the groupchat.`);
+        return success(
+            `Successfully made <@${targetId}> the new owner of the groupchat.`
+        );
     },
 
-    async setGroupchatName(userId: string, newName: string, channelId: string): Promise<Result> {
+    async setGroupchatName(
+        userId: string,
+        newName: string,
+        channelId: string
+    ): Promise<Result> {
         // if the player cannot do a group chat action, return a failure
-        const canDoGroupchatActionResult = await contacting.canDoGroupchatAction(userId, channelId);
-        if (!canDoGroupchatActionResult.success) return canDoGroupchatActionResult;
+        const canDoGroupchatActionResult =
+            await contacting.canDoGroupchatAction(userId, channelId);
+        if (!canDoGroupchatActionResult.success)
+            return canDoGroupchatActionResult;
 
         // set the new name of the group chat
         const channel = await client.channels.fetch(channelId);
         if (!channel.isDMBased())
-            await channel.setName(newName).catch(() => { });
+            await channel.setName(newName).catch(console.error);
 
-        return success(`Successfully changed the groupchat name to ${newName}.`);
+        return success(
+            `Successfully changed the groupchat name to ${newName}.`
+        );
     },
 
     async closeLounge(userId: string, loungeId: number) {
@@ -348,18 +470,26 @@ const contacting = {
         const userData = await Player.findOne({ userId });
 
         // if the user is not a member of the lounge, return
-        if (lounge.contactorId !== userId && lounge.contactedId !== userId) return;
+        if (lounge.contactorId !== userId && lounge.contactedId !== userId)
+            return;
 
         // find closer alias (don't want to leak them if the lounge was anonymous)
-        const alias = lounge.anonymous && lounge.contactorId === userId ? userData.role : await names.getAlias(userId);
+        const alias =
+            lounge.anonymous && lounge.contactorId === userId
+                ? userData.role
+                : await names.getAlias(userId);
 
         // remove the user's perms from all of the lounge's channels and remove the channel id from the user's data
         // also send the notification message
         for (const channelId of lounge.channelIds) {
             await util.deletePermissionsToChannel(channelId, [userId]);
-            await Player.updateOne({ userId }, { $pull: { loungeChannelIds: channelId } });
+            await Player.updateOne(
+                { userId },
+                { $pull: { loungeChannelIds: channelId } }
+            );
             const channel = await client.channels.fetch(channelId);
-            if (channel.isSendable()) await channel.send(`**${alias}** has closed the lounge.`);
+            if (channel.isSendable())
+                await channel.send(`**${alias}** has closed the lounge.`);
         }
     },
 
@@ -381,14 +511,21 @@ const contacting = {
         // remove the user's perms from all of the gc's channel and remove the channel id from the user's data
         // also send the notification message
         await util.deletePermissionsToChannel(channelId, [userId]);
-        await Player.updateOne({ userId }, { $pull: { loungeChannelIds: channelId } });
+        await Player.updateOne(
+            { userId },
+            { $pull: { loungeChannelIds: channelId } }
+        );
         const channel = await client.channels.fetch(channelId);
-        if (channel.isSendable()) await channel.send(`**${alias}** has left the groupchat.`);
+        if (channel.isSendable())
+            await channel.send(`**${alias}** has left the groupchat.`);
 
         // log it
         const timeString = `<t:${Math.floor(Date.now() / 1000)}:F>`;
         const logMessage = `**${alias}** left a group chat at ${timeString}`;
-        await contacting.sendLogMessage(logMessage, userData.flags.get("underTheRadar"));
+        await contacting.sendLogMessage(
+            logMessage,
+            userData.flags.get("underTheRadar")
+        );
     },
 
     async sendLogMessage(logMessage: string, underTheRadar: boolean) {
@@ -403,30 +540,43 @@ const contacting = {
         const aliveWatariCount = await Player.countDocuments({
             role: "Watari",
             "flags.alive": true,
-        })
+        });
         if (aliveWatariCount > 0) {
-            const lwatariLogs = await client.channels.fetch(config.channels.watariContactLogs);
+            const lwatariLogs = await client.channels.fetch(
+                config.channels.watariContactLogs
+            );
             if (lwatariLogs.isSendable()) await lwatariLogs.send(logMessage);
         }
 
         // log to stolen contact logs
-        const stolen = await client.channels.fetch(config.channels.stolenContactLogs);
+        const stolen = await client.channels.fetch(
+            config.channels.stolenContactLogs
+        );
         if (stolen.isSendable()) await stolen.send(logMessage);
     },
 
-    async logContact(userId: string, targetId: string, anonymous: boolean): Promise<void> {
+    async logContact(
+        userId: string,
+        targetId: string,
+        anonymous: boolean
+    ): Promise<void> {
         // if no data, don't log. should be impossible anyway.
         const userData = await Player.findOne({ userId });
         if (!userData) return;
 
         // construct the info strings
-        const contactorStr = anonymous ? `**${userData.role}**` : `**${await names.getAlias(userId)}**`;
-        const contactedStr = `**${names.getAlias(targetId)}**`;
+        const contactorStr = anonymous
+            ? `**${userData.role}**`
+            : `**${await names.getAlias(userId)}**`;
+        const contactedStr = `**${await names.getAlias(targetId)}**`;
         const timeString = `<t:${Math.floor(Date.now() / 1000)}:F>`;
-        const logMessage = `${contactorStr} contacted ${contactedStr} at ${timeString}`
+        const logMessage = `${contactorStr} contacted ${contactedStr} at ${timeString}`;
 
         // send log message
-        await contacting.sendLogMessage(logMessage, userData.flags.get("underTheRadar"));
+        await contacting.sendLogMessage(
+            logMessage,
+            userData.flags.get("underTheRadar")
+        );
     },
 
     async logGroupchatAddition(userId: string, targetId: string) {
@@ -436,12 +586,15 @@ const contacting = {
 
         // construct info strings
         const contactorStr = `**${await names.getAlias(userId)}**`;
-        const contactedStr = `**${names.getAlias(targetId)}**`;
+        const contactedStr = `**${await names.getAlias(targetId)}**`;
         const timeString = `<t:${Math.floor(Date.now() / 1000)}:F>`;
-        const logMessage = `${contactorStr} added ${contactedStr} to a group chat at ${timeString}`
+        const logMessage = `${contactorStr} added ${contactedStr} to a group chat at ${timeString}`;
 
         // send log message
-        await contacting.sendLogMessage(logMessage, userData.flags.get("underTheRadar"));
+        await contacting.sendLogMessage(
+            logMessage,
+            userData.flags.get("underTheRadar")
+        );
     },
 
     async logGroupchatRemoval(userId: string, targetId: string) {
@@ -451,12 +604,15 @@ const contacting = {
 
         // construct info strings
         const contactorStr = `**${await names.getAlias(userId)}**`;
-        const contactedStr = `**${names.getAlias(targetId)}**`;
+        const contactedStr = `**${await names.getAlias(targetId)}**`;
         const timeString = `<t:${Math.floor(Date.now() / 1000)}:F>`;
-        const logMessage = `${contactorStr} added ${contactedStr} to a group chat at ${timeString}`
+        const logMessage = `${contactorStr} added ${contactedStr} to a group chat at ${timeString}`;
 
         // send log message
-        await contacting.sendLogMessage(logMessage, userData.flags.get("underTheRadar"));
+        await contacting.sendLogMessage(
+            logMessage,
+            userData.flags.get("underTheRadar")
+        );
     },
 
     async logGroupchatCreation(userId: string, originalMembers: string[]) {
@@ -466,14 +622,22 @@ const contacting = {
 
         // construct info strings
         const contactorStr = `**${await names.getAlias(userId)}**`;
-        const contactedStrs = await Promise.all(originalMembers.map(async (targetId) => `**${await names.getAlias(targetId)}**`));
+        const contactedStrs = await Promise.all(
+            originalMembers.map(
+                async (targetId) => `**${await names.getAlias(targetId)}**`
+            )
+        );
         const timeString = `<t:${Math.floor(Date.now() / 1000)}:F>`;
-        const logMessage = `${contactorStr} created a group chat with ${contactedStrs.join(", ")} at ${timeString}`;
+        const logMessage = `${contactorStr} created a group chat with ${contactedStrs.join(
+            ", "
+        )} at ${timeString}`;
 
         // send log message
-        await contacting.sendLogMessage(logMessage, userData.flags.get("underTheRadar"));
+        await contacting.sendLogMessage(
+            logMessage,
+            userData.flags.get("underTheRadar")
+        );
     },
-
 };
 
 export default contacting;

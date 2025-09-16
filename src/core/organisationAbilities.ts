@@ -2,7 +2,7 @@ import { Client } from "discord.js";
 
 let client: Client;
 
-const module = {
+const orgAbilities = {
 
     init(c: Client) {
         client = c;
@@ -10,4 +10,4 @@ const module = {
 
 }
 
-export default module;
+export default orgAbilities;

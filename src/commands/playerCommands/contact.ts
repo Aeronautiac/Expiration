@@ -6,6 +6,7 @@ import {
     User,
 } from "discord.js";
 import contacting from "../../core/contacting";
+import abilities from "../../core/abilities";
 
 export default {
     data: new SlashCommandBuilder()
@@ -29,11 +30,21 @@ export default {
             ephemeral: true,
         });
 
-        const result = await contacting.contact(
-            interaction.user.id,
-            interaction.options.getUser("target").id,
-            interaction.options.getBoolean("anonymous")
-        );
+        const anonymous = interaction.options.getBoolean("anonymous");
+        const target = interaction.options.getUser("target");
+        const result = anonymous
+            ? await abilities.useAbility(
+                  interaction.user.id,
+                  "anonymousContact",
+                  {
+                      targetId: target.id,
+                  }
+              )
+            : await contacting.contact(
+                  interaction.user.id,
+                  interaction.options.getUser("target").id,
+                  interaction.options.getBoolean("anonymous")
+              );
         if (!result.success)
             await interaction.editReply({
                 content:

@@ -28,6 +28,11 @@ export interface Organisation {
     guilds: GuildName[]; // list of guild names that members of this organisation should have access to
     abilityOverrides: AbilityOverrides;
     abilities: OrganisationAbilityName[]; // list of organisation abilities that this organisation has access to
+    article?: string; // used for grammar in various contexts
+    rankNames: {
+        member: string,
+        leader?: string
+    }
 }
 
 export type AbilityOverrides = Partial<
@@ -67,6 +72,7 @@ export interface Config {
     pollUpdateRate: number; // in secs
     pollYesEmoji: string;
     pollNoEmoji: string;
+    groupGuilds: GuildName[];
 
     loungeMemberPermissions: PermissionOverwriteOptions;
     spectatorPermissions: PermissionOverwriteOptions;

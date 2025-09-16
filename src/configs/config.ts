@@ -19,6 +19,7 @@ export const config = {
     pollUpdateRate: 5,
     pollYesEmoji: `✅`,
     pollNoEmoji: `❌`,
+    groupGuilds: ["lwatari", "kk", "tf"],
 
     loungeMemberPermissions: {
         ViewChannel: true,

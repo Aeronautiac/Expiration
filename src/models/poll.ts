@@ -40,8 +40,10 @@ const pollSchema = new Schema<IPoll>({
         required: true,
     },
     location: {
-        messageId: { type: String, required: true },
-        channelId: { type: String, required: true },
+        type: {
+            messageId: { type: String, required: true },
+            channelId: { type: String, required: true },
+        },
         required: true,
     },
     data: { type: Schema.Types.Mixed, required: true, default: {} },

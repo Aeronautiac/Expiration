@@ -1,4 +1,5 @@
 import {
+    APIApplicationCommandOptionChoice,
     Channel,
     ChannelType,
     Client,
@@ -17,6 +18,9 @@ import contacting from "./contacting";
 import { DiscordRoleName } from "../configs/discordRoles";
 import { RoleName } from "../configs/roles";
 import { failure, Result, success } from "../types/Result";
+import Organisation from "../models/organisation";
+import { OrgMember } from "../types/OrgMember";
+import { OrganisationName } from "../configs/organisations";
 
 let client: Client;
 
@@ -38,7 +42,8 @@ const util = {
         guildId: string,
         name: string,
         categoryPrefix: string,
-        perms: ChannelPerms[] = []
+        perms: ChannelPerms[] = [],
+        hidden?: boolean
     ): Promise<Channel> {
         const season = await Season.findOne({});
         if (!season) throw new Error("No season exists.");
@@ -83,11 +88,21 @@ const util = {
                 name: `${categoryPrefix}${categoryNumber}`,
                 type: ChannelType.GuildCategory,
             });
-
             chosenCategory = newCategory;
         }
 
+        // put the channel in the category
+        await newChannel.setParent(chosenCategory);
+
         // add perms
+        if (hidden)
+            perms.push({
+                ids: [guild.roles.everyone.id],
+                perms: {
+                    ViewChannel: false,
+                },
+            });
+
         await util.addPermissionsToChannel(newChannel.id, perms);
 
         season.temporaryChannels.push(newChannel.id);
@@ -204,6 +219,21 @@ const util = {
         }
     },
 
+    async getMemberObjects(userId: string) {
+        const memberOfOrgs = await Organisation.find({ memberIds: userId });
+
+        const objects: OrgMember[] = [];
+        for (const org of memberOfOrgs) {
+            const obj: OrgMember = {
+                org: org.name as OrganisationName,
+                leader: org.leaderId === userId,
+            };
+            objects.push(obj);
+        }
+
+        return objects;
+    },
+
     async deleteTemporaryChannels() {
         const season = await Season.findOne({});
         if (!season) return;
@@ -305,6 +335,15 @@ const util = {
         return allMessages;
     },
 
+    interactionChoice(
+        choice: string
+    ): APIApplicationCommandOptionChoice<string> {
+        return {
+            name: choice,
+            value: choice,
+        };
+    },
+
     roleMention(r: RoleName) {
         // Try to find role id from config, fallback to plain text
         const id = config.discordRoles[r];
@@ -321,6 +360,15 @@ const util = {
 
     secToMs(sec: number) {
         return 1000 * sec;
+    },
+
+    toTitleCase(str: string) {
+        return str
+            .toLowerCase()
+            .trim() // remove leading/trailing spaces and newlines
+            .split(/\s+/) // split on any whitespace (spaces, tabs, newlines)
+            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)) // capitalize first letter of each word
+            .join(" "); // join with single space
     },
 };
 

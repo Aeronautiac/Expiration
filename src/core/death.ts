@@ -1,4 +1,4 @@
-import { Client } from "discord.js";
+import { Client, roleMention } from "discord.js";
 import access from "./access";
 import game from "./game";
 import { config } from "../configs/config";
@@ -11,6 +11,9 @@ import names from "./names";
 import util from "./util";
 import { OrganisationName } from "../configs/organisations";
 import { RoleName } from "../configs/roles";
+import { pseudoRandomBytes } from "node:crypto";
+import Organisation from "../models/organisation";
+import { OrgMember } from "../types/OrgMember";
 
 let client: Client;
 
@@ -49,7 +52,9 @@ const death = {
 
         // give discord roles and strip their nickname to their base display name
         const mainGuild = await client.guilds.fetch(config.guilds.main);
-        const member = await mainGuild.members.fetch(userId).catch(() => null);
+        const member = await mainGuild.members
+            .fetch(userId)
+            .catch(console.error);
         if (member) {
             await member.roles
                 .remove(config.discordRoles.Civilian)
@@ -104,6 +109,13 @@ const death = {
             await killerData.save();
         }
 
+        // revoke access to any notebooks still in their possession (can happen due to pseudocide)
+        const toRevokeNotebooks = await Notebook.find({});
+        const revokePromises = toRevokeNotebooks.map(async (book) => {
+            await access.revoke(userId, book.guildId);
+        });
+        await Promise.all(revokePromises);
+
         // death announcement
         const wasKilledByPlayer = args.killerId && args.killerId !== userId;
         if (!args.dontSendDeathAnnouncement) {
@@ -115,7 +127,7 @@ const death = {
                 ownedBugAbility:
                     bugAbility !== undefined && bugAbility !== null,
                 role: userData.role,
-                affiliations: userData.affiliations,
+                memberObjects: await util.getMemberObjects(userId),
             });
         }
     },
@@ -129,17 +141,19 @@ const death = {
             ownedBugAbility?: boolean;
             trueName: string;
             role: RoleName;
-            affiliations?: string[];
+            memberObjects?: OrgMember[];
         }
     ) {
+        if (!args.memberObjects) args.memberObjects = [];
         const user = await client.users.fetch(userId);
-        const alias = await names.getAlias(userId);
         const role = args.role;
         const deathReason =
-            args.deathMessage ?? `They died to a sudden heart attack`;
+            args.deathMessage ?? `They died to a sudden heart attack.`;
 
         // Compose the base death message
-        let output = `@everyone ${user} (${alias}) has died. ${deathReason}`;
+        let output = `@everyone ${user} (${names.toReadable(
+            args.trueName
+        )}) has died. ${deathReason}`;
 
         // Send the initial death message
         const deathMsg = await game.announce(output);
@@ -149,17 +163,26 @@ const death = {
 
         // Determine the role/affiliation reveal message
         let revealMsg = "";
-        const affiliations = args.affiliations ?? [];
 
         const orgMention = (org: OrganisationName) => {
             const id = config.discordRoles[org];
             return id ? `<@&${id}>` : org;
         };
 
+        function joinWithAnd(items: string[]): string {
+            if (items.length === 0) return "";
+            if (items.length === 1) return items[0];
+            return (
+                items.slice(0, -1).join(", ") +
+                " and " +
+                items[items.length - 1]
+            );
+        }
+
         const revealMessages: Map<RoleName, string> = new Map([
             ["Civilian", "They were just a "],
-            ["Kira", "They were the world's most prolific serial killer, "],
-            ["L", "They were the world's greatest detective, "],
+            ["Kira", "They were the god-like serial killer known as "],
+            ["L", "They were the world's greatest detective known as "],
             ["Rogue Civilian", "They were the unpredictable "],
             ["Private Investigator", "They were the vengeful "],
             ["News Anchor", "They were the voice of the people, the "],
@@ -172,54 +195,49 @@ const death = {
             ],
             [
                 "2nd Kira",
-                `They were ${util.roleMention("Kira")}'s most devoted supporter, `,
+                `They were ${util.roleMention(
+                    "Kira"
+                )}'s most devoted supporter, `,
             ],
         ]);
 
         const roleAddition = revealMessages.get(role) ?? "They were ";
         revealMsg += roleAddition + util.roleMention(role);
+        revealMsg += ".";
 
-        const chiefs = affiliations.filter((a) => a.endsWith("Chief"));
-        const orgs = affiliations.filter(
-            (a) => !a.endsWith("Chief")
-        ) as OrganisationName[];
+        // org reveals
+        let orgParts: string[] = [];
+        let noNewMembersParts: string[] = [];
 
-        if (orgs.length === 1 && chiefs.length === 0) {
-            // Single org, not chief
-            revealMsg += ` and member of the ${orgMention(orgs[0])}.`;
-        } else if (orgs.length > 1 && chiefs.length === 0) {
-            // Multiple orgs, not chief
-            const mentions = orgs.map(orgMention);
-            revealMsg += ` and members of the ${mentions
-                .slice(0, -1)
-                .join(", ")} and ${mentions.slice(-1)}.`;
-        } else if (
-            orgs.length === 1 &&
-            chiefs.length === 1 &&
-            chiefs[0].startsWith(orgs[0])
-        ) {
-            // Chief of their only org
-            const chiefOrg = orgs[0];
-            revealMsg += ` and the chief of the ${orgMention(
-                chiefOrg
-            )}. Now no new members may join the ${orgMention(chiefOrg)}.`;
-        } else if (orgs.length > 0 && chiefs.length > 0) {
-            // Member of orgs and also chief(s)
-            const mentions = orgs.map(orgMention);
-            let msg = ` and members of the ${mentions.slice(0, -1).join(", ")}${
-                orgs.length > 1 ? " and " : ""
-            }${mentions.slice(-1)}.`;
-            // List all chief roles
-            for (const chief of chiefs) {
-                const chiefOrg = chief.replace(
-                    / Chief$/,
-                    ""
-                ) as OrganisationName;
-                msg += ` They were also the chief of the ${orgMention(
-                    chiefOrg
-                )}. Now no new members may join the ${orgMention(chiefOrg)}.`;
-            }
-            revealMsg += msg;
+        for (const member of args.memberObjects) {
+            const orgConfig = config.organisations[member.org];
+            const isLeader = member.leader;
+            const starter = isLeader ? "the" : "a";
+            const rank = isLeader
+                ? orgConfig.rankNames["leader"]
+                : orgConfig.rankNames["member"];
+            const article = orgConfig["article"]
+                ? orgConfig["article"] + " "
+                : "";
+
+            // member of org
+            orgParts.push(
+                `${starter} ${rank} of ${article}${orgMention(member.org)}`
+            );
+
+            // leader of org
+            if (isLeader)
+                noNewMembersParts.push(`${article}${orgMention(member.org)}`);
+        }
+
+        if (orgParts.length > 0) {
+            revealMsg += `\nThey were also ${joinWithAnd(orgParts)}.`;
+        }
+
+        if (noNewMembersParts.length > 0) {
+            revealMsg += ` Now no new members may join ${joinWithAnd(
+                noNewMembersParts
+            )}.`;
         }
 
         // Reply to the death message with the reveal
@@ -228,21 +246,24 @@ const death = {
             allowedMentions: { parse: ["roles"] },
         });
 
-        // If they had a notebook, announce it
-        if (args.ownedANotebook) {
-            await util.sleep(config.announcementDelay);
-            await deathMsg.reply({
-                content: `Whoever is responsible has now gained possession of their death note(s).`,
-            });
-        }
+        // handle death info like notebooks and bug ability transfers
+        let possessionMessage = ``;
+        if (args.ownedANotebook)
+            possessionMessage += `Whoever is responsible for their death has now gained possession of their death note(s)`;
 
-        // If they had the bug ability, announce it
-        if (args.ownedBugAbility) {
-            await util.sleep(config.announcementDelay);
+        if (args.ownedBugAbility && args.ownedANotebook)
+            possessionMessage += ` and their bug and contact log abilities`;
+
+        if (args.ownedBugAbility && !args.ownedANotebook)
+            possessionMessage += `Whoever is responsible for their death has now gained possession of their bug and contact log abilities`;
+
+        if (possessionMessage) possessionMessage += `.`;
+
+        await util.sleep(config.announcementDelay);
+        if (possessionMessage)
             await deathMsg.reply({
-                content: `Whoever is responsible has now gained possession of their bug and contact log abilities.`,
+                content: possessionMessage,
             });
-        }
     },
 };
 

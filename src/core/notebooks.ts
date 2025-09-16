@@ -8,6 +8,7 @@ import agenda from "../jobs";
 import util from "./util";
 import game from "./game";
 import death from "./death";
+import Season from "../models/season";
 
 let client: Client;
 
@@ -40,13 +41,13 @@ const notebooks = {
             if (temporary) {
                 await Notebook.updateOne(
                     { _id: existingBook._id },
-                    { $set: { temporaryOwner: ownerId } }
+                    { temporaryOwner: ownerId }
                 );
             } else {
                 if (existingBook.currentOwner !== ownerId)
                     await Notebook.updateOne(
                         { _id: existingBook._id },
-                        { $set: { currentOwner: ownerId } }
+                        { currentOwner: ownerId }
                     );
             }
 
@@ -104,8 +105,12 @@ const notebooks = {
             delay?: number;
         }
     ): Promise<Result> {
+        const season = await Season.findOne({});
+        if (!season || !season.flags.get("active"))
+            return failure("The season is not yet active.");
+
         const notebook = await Notebook.findOne({ guildId });
-        const player = await Player.findOne({ trueName });
+        const player = await Player.findOne({ userId });
 
         // is the server a death note server?
         if (!notebook)
@@ -140,7 +145,9 @@ const notebooks = {
             return failure("You have already used this death note today.");
 
         // find the target player
-        const targetPlayer = await Player.findOne({ trueName });
+        const targetPlayer = await Player.findOne({
+            trueName: names.toInternal(trueName),
+        });
 
         // if nobody has this true name, then subtract a use and return a failure.
         if (!targetPlayer || !targetPlayer.flags.get("alive")) {
@@ -169,7 +176,7 @@ const notebooks = {
         );
 
         // if the user is under ipp, then return a success, but say the user survived because of IPP.
-        if (player.flags.get("ipp"))
+        if (targetPlayer.flags.get("ipp"))
             return success(
                 `${names.toReadable(trueName)} was protected by IPP.`
             );
@@ -220,6 +227,10 @@ const notebooks = {
         guildId: string,
         newOwnerId: string
     ): Promise<Result> {
+        const season = await Season.findOne({});
+        if (!season || !season.flags.get("active"))
+            return failure("The season is not yet active.");
+
         const notebook = await Notebook.findOne({ guildId });
         if (!notebook) return failure("Notebook not found.");
 
@@ -253,7 +264,7 @@ const notebooks = {
     async resetDailyUsage(): Promise<void> {
         await Notebook.updateMany(
             {},
-            { $set: { usedToday: [] }, $unset: { attemptsToday: "" } }
+            { usedToday: [], $unset: { attemptsToday: "" } }
         );
     },
 };

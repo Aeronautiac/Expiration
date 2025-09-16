@@ -14,7 +14,7 @@ export type Resolution = "inconclusive" | "success" | "failure";
 
 let client: Client;
 
-const module = {
+const polls = {
     init(c: Client) {
         client = c;
     },
@@ -25,14 +25,14 @@ const module = {
             .fetch(poll.location.channelId)
             .catch(() => null)) as TextChannel;
         if (!channel) {
-            await module.cancel(poll.identifier, poll.data);
+            await polls.cancel(poll.identifier, poll.data);
             return;
         }
         const message = await channel.messages
             .fetch(poll.location.messageId)
             .catch(() => null);
         if (!message) {
-            await module.cancel(poll.identifier, poll.data);
+            await polls.cancel(poll.identifier, poll.data);
             return;
         }
 
@@ -114,7 +114,7 @@ const module = {
     async updateAll() {
         const allPolls = await Poll.find({});
         const pollUpdatePromises = allPolls.map(async (poll) => {
-            await module.update(poll).catch(console.error);
+            await polls.update(poll).catch(console.error);
         });
         await Promise.all(pollUpdatePromises);
     },
@@ -163,7 +163,7 @@ const module = {
             running = true;
 
             try {
-                await module.updateAll();
+                await polls.updateAll();
             } catch (err) {
                 console.error(err);
             } finally {
@@ -176,4 +176,4 @@ const module = {
     },
 };
 
-export default module;
+export default polls;

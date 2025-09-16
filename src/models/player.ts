@@ -1,6 +1,5 @@
 import { Document, Schema, Model, model } from "mongoose";
 import { RoleName } from "../configs/roles";
-import { PlayerState } from "../types/configTypes";
 import { PlayerStateName } from "../configs/playerStates";
 
 export type ExtraPlayerFlag = "ipp" | "underTheRadar" | "kiraConnection" | "alive";
@@ -15,7 +14,6 @@ export interface IPlayer {
     contactTokens: number;
     monologueChannelId?: string;
     cooldowns: Map<string, number>;
-    affiliations: string[];
     loungeHiders: Map<string, boolean>;
     notebookWriteRestrictors: Map<string, boolean>;
     notebookPassRestrictors: Map<string, boolean>;
@@ -39,7 +37,6 @@ const playerSchema = new Schema<IPlayerDocument>({
     contactTokens: { type: Number, required: true },
     monologueChannelId: String,
     cooldowns: { type: Map, of: Number, required: true, default: {} },
-    affiliations: { type: [String], required: true, default: [] },
     loungeHiders: { type: Map, of: String, required: true, default: {} },
     notebookWriteRestrictors: { type: Map, of: String, required: true, default: {} },
     notebookPassRestrictors: { type: Map, of: String, required: true, default: {} },

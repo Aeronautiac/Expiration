@@ -14,7 +14,7 @@ import Notebook from "../models/notebook";
 
 let client: Client;
 
-const module = {
+const playerAbilities = {
     init(c: Client) {
         client = c;
     },
@@ -71,7 +71,7 @@ const module = {
         );
         await agenda.schedule(reviveAt, "pseudocideRevival", {
             userId: args.targetId,
-            roleOnDeath: args.role,
+            roleOnDeath: targetData.role,
         });
 
         return success();
@@ -96,7 +96,7 @@ const module = {
 
         names.setNick(
             args.targetId,
-            `${names.getDisplay(args.targetId)} (IPP)`
+            `${await names.getDisplay(args.targetId)} (IPP)`
         );
 
         return success();
@@ -164,11 +164,13 @@ const module = {
         if (userData.role === "Beyond Birthday" && userData.eyes <= 0)
             return failure("You no longer possess shinigami eyes.");
 
+        if (checkOnly) return success();
+
         const user = await client.users.fetch(userId);
         await user.send(
             `The true name of **${await names.getDisplay(
                 args.targetId
-            )}** is **${targetData.trueName}**.`
+            )}** is **${names.toReadable(targetData.trueName)}**.`
         );
 
         return success();
@@ -187,6 +189,8 @@ const module = {
             return failure("This player is dead.");
         if (userData.role === "Beyond Birthday" && userData.eyes <= 0)
             return failure("You no longer possess shinigami eyes.");
+
+        if (checkOnly) return success();
 
         // need to check if the target is currently holding a notebook. for all notebooks which they are the currentOwner of,
         // check if there is a temporary owner. if there is a temporary owner, they do not hold that notebook.
@@ -211,7 +215,9 @@ const module = {
         const user = await client.users.fetch(userId);
         if (temporaryOwner || notebooksNotPassed > 0) {
             await user.send(
-                `**<@${args.targetId}>** currently possesses a notebook.`
+                `**${await names.getAlias(
+                    targetData.userId
+                )}** currently possesses a notebook.`
             );
         } else {
             if (userData.role === "Beyond Birthday")
@@ -220,7 +226,9 @@ const module = {
                     { $inc: { eyes: -1 } }
                 );
             await user.send(
-                `**<@${args.targetId}>** does not currently possess a notebook.`
+                `**${await names.getAlias(
+                    targetData.userId
+                )}** does not currently possess a notebook.`
             );
         }
 
@@ -238,6 +246,8 @@ const module = {
 
         if (!targetData) return "This user has no data.";
         if (targetData.flags.get("alive")) return "This user is not dead.";
+
+        if (checkOnly) return success();
 
         const timeOfDeath = targetData.timeOfDeath;
         const autopsyLogs = (await client.channels.fetch(
@@ -342,4 +352,4 @@ const module = {
     },
 };
 
-export default module;
+export default playerAbilities;

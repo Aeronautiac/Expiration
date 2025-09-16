@@ -59,7 +59,7 @@ async function applyUsageConsequences(
     await abilityData.save();
 }
 
-const module = {
+const abilities = {
     init(c: Client) {
         client = c;
     },
@@ -260,7 +260,7 @@ const module = {
             ? OrganisationAbilityArgs[K]
             : never
     ): Promise<Result> {
-        return module.useAbility(owner, abilityName, args, true);
+        return abilities.useAbility(owner, abilityName, args, true);
     },
 
     async giveRoleAbilities(userId: string): Promise<void> {
@@ -282,6 +282,7 @@ const module = {
             if (existingAbility) continue;
             // give the ability
             await Ability.create({
+                type: "player",
                 owner: userId,
                 ability: abilityName,
                 roleRestrictions: [playerData.role],
@@ -329,8 +330,11 @@ const module = {
             await Ability.updateOne(
                 { _id: ability._id },
                 {
-                    $set: { cooldown: ability.queuedCooldown },
-                    $unset: { queuedCooldown: "" },
+                    cooldown: ability.queuedCooldown,
+                    $unset: { 
+                        queuedCooldown: "",
+                        charges: "",
+                     },
                 }
             );
         });
@@ -338,4 +342,4 @@ const module = {
     },
 };
 
-export default module;
+export default abilities;

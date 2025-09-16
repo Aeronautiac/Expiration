@@ -2,6 +2,7 @@ import { Client, Guild } from "discord.js";
 import fs from "fs";
 import { config } from "../configs/config";
 import Player from "../models/player";
+import util from "./util";
 
 let client: Client;
 const first_names = fs
@@ -77,14 +78,18 @@ const names = {
         return member?.displayName;
     },
 
+    async sync() {
+        const players = await Player.find({});
+        const setNickPromises = players.map(async (p) => {
+            const display = await names.getDisplay(p.userId);
+            await names.setNick(p.userId, display);
+        });
+        await Promise.allSettled(setNickPromises);
+    },
+
     // converts a name to a readable, presentable format.
     toReadable(name: string): string {
-        return name
-            .toLowerCase()
-            .trim() // remove leading/trailing spaces and newlines
-            .split(/\s+/) // split on any whitespace (spaces, tabs, newlines)
-            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)) // capitalize first letter of each word
-            .join(" "); // join with single space
+        return util.toTitleCase(name);
     },
 
     // converts a name to an internal format (lowercase, no special characters)
