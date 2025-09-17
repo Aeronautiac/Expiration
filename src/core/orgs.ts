@@ -75,7 +75,7 @@ const orgs = {
 
         // revoke access
         const guilds = config.organisations[name].guilds;
-        const promises = guilds.map(async(guild: GuildName) => {
+        const promises = guilds.map(async (guild: GuildName) => {
             await access.revoke(userId, config.guilds[guild]);
         })
         await Promise.allSettled(promises);
@@ -84,15 +84,28 @@ const orgs = {
     },
 
     async getLivingMembers(orgName: OrganisationName) {
-        const orgData = await Organisation.findOne({name: orgName});
+        const orgData = await Organisation.findOne({ name: orgName });
         if (!orgData) throw new Error(`Org ${orgName} does not exist. Cannot fetch living members.`);
-        const livingMembersPromises = orgData.memberIds.map(async(userId) => {
-            const userData = await Player.findOne({userId});
+        const livingMembersPromises = orgData.memberIds.map(async (userId) => {
+            const userData = await Player.findOne({ userId });
             if (userData && userData.flags.get("alive"))
                 return userId;
         });
         const livingMembers = await Promise.all(livingMembersPromises);
         return livingMembers;
+    },
+
+    // returns an array of userids for members that are able to vote
+    async getVotingMembers(orgName: OrganisationName) {
+        const orgData = await Organisation.findOne({ name: orgName });
+        if (!orgData) throw new Error(`Org ${orgName} does not exist. Cannot fetch voting members.`);
+        const votingMembersPromises = orgData.memberIds.map(async (userId) => {
+            const userData = await Player.findOne({ userId });
+            if (userData.loungeHiders.size === 0 && userData.flags.get("alive"))
+                return userId;
+        });
+        const votingMembers = await Promise.all(votingMembersPromises);
+        return votingMembers;
     },
 
     getGuildIds(orgName: OrganisationName) {

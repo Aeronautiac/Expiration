@@ -143,7 +143,7 @@ export default {
             {
                 threshold: "orgMajority",
                 canContinue: "orgAbility",
-                resolve: ability,
+                resolve: "orgAbility",
                 filter: "validOrgVoter"
             },
             {
