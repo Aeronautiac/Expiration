@@ -1,5 +1,6 @@
 import { Document, Schema, Model, model } from "mongoose";
 
+export type PollResolutionReason = "accepted" | "rejected" | "inconclusive" | "cancelled";
 export type PollData = Record<string, unknown>;
 export type PollCallbacks = {
     threshold: string;
@@ -14,7 +15,8 @@ export type PollResolutionRules = {
 };
 export type PollLocation = {
     channelId: string;
-    messageId: string;
+    messageId?: string;
+    messageContent?: string;
 };
 
 export interface IPoll extends Document {

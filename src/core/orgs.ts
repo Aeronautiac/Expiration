@@ -1,4 +1,4 @@
-import { Client } from "discord.js";
+import { Client, Guild } from "discord.js";
 import Organisation from "../models/organisation";
 import { OrganisationName } from "../configs/organisations";
 import { failure, Result, success } from "../types/Result";
@@ -82,6 +82,14 @@ const orgs = {
 
         return success("Successfully removed user from org.");
     },
+
+    getGuildIds(orgName: OrganisationName) {
+        const guilds = config.organisations[orgName].guilds;
+        const ids = guilds.map((guildName: GuildName) => {
+            return config.guilds[guildName];
+        });
+        return ids;
+    }
 };
 
 export default orgs;

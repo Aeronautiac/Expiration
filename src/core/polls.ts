@@ -1,16 +1,15 @@
-import { Client, TextChannel, User } from "discord.js";
+import { Client, Message, TextChannel, User } from "discord.js";
 import Poll, {
     IPoll,
     PollCallbacks,
     PollData,
     PollLocation,
+    PollResolutionReason,
     PollResolutionRules,
 } from "../models/poll";
 import util from "./util";
 import { config } from "../configs/config";
 import pollCallbacks from "../pollCallbacks";
-
-export type Resolution = "inconclusive" | "success" | "failure" | "cancelled";
 
 let client: Client;
 
@@ -19,33 +18,38 @@ const polls = {
         client = c;
     },
 
+    async resolve(poll: IPoll, resolution: PollResolutionReason) {
+        const resolveCallback = pollCallbacks.resolve[poll.callbacks.resolve];
+        await resolveCallback(poll);
+        await polls.cancel(poll.identifier, poll.data);
+    },
+
     async update(poll: IPoll) {
         // get the poll's message. if the message doesn't exist anymore, cancel the poll.
         const channel = (await client.channels
             .fetch(poll.location.channelId)
             .catch(() => null)) as TextChannel;
         if (!channel) {
-            await polls.cancel(poll.identifier, poll.data);
+            await polls.resolve(poll, "cancelled");
             return;
         }
         const message = await channel.messages
             .fetch(poll.location.messageId)
             .catch(() => null);
         if (!message) {
-            await polls.cancel(poll.identifier, poll.data);
+            await polls.resolve(poll, "cancelled");
             return;
         }
 
         const timeNow = Date.now();
         const thresholdCallback =
             pollCallbacks.threshold[poll.callbacks.threshold];
-        const resolveCallback = pollCallbacks.resolve[poll.callbacks.resolve];
         const filterCallback = pollCallbacks.filter[poll.callbacks.filter];
         const canContinueCallback = pollCallbacks.canContinue[poll.callbacks.canContinue];
-        
-        // if the poll cannot continue, return a failure
+
+        // if the poll cannot continue, resolve with "cancelled"
         if (!canContinueCallback(poll)) {
-            await resolveCallback(poll, "cancelled");
+            await polls.resolve(poll, "cancelled");
             return;
         }
 
@@ -81,14 +85,14 @@ const polls = {
         if (poll.resolutionRules && timeNow >= poll.resolutionRules.resolveAt) {
             // default to inconclusive
             if (poll.resolutionRules.prioritizeInconclusive)
-                await resolveCallback(poll, "inconclusive");
+                await polls.resolve(poll, "inconclusive");
             else {
                 // accept/reject, inconclusive if equal
                 if (validAcceptUsers.length > validRejectUsers.length)
-                    await resolveCallback(poll, "success");
+                    await polls.resolve(poll, "accepted");
                 else if (validRejectUsers.length > validAcceptUsers.length)
-                    await resolveCallback(poll, "failure");
-                else await resolveCallback(poll, "inconclusive");
+                    await polls.resolve(poll, "rejected");
+                else await polls.resolve(poll, "inconclusive");
             }
             return;
         }
@@ -102,20 +106,20 @@ const polls = {
             validAcceptUsers.length >= threshold &&
             validRejectUsers.length >= threshold
         ) {
-            const outcome =
+            const outcome: PollResolutionReason =
                 validAcceptUsers.length > validRejectUsers.length
-                    ? "success"
-                    : "failure";
-            await resolveCallback(poll, outcome);
+                    ? "accepted"
+                    : "rejected";
+            await polls.resolve(poll, outcome);
             return;
         }
 
         // if only one option passes threshold, then resolve with "success"
         if (validAcceptUsers.length >= threshold)
-            await resolveCallback(poll, "success");
+            await polls.resolve(poll, "accepted");
 
         if (validRejectUsers.length >= threshold)
-            await resolveCallback(poll, "failure");
+            await polls.resolve(poll, "rejected");
     },
 
     async updateAll() {
@@ -140,16 +144,21 @@ const polls = {
         if (!channel.isTextBased())
             throw new Error("Channel must be text based.");
 
-        const message = await channel.messages
+        const message: Message = location.messageId ? await channel.messages
             .fetch(location.messageId)
-            .catch(() => null);
+            .catch(() => null)
+            :
+            channel.send(location.messageContent);
         if (!message) throw new Error("This is not a valid message id.");
 
         await message.react(config.pollYesEmoji);
         await message.react(config.pollNoEmoji);
 
         return await Poll.create({
-            location,
+            location: {
+                messageId: message.id,
+                channelId: channel.id
+            },
             identifier,
             callbacks,
             data,
