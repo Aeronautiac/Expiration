@@ -3,3 +3,4 @@ node_modules
 players
 .env test
 .env main
+dist

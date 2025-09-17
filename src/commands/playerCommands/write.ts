@@ -1,0 +1,59 @@
+import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
+import notebooks from "../../core/notebooks";
+
+export default {
+    data: new SlashCommandBuilder()
+        .setName("write")
+        .setDescription("Write a name in the notebook.")
+        .addStringOption((option) =>
+            option
+                .setName("name")
+                .setDescription("The name you want to write.")
+                .setRequired(true)
+        )
+        .addNumberOption((option) =>
+            option
+                .setName("delay")
+                .setDescription("The number of minutes until the death occurs.")
+                .setRequired(false)
+        )
+        .addStringOption((option) =>
+            option
+                .setName("message")
+                .setDescription(
+                    "The death message to be displayed to everyone."
+                )
+                .setRequired(false)
+        ),
+
+    async execute(interaction: ChatInputCommandInteraction) {
+        await interaction.deferReply({});
+
+        const name = interaction.options.getString("name");
+        const deathMessage = interaction.options.getString("message");
+        const delay = interaction.options.getNumber("delay");
+
+        let relayed = `${name}`;
+        if (delay) relayed = relayed.concat(`, dies in ${delay} minutes`);
+        if (deathMessage) relayed = relayed.concat(`, ${deathMessage}`);
+
+        const result = await notebooks.write(
+            interaction.user.id,
+            interaction.guildId,
+            name,
+            {
+                deathMessage,
+                delay,
+            }
+        );
+
+        if (result.success) {
+            await interaction.editReply({ content: relayed });
+        } else {
+            await interaction.editReply({ content: relayed });
+            await interaction.followUp({
+                content: result.message || "Failed to use write name.",
+            });
+        }
+    },
+};
