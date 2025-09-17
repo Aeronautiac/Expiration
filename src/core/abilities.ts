@@ -23,6 +23,7 @@ import {
 import { OrganisationAbilityName } from "../configs/organisationAbilities";
 import { PlayerAbilityName } from "../configs/playerAbilities";
 import { OrganisationName, organisations } from "../configs/organisations";
+import orgs from "./orgs";
 
 let client: Client;
 
@@ -153,8 +154,9 @@ const abilities = {
 
         // if the org does not have enough members to use the ability, or does not have the roles required, then they cannot use the ability
         if (abilityData.type === "organisation") {
-            const memberCount = organisationData.memberIds.length;
-            const rolesInOrgPromises = organisationData.memberIds.map(
+            const livingMemberIds = await orgs.getLivingMembers(owner as OrganisationName);
+            const memberCount = livingMemberIds.length;
+            const rolesInOrgPromises = livingMemberIds.map(
                 async (memberId) => {
                     const data = await Player.findOne({ userId: memberId });
                     if (data) {

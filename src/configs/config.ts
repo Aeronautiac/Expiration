@@ -17,6 +17,7 @@ export const config = {
     maxGroupChatsInGame: 3,
     announcementDelay: 5, // in seconds
     pollUpdateRate: 5,
+    orgPollDuration: 8, // in hours
     pollYesEmoji: `✅`,
     pollNoEmoji: `❌`,
     groupGuilds: ["lwatari", "kk", "tf"],

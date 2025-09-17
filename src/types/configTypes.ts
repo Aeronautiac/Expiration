@@ -72,6 +72,7 @@ export interface Config {
     pollUpdateRate: number; // in secs
     pollYesEmoji: string;
     pollNoEmoji: string;
+    orgPollDuration: number;
     groupGuilds: GuildName[];
 
     loungeMemberPermissions: PermissionOverwriteOptions;

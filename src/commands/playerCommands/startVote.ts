@@ -8,6 +8,7 @@ import Organisation from "../../models/organisation";
 import abilities from "../../core/abilities";
 import { AbilityName } from "../../configs/abilityArgs";
 import polls from "../../core/polls";
+import names from "../../core/names";
 
 const kidnapperAbilities: Set<OrganisationAbilityName> = new Set();
 kidnapperAbilities
@@ -54,8 +55,8 @@ export default {
             option
                 .setName("loungenumber")
                 .setDescription("The lounge number you want to tap into")
-        )
-    ,
+        ),
+
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
@@ -116,15 +117,46 @@ export default {
             kidnapperId,
         });
         if (!canUseResult.success) {
-            interaction.editReply(canUseResult.message || `Cannot use ability ${ability}.`)
+            interaction.editReply(canUseResult.message || `Cannot use ability ${ability}.`);
+            return;
         }
 
         // ability can currently be used, it is safe to start the vote.
         interaction.editReply("Vote started.");
 
+        // poll message
+        let pollMessage = `A vote has been started by <@${userId}> to use ability **${ability}**.`;
+        if (targetId && targetAbilities.has(ability))
+            pollMessage += `\nTarget: <@${targetId}>`;
+        if (kidnapperId && kidnapperAbilities.has(ability))
+            pollMessage += `\nKidnapper: <@${kidnapperId}>`;
+        if (loungeNumber && loungeNumberAbilities.has(ability))
+            pollMessage += `\nLounge number: **${loungeNumber}**`;
+
         // create the poll
-        await polls.create({
-            messageContent: `A vote has been started by ${}`
-        }, ability, {}, {}, {});
+        await polls.create(
+            {
+                messageContent: pollMessage,
+                channelId: interaction.channelId
+            },
+            `${orgName}_${ability}`,
+            {
+                threshold: "orgMajority",
+                canContinue: "orgAbility",
+                resolve: ability,
+                filter: "validOrgVoter"
+            },
+            {
+                orgName,
+                targetId,
+                loungeNumber,
+                kidnapperId
+            },
+            {
+                resolvesOnThreshold: true,
+                prioritizeInconclusive: true,
+                resolveAt: Date.now() + util.hrsToMs(config.orgPollDuration)
+            }
+        );
     },
 };

@@ -66,11 +66,11 @@ const polls = {
         const rejectUsers = await rejectReactions.users.fetch();
 
         const validAcceptUsersPromises = acceptUsers.map(async (user: User) => {
-            const valid = await filterCallback(user.id);
+            const valid = await filterCallback(poll, user.id);
             if (valid) return user;
         });
         const validRejectUsersPromises = rejectUsers.map(async (user: User) => {
-            const valid = await filterCallback(user.id);
+            const valid = await filterCallback(poll, user.id);
             if (valid) return user;
         });
         const validAcceptUsers = (

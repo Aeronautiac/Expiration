@@ -83,6 +83,18 @@ const orgs = {
         return success("Successfully removed user from org.");
     },
 
+    async getLivingMembers(orgName: OrganisationName) {
+        const orgData = await Organisation.findOne({name: orgName});
+        if (!orgData) throw new Error(`Org ${orgName} does not exist. Cannot fetch living members.`);
+        const livingMembersPromises = orgData.memberIds.map(async(userId) => {
+            const userData = await Player.findOne({userId});
+            if (userData && userData.flags.get("alive"))
+                return userId;
+        });
+        const livingMembers = await Promise.all(livingMembersPromises);
+        return livingMembers;
+    },
+
     getGuildIds(orgName: OrganisationName) {
         const guilds = config.organisations[orgName].guilds;
         const ids = guilds.map((guildName: GuildName) => {
