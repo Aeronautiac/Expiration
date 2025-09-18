@@ -157,8 +157,8 @@ const game = {
     },
 
     async cleanSlate() {
+        await util.deleteTemporaryChannels();
         await resetDatabase();
-
         return success(
             "The season has been cleared. You may now create a new season with /newseason."
         );

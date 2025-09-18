@@ -111,6 +111,21 @@ const util = {
         return newChannel;
     },
 
+    async deleteTemporaryChannels() {
+        const season = await Season.findOne({});
+        if (!season) return;
+
+        const deletePromises = season.temporaryChannels.map(
+            async (channelId) => {
+                const channel: Channel | null = await client.channels
+                    .fetch(channelId)
+                    .catch(() => null);
+                if (channel) await channel.delete().catch(console.error);
+            }
+        );
+        await Promise.all(deletePromises);
+    },
+
     async addPermissionsToChannel(
         channelId: string,
         permissions: ChannelPerms[]
@@ -232,18 +247,6 @@ const util = {
         }
 
         return objects;
-    },
-
-    async deleteTemporaryChannels() {
-        const season = await Season.findOne({});
-        if (!season) return;
-
-        const promises = season.temporaryChannels.map(async (channelId) => {
-            const channel = await client.channels.fetch(channelId);
-            await channel?.delete();
-        });
-
-        await Promise.allSettled(promises);
     },
 
     async setChannelLoggable(
