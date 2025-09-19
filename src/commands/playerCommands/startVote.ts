@@ -8,25 +8,7 @@ import Organisation from "../../models/organisation";
 import abilities from "../../core/abilities";
 import { AbilityName } from "../../configs/abilityArgs";
 import polls from "../../core/polls";
-import names from "../../core/names";
-
-const kidnapperAbilities: Set<OrganisationAbilityName> = new Set();
-kidnapperAbilities
-    .add("Public Kidnap");
-
-const targetAbilities: Set<OrganisationAbilityName> = new Set();
-targetAbilities
-    .add("2nd Kira+Kira Anonymous Kidnap")
-    .add("Anonymous Kidnap")
-    .add("Background Check")
-    .add("Civilian Arrest")
-    .add("PI+Watari Unlawful Arrest")
-    .add("Public Kidnap")
-    .add("Unlawful Arrest");
-
-const loungeNumberAbilities: Set<OrganisationAbilityName> = new Set();
-loungeNumberAbilities
-    .add("Tap In");
+import { kidnapperAbilities, loungeNumberAbilities, targetAbilities } from "../../core/organisationAbilities";
 
 export default {
     data: new SlashCommandBuilder()
@@ -139,7 +121,7 @@ export default {
                 messageContent: pollMessage,
                 channelId: interaction.channelId
             },
-            `${orgName}_${ability}`,
+            ability,
             {
                 threshold: "orgMajority",
                 canContinue: "orgAbility",

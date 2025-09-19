@@ -11,6 +11,8 @@ export const guilds = {
     notebook2: "1406302376083722270",
     notebook3: "1406302628450930708",
     watarilaptop: "1412998755430432788",
+    newsAnchor: "1414838956171726870",
+    rogueCivilian: "1414839208388071507"
 } as const satisfies { [guildName: string]: string };
 
 export type GuildName = keyof typeof guilds;

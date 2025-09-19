@@ -1,6 +1,8 @@
 import { OrgMember } from "../types/OrgMember";
 import { RoleName } from "./roles";
 
+export type AbilityArgsMap = PlayerAbilityArgs & OrganisationAbilityArgs;
+
 export interface PlayerAbilityArgs {
     pseudocide: {
         targetId: string;
@@ -43,7 +45,35 @@ export interface PlayerAbilityArgs {
     };
 }
 
-export interface OrganisationAbilityArgs {}
+export interface OrganisationAbilityArgs {
+    Blackout: {},
+
+    "Public Kidnap": {
+        kidnapperId: string;
+        targetId: string;
+    };
+
+    "Anonymous Kidnap": {
+        targetId: string;
+    };
+
+
+    "Tap In": {
+        loungeNumber: number;
+    }
+
+    "Background Check": {
+        targetId: string;
+    };
+
+    "Civilian Arrest": {
+        targetId: string;
+    };
+
+    "Unlawful Arrest": {
+        targetId: string;
+    };
+}
 
 export type AbilityName =
     | keyof PlayerAbilityArgs

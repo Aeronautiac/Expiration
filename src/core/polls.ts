@@ -9,7 +9,7 @@ import Poll, {
 } from "../models/poll";
 import util from "./util";
 import { config } from "../configs/config";
-import pollCallbacks from "../pollCallbacks";
+import pollCallbacks from "./pollCallbacks";
 
 let client: Client;
 

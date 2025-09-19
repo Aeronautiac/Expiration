@@ -16,6 +16,7 @@ import {
 } from "../types/configTypes";
 import { PlayerStateName } from "../configs/playerStates";
 import {
+    AbilityArgsMap,
     AbilityName,
     OrganisationAbilityArgs,
     PlayerAbilityArgs,
@@ -31,7 +32,7 @@ async function applyUsageConsequences(
     season: ISeason,
     abilityData: IAbility,
     abilityConfig: BaseAbility,
-    subtractCharges: number,
+    subtractCharges: number
 ) {
     // charges
     // find default ability number based on the current day
@@ -51,7 +52,10 @@ async function applyUsageConsequences(
     if (abilityData.charges === null || abilityData.charges === undefined) {
         abilityData.charges = Math.max(0, defaultCharges - subtractCharges);
     } else {
-        abilityData.charges = Math.max(0, abilityData.charges - subtractCharges);
+        abilityData.charges = Math.max(
+            0,
+            abilityData.charges - subtractCharges
+        );
     }
 
     // set the cooldown to whatever their cooldown for this ability should be at this moment
@@ -68,11 +72,7 @@ const abilities = {
     async useAbility<K extends AbilityName>(
         owner: string,
         abilityName: K,
-        args: K extends keyof PlayerAbilityArgs
-            ? PlayerAbilityArgs[K]
-            : K extends keyof OrganisationAbilityArgs
-            ? OrganisationAbilityArgs[K]
-            : never,
+        args: AbilityArgsMap[K],
         checkOnly?: boolean
     ): Promise<Result> {
         // abilities can only be used when a season is active
@@ -154,16 +154,16 @@ const abilities = {
 
         // if the org does not have enough members to use the ability, or does not have the roles required, then they cannot use the ability
         if (abilityData.type === "organisation") {
-            const livingMemberIds = await orgs.getLivingMembers(owner as OrganisationName);
-            const memberCount = livingMemberIds.length;
-            const rolesInOrgPromises = livingMemberIds.map(
-                async (memberId) => {
-                    const data = await Player.findOne({ userId: memberId });
-                    if (data) {
-                        return data.role;
-                    }
-                }
+            const livingMemberIds = await orgs.getLivingMembers(
+                owner as OrganisationName
             );
+            const memberCount = livingMemberIds.length;
+            const rolesInOrgPromises = livingMemberIds.map(async (memberId) => {
+                const data = await Player.findOne({ userId: memberId });
+                if (data) {
+                    return data.role;
+                }
+            });
             const rolesInOrg = (await Promise.all(rolesInOrgPromises)).filter(
                 (x) => x !== undefined
             );
@@ -231,19 +231,27 @@ const abilities = {
 
         // main ability usage
         await applyUsageConsequences(season, abilityData, abilityConfig, 1);
-        
+
         // handle linked abilities
         // might need to handle override system here too later, but not important right now
         if (abilityConfig.linkedAbilities) {
-            for (const [name, info] of Object.entries(abilityConfig.linkedAbilities)) {
+            for (const [name, info] of Object.entries(
+                abilityConfig.linkedAbilities
+            )) {
                 const linkedAbilityConfig: BaseAbility =
-                    config.organisationAbilities[name] ?? config.playerAbilities[name];
+                    config.organisationAbilities[name] ??
+                    config.playerAbilities[name];
                 const linkedAbilityData = await Ability.findOne({
                     owner,
                     ability: name,
                 });
                 if (linkedAbilityData)
-                    await applyUsageConsequences(season, linkedAbilityData, linkedAbilityConfig, info.useCharges);
+                    await applyUsageConsequences(
+                        season,
+                        linkedAbilityData,
+                        linkedAbilityConfig,
+                        info.useCharges
+                    );
             }
         }
 
@@ -256,11 +264,7 @@ const abilities = {
     async canUseAbility<K extends AbilityName>(
         owner: string,
         abilityName: K,
-        args: K extends keyof PlayerAbilityArgs
-            ? PlayerAbilityArgs[K]
-            : K extends keyof OrganisationAbilityArgs
-            ? OrganisationAbilityArgs[K]
-            : never
+        args: AbilityArgsMap[K]
     ): Promise<Result> {
         return abilities.useAbility(owner, abilityName, args, true);
     },
@@ -333,10 +337,10 @@ const abilities = {
                 { _id: ability._id },
                 {
                     cooldown: ability.queuedCooldown,
-                    $unset: { 
+                    $unset: {
                         queuedCooldown: "",
                         charges: "",
-                     },
+                    },
                 }
             );
         });
