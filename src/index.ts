@@ -9,6 +9,7 @@ import {
 } from "discord.js";
 import { connectMongoose } from "./mongoose";
 import agenda from "./jobs";
+import polls from "./core/polls";
 
 const token = process.env.DISCORD_TOKEN;
 
@@ -77,6 +78,9 @@ for (const folder of commandFolders) {
 
 // start agenda
 agenda.start().catch(console.error);
+
+// start polls
+polls.start().catch(console.error);
 
 // load events
 const eventsPath = path.join(__dirname, "events");

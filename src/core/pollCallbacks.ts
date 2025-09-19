@@ -30,8 +30,8 @@ const pollCallbacks = {
 
             switch (resolution) {
                 case "accepted":
+                    console.log("accepted");
                     await pollMessage.reply("The vote has succeeded. The action will now be performed.");
-
                     await abilities.useAbility(orgName, abilityName as AbilityName, {
                         targetId,
                         loungeNumber,
@@ -40,12 +40,15 @@ const pollCallbacks = {
 
                     break;
                 case "rejected":
+                    console.log("rejected");
                     await pollMessage.reply("The vote has been rejected. The action will not be performed.");
                     break;
                 case "inconclusive":
+                    console.log("inconclusive");
                     await pollMessage.reply("The vote was inconclusive. The action will not be performed.");
                     break;
                 case "cancelled":
+                    console.log("cancelled");
                     await pollMessage.reply("The vote was cancelled. The action will not be performed.");
                     break;
             }
@@ -60,6 +63,7 @@ const pollCallbacks = {
             const isMember = orgData.memberIds.includes(userId);
             // if no lounge hiders, then there should be nothing stopping the person from voting
             const userData = await Player.findOne({ userId });
+            if (!userData) return false;
             const hasBlockers = userData.loungeHiders.size > 0;
             return isMember && !hasBlockers;
         },

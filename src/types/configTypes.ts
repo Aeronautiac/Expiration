@@ -1,4 +1,4 @@
-import { PermissionOverwriteOptions } from "discord.js";
+import { Guild, PermissionOverwriteOptions } from "discord.js";
 import { ChannelName } from "../configs/channels";
 import { GuildName } from "../configs/guilds";
 import { OrganisationAbilityName } from "../configs/organisationAbilities";
@@ -25,14 +25,15 @@ export interface PlayerState {
 }
 
 export interface Organisation {
-    guilds: GuildName[]; // list of guild names that members of this organisation should have access to
+    guild: GuildName; // list of guild names that members of this organisation should have access to
+    mainChannel: ChannelName;
     abilityOverrides: AbilityOverrides;
     abilities: OrganisationAbilityName[]; // list of organisation abilities that this organisation has access to
     article?: string; // used for grammar in various contexts
     rankNames: {
-        member: string,
-        leader?: string
-    }
+        member: string;
+        leader?: string;
+    };
 }
 
 export type AbilityOverrides = Partial<

@@ -43,11 +43,14 @@ export default {
         const m1 = interaction.options.getUser("target1");
         const m2 = interaction.options.getUser("target2");
         const m3 = interaction.options.getUser("target3");
-        const result = await contacting.createGroupchat(interaction.user.id, [
-            m1.id,
-            m2.id,
-            m3.id,
-        ]);
+        const m4 = interaction.options.getUser("target4");
+        const members = [
+            m1?.id,
+            m2?.id,
+            m3?.id,
+            m4?.id,
+        ].filter((entry) => Boolean(entry));
+        const result = await contacting.createGroupchat(interaction.user.id, members);
         if (!result.success)
             await interaction.editReply({
                 content: result.message || "Failed to create group chat.",

@@ -69,7 +69,7 @@ const death = {
         await names.setNick(userId, await names.getAlias(userId));
 
         const bugAbility = await Ability.findOne({
-            ownerId: userId,
+            owner: userId,
             ability: "bug",
         });
         const ownedNotebooks = await Notebook.find({ currentOwner: userId });

@@ -49,8 +49,7 @@ export default {
         const guildId = interaction.guildId;
         let orgName: OrganisationName;
         for (const org of Object.keys(config.organisations)) {
-            const orgGuildIds = orgs.getGuildIds(org as OrganisationName) as string[];
-            if (orgGuildIds.includes(guildId)) {
+            if (config.guilds[config.organisations[org].guild] === guildId) {
                 orgName = org as OrganisationName;
                 break;
             }

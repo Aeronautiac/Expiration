@@ -57,16 +57,9 @@ const names = {
     async setNick(userId: string, nickname: string): Promise<void> {
         const promises = Object.entries(config.guilds).map(
             async ([name, id]) => {
-                try {
-                    const guild = await client.guilds.fetch(id);
-                    const member = await guild.members.fetch(userId);
-                    await member.setNickname(nickname);
-                } catch (err) {
-                    console.warn(
-                        `Failed to set nickname in guild ${name}:`,
-                        err
-                    );
-                }
+                const guild = await client.guilds.fetch(id);
+                const member = await guild.members.fetch(userId);
+                await member.setNickname(nickname).catch(() => {});
             }
         );
         await Promise.all(promises);

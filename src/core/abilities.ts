@@ -303,7 +303,7 @@ const abilities = {
         const abilitiesToGive = organisations[name].abilities;
         for (const abilityName of abilitiesToGive) {
             // if the ability does not exist, skip it
-            const abilityConfig = config.playerAbilities[abilityName];
+            const abilityConfig = config.organisationAbilities[abilityName];
             if (!abilityConfig) continue;
             // dont give the ability if they already have it
             const existingAbility = await Ability.findOne({
@@ -314,6 +314,7 @@ const abilities = {
             // give the ability
             await Ability.create({
                 owner: name,
+                type: "organisation",
                 ability: abilityName,
                 roleRestrictions:
                     config.organisationAbilities[abilityName].rolesRequired,

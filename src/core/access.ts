@@ -174,13 +174,11 @@ access.grantGroup = async function (userId) {
 
     const guildsToGrant = new Set<string>();
 
-    // add affiliation guilds
+    // add affiliation guild
     const memberObjects = await util.getMemberObjects(userId);
     for (const member of memberObjects) {
         const orgConfig = config.organisations[member.org];
-        for (const guildName of orgConfig.guilds) {
-            guildsToGrant.add(guildName);
-        }
+        guildsToGrant.add(orgConfig.guild);
     }
 
     // add any role guilds that are also group guilds
@@ -194,8 +192,7 @@ access.grantGroup = async function (userId) {
 
     for (const guildName of guildsToGrant) {
         const guildId = config.guilds[guildName];
-        const guild = await client.guilds.fetch(guildId).catch(() => null);
-        if (guild) await access.grant(userId, guild);
+        await access.grant(userId, guildId);
     }
 };
 

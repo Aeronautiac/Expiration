@@ -106,6 +106,7 @@ const game = {
         // grants access to role guilds and abilities
         await abilities.giveRoleAbilities(userId);
         await access.grantRole(userId);
+        await access.grantGroup(userId);
 
         // roles
         const mainGuild = await client.guilds.fetch(config.guilds.main);

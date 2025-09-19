@@ -149,6 +149,10 @@ const notebooks = {
             trueName: names.toInternal(trueName),
         });
 
+        // if the person with this name is already dead, then return a failure
+        if (targetPlayer && !targetPlayer.flags.get("alive"))
+            return failure("This person is already dead.");
+
         // if nobody has this true name, then subtract a use and return a failure.
         if (!targetPlayer || !targetPlayer.flags.get("alive")) {
             notebook.attemptsToday.set(

@@ -20,7 +20,7 @@ const polls = {
 
     async resolve(poll: IPoll, resolution: PollResolutionReason) {
         const resolveCallback = pollCallbacks.resolve[poll.callbacks.resolve];
-        await resolveCallback(poll);
+        await resolveCallback(poll, resolution);
         await polls.cancel(poll.identifier, poll.data);
     },
 
@@ -48,7 +48,8 @@ const polls = {
         const canContinueCallback = pollCallbacks.canContinue[poll.callbacks.canContinue];
 
         // if the poll cannot continue, resolve with "cancelled"
-        if (!canContinueCallback(poll)) {
+        const canContinueResult = await canContinueCallback(poll);
+        if (!canContinueResult) {
             await polls.resolve(poll, "cancelled");
             return;
         }
@@ -148,7 +149,7 @@ const polls = {
             .fetch(location.messageId)
             .catch(() => null)
             :
-            channel.send(location.messageContent);
+            await channel.send(location.messageContent);
         if (!message) throw new Error("This is not a valid message id.");
 
         await message.react(config.pollYesEmoji);
@@ -171,7 +172,7 @@ const polls = {
     },
 
     // starts the poll update loop
-    start() {
+    async start() {
         let running = false;
 
         const loop = async () => {

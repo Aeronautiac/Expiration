@@ -29,7 +29,7 @@ export interface IPoll extends Document {
 
 const pollSchema = new Schema<IPoll>({
     resolutionRules: {
-        allowInconclusive: { type: Boolean, required: true },
+        prioritizeInconclusive: { type: Boolean, required: true },
         resolveAt: { type: Number, required: true },
         resolvesOnThreshold: { type: Boolean, required: true },
     },

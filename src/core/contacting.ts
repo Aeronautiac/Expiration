@@ -132,7 +132,7 @@ const contacting = {
                         ids: [config.discordRoles.Spectator],
                         perms: config.spectatorPermissions,
                     },
-                ], 
+                ],
                 true
             );
             channels.push(contactedChannel);
@@ -232,8 +232,9 @@ const contacting = {
         const canContactResult = await contacting.canContact(userId);
         if (!canContactResult.success) return canContactResult;
 
-        // if there are duplicate members, return a failure
-        if (new Set(originalMembers).size !== originalMembers.length)
+        // if there aren't enough members, return a failure
+        const allMembers = Array.from(new Set([...originalMembers, userId]));
+        if (allMembers.length < 3)
             return failure(
                 "A group chat must be created with at least 3 initial members."
             );
@@ -257,7 +258,6 @@ const contacting = {
         }
 
         // create the groupchat
-        const allMembers = Array.from(new Set([...originalMembers, userId]));
         const groupchatChannel = await util.createTemporaryChannel(
             config.guilds.main,
             `groupchat-${count + 1}`,
@@ -310,6 +310,7 @@ const contacting = {
         }
 
         // log the creation
+        await contacting.logGroupchatCreation(userId, originalMembers);
 
         return success(`Groupchat created successfully: ${groupchatChannel}`);
     },
@@ -358,6 +359,7 @@ const contacting = {
             );
 
         // log the addition
+        await contacting.logGroupchatAddition(userId, targetId);
 
         return success(`Successfully added <@${targetId}> to the groupchat.`);
     },
@@ -397,6 +399,7 @@ const contacting = {
             );
 
         // log the removal
+        await contacting.logGroupchatRemoval(userId, targetId);
 
         return success(
             `Successfully removed <@${targetId}> from the groupchat.`
@@ -409,7 +412,7 @@ const contacting = {
         channelId: string
     ): Promise<Result> {
         // if the channel is not a group chat, return a failure
-        const groupchat = await GroupChat.findById(channelId);
+        const groupchat = await GroupChat.findOne({ channelId });
         if (!groupchat) return failure("This channel is not a group chat.");
 
         // if the player is not the owner of the group chat, return a failure
@@ -434,6 +437,7 @@ const contacting = {
             );
 
         // log the ownership change
+        await contacting.logGroupchatOwnerChange(userId, targetId);
 
         return success(
             `Successfully made <@${targetId}> the new owner of the groupchat.`
@@ -606,7 +610,7 @@ const contacting = {
         const contactorStr = `**${await names.getAlias(userId)}**`;
         const contactedStr = `**${await names.getAlias(targetId)}**`;
         const timeString = `<t:${Math.floor(Date.now() / 1000)}:F>`;
-        const logMessage = `${contactorStr} added ${contactedStr} to a group chat at ${timeString}`;
+        const logMessage = `${contactorStr} removed ${contactedStr} from a group chat at ${timeString}`;
 
         // send log message
         await contacting.sendLogMessage(
@@ -631,6 +635,24 @@ const contacting = {
         const logMessage = `${contactorStr} created a group chat with ${contactedStrs.join(
             ", "
         )} at ${timeString}`;
+
+        // send log message
+        await contacting.sendLogMessage(
+            logMessage,
+            userData.flags.get("underTheRadar")
+        );
+    },
+
+    async logGroupchatOwnerChange(userId: string, targetId: string) {
+        // if no data, don't log. should be impossible anyway.
+        const userData = await Player.findOne({ userId });
+        if (!userData) return;
+
+        // construct info strings
+        const oldOwnerStr = `**${await names.getAlias(userId)}**`;
+        const newOwnerStr = `**${await names.getAlias(targetId)}**`;
+        const timeString = `<t:${Math.floor(Date.now() / 1000)}:F>`;
+        const logMessage = `${oldOwnerStr} transferred ownership of a group chat to ${newOwnerStr} at ${timeString}`;
 
         // send log message
         await contacting.sendLogMessage(

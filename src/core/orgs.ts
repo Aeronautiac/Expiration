@@ -4,7 +4,7 @@ import { OrganisationName } from "../configs/organisations";
 import { failure, Result, success } from "../types/Result";
 import Player from "../models/player";
 import access from "./access";
-import { config } from "../configs/config"
+import { config } from "../configs/config";
 import { GuildName } from "../configs/guilds";
 import abilities from "./abilities";
 
@@ -53,7 +53,10 @@ const orgs = {
         return success("Successfully added user to org.");
     },
 
-    async removeFromOrg(userId: string, name: OrganisationName): Promise<Result> {
+    async removeFromOrg(
+        userId: string,
+        name: OrganisationName
+    ): Promise<Result> {
         const userData = await Player.findOne({ userId });
         if (!userData) return failure("This person is not a player.");
 
@@ -74,22 +77,20 @@ const orgs = {
         );
 
         // revoke access
-        const guilds = config.organisations[name].guilds;
-        const promises = guilds.map(async (guild: GuildName) => {
-            await access.revoke(userId, config.guilds[guild]);
-        })
-        await Promise.allSettled(promises);
+        await access.revoke(userId, config.guilds[config.organisations[name].guild]);
 
         return success("Successfully removed user from org.");
     },
 
     async getLivingMembers(orgName: OrganisationName) {
         const orgData = await Organisation.findOne({ name: orgName });
-        if (!orgData) throw new Error(`Org ${orgName} does not exist. Cannot fetch living members.`);
+        if (!orgData)
+            throw new Error(
+                `Org ${orgName} does not exist. Cannot fetch living members.`
+            );
         const livingMembersPromises = orgData.memberIds.map(async (userId) => {
             const userData = await Player.findOne({ userId });
-            if (userData && userData.flags.get("alive"))
-                return userId;
+            if (userData && userData.flags.get("alive")) return userId;
         });
         const livingMembers = await Promise.all(livingMembersPromises);
         return livingMembers;
@@ -98,7 +99,10 @@ const orgs = {
     // returns an array of userids for members that are able to vote
     async getVotingMembers(orgName: OrganisationName) {
         const orgData = await Organisation.findOne({ name: orgName });
-        if (!orgData) throw new Error(`Org ${orgName} does not exist. Cannot fetch voting members.`);
+        if (!orgData)
+            throw new Error(
+                `Org ${orgName} does not exist. Cannot fetch voting members.`
+            );
         const votingMembersPromises = orgData.memberIds.map(async (userId) => {
             const userData = await Player.findOne({ userId });
             if (userData.loungeHiders.size === 0 && userData.flags.get("alive"))
@@ -107,14 +111,6 @@ const orgs = {
         const votingMembers = await Promise.all(votingMembersPromises);
         return votingMembers;
     },
-
-    getGuildIds(orgName: OrganisationName) {
-        const guilds = config.organisations[orgName].guilds;
-        const ids = guilds.map((guildName: GuildName) => {
-            return config.guilds[guildName];
-        });
-        return ids;
-    }
 };
 
 export default orgs;
