@@ -73,8 +73,22 @@ const abilities = {
         owner: string,
         abilityName: K,
         args: AbilityArgsMap[K],
-        checkOnly?: boolean
+        checkOnly?: boolean,
+        excludeChecks: (
+            | "possession"
+            | "role"
+            | "restrictors"
+            | "members"
+            | "charges"
+            | "cooldown"
+        )[] = []
     ): Promise<Result> {
+        // if posessions checks are excluded, then by extension, so are charge and cooldown checks.
+        if (excludeChecks.includes("possession")) {
+            excludeChecks.push("charges");
+            excludeChecks.push("cooldown");
+        }
+
         // abilities can only be used when a season is active
         const season = await Season.findOne({});
         if (!season || !season.flags.get("active"))
@@ -85,7 +99,8 @@ const abilities = {
             owner,
             ability: abilityName,
         });
-        if (!abilityData) return failure("You do not possess this ability.");
+        if (!abilityData && !excludeChecks.includes("possession"))
+            return failure("You do not possess this ability.");
 
         // no player data -- no ability usage (if the user is a player)
         let userData: IPlayer;
@@ -145,7 +160,8 @@ const abilities = {
         if (
             abilityData.type === "player" &&
             abilityData.roleRestrictions.length > 0 &&
-            !abilityData.roleRestrictions.includes(userData.role)
+            !abilityData.roleRestrictions.includes(userData.role) &&
+            !excludeChecks.includes("role")
         ) {
             return failure(
                 `You cannot use this ability because it is restricted to the ${abilityData.roleRestrictions[0]} role.`
@@ -168,13 +184,19 @@ const abilities = {
                 (x) => x !== undefined
             );
 
-            if (memberCount < orgAbilityConfig.membersRequired)
+            if (
+                memberCount < orgAbilityConfig.membersRequired &&
+                !excludeChecks.includes("members")
+            )
                 return failure(
                     `You do not have enough members to use this ability.`
                 );
 
             for (const role of orgAbilityConfig.rolesRequired)
-                if (!rolesInOrg.includes(role))
+                if (
+                    !rolesInOrg.includes(role) &&
+                    !excludeChecks.includes("role")
+                )
                     return failure(
                         `This organisation does not have the roles required to use this ability.`
                     );
@@ -191,18 +213,21 @@ const abilities = {
                         )
                 )
                 .map(([restrictor]) => restrictor);
-            if (activeRestrictors.length > 0)
+            if (
+                activeRestrictors.length > 0 &&
+                !excludeChecks.includes("restrictors")
+            )
                 return failure(
                     `Cannot use ability because of restrictors: ${activeRestrictors.toString()}`
                 );
         }
 
         if (abilityData.charges !== undefined && abilityData.charges !== null)
-            if (abilityData.charges === 0)
+            if (abilityData.charges === 0 && !excludeChecks.includes("charges"))
                 return failure(`You have run out of charges for this ability.`);
 
         const cd = abilityData.cooldown;
-        if (cd > 0)
+        if (cd > 0 && !excludeChecks.includes("cooldown"))
             return failure(`This ability is on cooldown for ${cd} day(s).`);
 
         // if we're only checking if the ability can be used, this will be the final bit

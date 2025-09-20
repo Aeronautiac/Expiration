@@ -17,6 +17,7 @@ import { OrganisationName, organisations } from "../configs/organisations";
 import Kidnapping from "../models/kidnapping";
 import agenda from "../jobs";
 import orgs from "./orgs";
+import { DiscordRoleName } from "../configs/discordRoles";
 
 let client: Client;
 
@@ -325,17 +326,28 @@ const game = {
         throw new Error("News channel not found.");
     },
 
-    async incarcerate(userId: string, duration?: number) {
+    async incarcerate(
+        userId: string,
+        args: {
+            duration?: number;
+            message?: string;
+        } = {}
+    ) {
         // add incarcerated state
         await util.addState(userId, "incarcerated");
 
         // if there is a duration, schedule their release
-        if (duration) {
-            const releaseAt = new Date(Date.now() + util.hrsToMs(duration));
+        if (args.duration) {
+            const releaseAt = new Date(
+                Date.now() + util.hrsToMs(args.duration)
+            );
             await agenda.schedule(releaseAt, "releaseIncarcerated", {
                 userId,
             });
         }
+
+        // if there was a message, announce it
+        if (args.message) await game.announce(args.message);
 
         // add incarcerated role and remove civilian role
         const mainGuild = await client.guilds.fetch(config.guilds.main);
@@ -349,12 +361,18 @@ const game = {
             .catch(console.error);
     },
 
-    async removeIncarcerated(userId: string) {
+    async removeIncarcerated(userId: string, announce?: boolean) {
         const userData = await Player.findOne({ userId });
         if (!userData) throw new Error("Player does not exist.");
 
         // remove incarcerated state
         await util.removeState(userId, "incarcerated");
+
+        // if announced, announce it
+        if (announce)
+            await game.announce(
+                `@everyone <@${userId}> has served their time and has now returned to society.`
+            );
 
         // if a release was scheduled, then cancel it
         await agenda.cancel({ name: "releaseIncarcerated", data: { userId } });

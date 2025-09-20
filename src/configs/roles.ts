@@ -51,7 +51,7 @@ export const roles = {
         guildChannels: {},
     },
     "News Anchor": {
-        abilities: ["civilianArrest"],
+        abilities: ["Civilian Arrest"],
         guildChannels: {
             main: ["news"],
         },

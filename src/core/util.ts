@@ -365,6 +365,13 @@ const util = {
         return id ? `<@&${id}>` : org;
     },
 
+    articledOrgMention(org: OrganisationName) {
+        const article = config.organisations[org]["article"];
+        const start = article ? article : ``;
+        const orgPing = util.orgMention(org);
+        return `${start} ${orgPing}`;
+    },
+
     hrsToMs(hrs: number) {
         return 1000 * 60 * 60 * hrs;
     },

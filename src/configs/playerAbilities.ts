@@ -10,7 +10,7 @@ export type PlayerAbilityName =
     | "anonymousAnnouncement"
     | "ipp"
     | "anonymousContact"
-    | "civilianArrest"
+    | "Civilian Arrest"
     | "anonymousProsecution";
 
 export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
@@ -60,7 +60,7 @@ export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
         cooldown: 0,
         bypasses: [],
     },
-    civilianArrest: {
+    "Civilian Arrest": {
         charges: 1,
         cooldown: 1,
         bypasses: [],

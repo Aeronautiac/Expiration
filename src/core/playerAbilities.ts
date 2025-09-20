@@ -12,6 +12,7 @@ import contacting from "./contacting";
 import Season from "../models/season";
 import Notebook from "../models/notebook";
 import { guilds } from "../configs/guilds";
+import sharedAbilities from "./sharedAbilities";
 
 let client: Client;
 
@@ -340,6 +341,14 @@ const playerAbilities = {
         await sendBlock(currentBlock);
 
         return success();
+    },
+
+    "Civilian Arrest": async (
+        userId: string,
+        args: PlayerAbilityArgs["autopsy"],
+        checkOnly?: boolean
+    ) => {
+        return sharedAbilities.civilianArrest(userId, args, checkOnly);
     },
 };
 

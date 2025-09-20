@@ -29,7 +29,7 @@ agenda.define("kidnapRelease", async (job: Job<{ userId: string }>) => {
 
 agenda.define("releaseIncarcerated", async (job: Job<{ userId: string }>) => {
     const { userId } = job.attrs.data;
-    await game.removeIncarcerated(userId);
+    await game.removeIncarcerated(userId, true);
 });
 
 agenda.define("endBlackout", async (job: Job<{}>) => {

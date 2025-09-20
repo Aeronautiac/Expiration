@@ -1,5 +1,8 @@
 import { AbilityName } from "../configs/abilityArgs";
-import { organisationAbilities, OrganisationAbilityName } from "../configs/organisationAbilities";
+import {
+    organisationAbilities,
+    OrganisationAbilityName,
+} from "../configs/organisationAbilities";
 import { OrganisationName } from "../configs/organisations";
 import abilities from "./abilities";
 import orgs from "./orgs";
@@ -7,6 +10,9 @@ import Organisation from "../models/organisation";
 import Player from "../models/player";
 import { IPoll, PollResolutionReason } from "../models/poll";
 import { Client, TextChannel } from "discord.js";
+import game from "./game";
+import { config } from "../configs/config";
+import sharedAbilities from "./sharedAbilities";
 
 let client: Client;
 
@@ -23,33 +29,94 @@ const pollCallbacks = {
             const targetId = poll.data["targetId"] as string | null;
             const loungeNumber = poll.data["loungeNumber"] as number | null;
             const kidnapperId = poll.data["kidnapperId"] as string | null;
-            const pollChannel = await client.channels.fetch(poll.location.channelId) as TextChannel;
+            const pollChannel = (await client.channels.fetch(
+                poll.location.channelId
+            )) as TextChannel;
             if (!pollChannel) return;
-            const pollMessage = await pollChannel.messages.fetch(poll.location.messageId);
+            const pollMessage = await pollChannel.messages.fetch(
+                poll.location.messageId
+            );
             if (!pollMessage) return;
 
             switch (resolution) {
                 case "accepted":
                     console.log("accepted");
-                    await pollMessage.reply("The vote has succeeded. The action will now be performed.");
-                    await abilities.useAbility(orgName, abilityName as AbilityName, {
-                        targetId,
-                        loungeNumber,
-                        kidnapperId
+                    await pollMessage.reply(
+                        "The vote has succeeded. The action will now be performed."
+                    );
+                    await abilities.useAbility(
+                        orgName,
+                        abilityName as AbilityName,
+                        {
+                            targetId,
+                            loungeNumber,
+                            kidnapperId,
+                        }
+                    );
+
+                    break;
+                case "rejected":
+                    console.log("rejected");
+                    await pollMessage.reply(
+                        "The vote has been rejected. The action will not be performed."
+                    );
+                    break;
+                case "inconclusive":
+                    console.log("inconclusive");
+                    await pollMessage.reply(
+                        "The vote was inconclusive. The action will not be performed."
+                    );
+                    break;
+                case "cancelled":
+                    console.log("cancelled");
+                    await pollMessage.reply(
+                        "The vote was cancelled. The action will not be performed."
+                    );
+                    break;
+            }
+        },
+
+        async civArrest(poll: IPoll, resolution: PollResolutionReason) {
+            const targetId = poll.data["targetId"] as string | null;
+            const pollChannel = (await client.channels.fetch(
+                poll.location.channelId
+            )) as TextChannel;
+            if (!pollChannel) return;
+            const pollMessage = await pollChannel.messages.fetch(
+                poll.location.messageId
+            );
+            if (!pollMessage) return;
+
+            switch (resolution) {
+                case "accepted":
+                    console.log("accepted");
+                    await pollMessage.reply(
+                        "@everyone The vote has succeeded. The civilian arrest will now be performed."
+                    );
+
+                    await game.incarcerate(targetId, {
+                        duration: config.civArrestDuration,
+                        message: `<@${targetId}> will now be <@&${config.discordRoles.Incarcerated}> for ${config.civArrestDuration} hours.`,
                     });
 
                     break;
                 case "rejected":
                     console.log("rejected");
-                    await pollMessage.reply("The vote has been rejected. The action will not be performed.");
+                    await pollMessage.reply(
+                        "@everyone The vote has been rejected. The civilian arrest will not be performed."
+                    );
                     break;
                 case "inconclusive":
                     console.log("inconclusive");
-                    await pollMessage.reply("The vote was inconclusive. The action will not be performed.");
+                    await pollMessage.reply(
+                        "@everyone The vote was inconclusive. The civilian arrest will not be performed."
+                    );
                     break;
                 case "cancelled":
                     console.log("cancelled");
-                    await pollMessage.reply("The vote was cancelled. The action will not be performed.");
+                    await pollMessage.reply(
+                        "@everyone The vote was cancelled. The civilian arrest will not be performed."
+                    );
                     break;
             }
         },
@@ -67,6 +134,13 @@ const pollCallbacks = {
             const hasBlockers = userData.loungeHiders.size > 0;
             return isMember && !hasBlockers;
         },
+
+        async validCivVoter(poll: IPoll, userId: string) {
+            // if they are able to see news, and they are alive, then they should be able to vote.
+            const userData = await Player.findOne({ userId });
+            if (!userData) return false;
+            return userData.flags.get("alive");
+        },
     },
 
     threshold: {
@@ -75,6 +149,11 @@ const pollCallbacks = {
             const org: OrganisationName = poll.data.orgName as OrganisationName;
             const votingMembers = await orgs.getVotingMembers(org);
             return Math.floor(votingMembers.length / 2) + 1;
+        },
+
+        async civMajority(poll: IPoll) {
+            const allLivingPlayers = await Player.find({ "flags.alive": true });
+            return Math.floor(allLivingPlayers.length / 2) + 1;
         },
     },
 
@@ -95,6 +174,20 @@ const pollCallbacks = {
                     loungeNumber,
                     kidnapperId,
                 }
+            );
+            return canUse.success;
+        },
+
+        // civ arrest
+        async civArrest(poll: IPoll) {
+            const arrester = poll.data["arrester"] as string | null;
+            const targetId = poll.data["targetId"] as string | null;
+            const canUse = await abilities.useAbility(
+                arrester,
+                "Civilian Arrest",
+                { targetId },
+                true,
+                ["charges", "cooldown"]
             );
             return canUse.success;
         },

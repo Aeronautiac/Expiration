@@ -70,6 +70,8 @@ export interface Config {
     maxGroupChatSize: number;
     groupChatTokenCost: number;
     maxGroupChatsInGame: number;
+    civArrestVoteDuration: number;
+    civArrestDuration: number;
     announcementDelay: number; // in seconds
     pollUpdateRate: number; // in secs
     pollYesEmoji: string;

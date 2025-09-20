@@ -1,7 +1,10 @@
 import { Client, Message, TextChannel } from "discord.js";
 import { OrganisationAbilityName } from "../configs/organisationAbilities";
 import { OrganisationName } from "../configs/organisations";
-import { OrganisationAbilityArgs } from "../configs/abilityArgs";
+import {
+    OrganisationAbilityArgs,
+    SharedAbilityArgs,
+} from "../configs/abilityArgs";
 import Player from "../models/player";
 import { failure, success } from "../types/Result";
 import { config } from "../configs/config";
@@ -11,6 +14,7 @@ import game from "./game";
 import Season from "../models/season";
 import Lounge from "../models/lounge";
 import util from "./util";
+import sharedAbilities from "./sharedAbilities";
 
 export const kidnapperAbilities: Set<OrganisationAbilityName> = new Set();
 kidnapperAbilities.add("Public Kidnap");
@@ -33,7 +37,7 @@ async function kidnapCheck(orgName: OrganisationName, args: any) {
     // if the target is dead or is not a player, they cannot be kidnapped
     if (!targetData) return failure("This person is not a player.");
     if (!targetData.flags.get("alive")) return failure("This person is dead.");
-    // if the target is already locked up in some way, they cannot be kidnapped, or is protected by ipp, they cannot be kidnapped
+    // if the target is already locked up in some way, or is protected by ipp, they cannot be kidnapped
     if (
         targetData.flags.get("custody") ||
         targetData.flags.get("incarcerated") ||
@@ -155,7 +159,6 @@ const orgAbilities = {
             return failure("This person is dead.");
         // if the target is already locked up in some way, they cannot be arrested, or is protected by ipp, they cannot be arrested
         if (
-            targetData.flags.get("custody") ||
             targetData.flags.get("incarcerated") ||
             targetData.flags.get("kidnapped") ||
             targetData.flags.get("ipp")
@@ -164,10 +167,19 @@ const orgAbilities = {
 
         if (checkOnly) return success();
 
-        await game.incarcerate(
-            args.targetId,
-            config.organisationAbilities["Unlawful Arrest"].duration
-        );
+        const duration =
+            config.organisationAbilities["Unlawful Arrest"].duration;
+        const message = `@everyone ${util.articledOrgMention(
+            orgName
+        )} has performed an unlawful arrest on <@${
+            args.targetId
+        }>. They will now be <@&${
+            config.discordRoles.Incarcerated
+        }> for ${duration} hours.`;
+        await game.incarcerate(args.targetId, {
+            duration,
+            message,
+        });
 
         return success();
     },
@@ -328,9 +340,11 @@ const orgAbilities = {
 
     "Civilian Arrest": async (
         orgName: OrganisationName,
-        args: OrganisationAbilityArgs["Civilian Arrest"],
+        args: SharedAbilityArgs["Civilian Arrest"],
         checkOnly?: boolean
-    ) => {},
+    ) => {
+        return sharedAbilities.civilianArrest(orgName, args, checkOnly);
+    },
 };
 
 export default orgAbilities;
