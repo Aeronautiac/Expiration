@@ -1,4 +1,4 @@
-import { Client, TextChannel } from "discord.js";
+import { Attachment, Client, TextChannel } from "discord.js";
 import death from "./death";
 import agenda from "../jobs";
 import util from "./util";
@@ -11,6 +11,7 @@ import game from "./game";
 import contacting from "./contacting";
 import Season from "../models/season";
 import Notebook from "../models/notebook";
+import { guilds } from "../configs/guilds";
 
 let client: Client;
 
@@ -231,6 +232,8 @@ const playerAbilities = {
         return success();
     },
 
+    // currently hardcoded to PI, but eventually, this should work for all roles. need to remove the option for multiple guilds for roles or just add
+    // a main guild option to roles. (This one is better)
     async autopsy(
         userId: string,
         args: PlayerAbilityArgs["autopsy"],
@@ -239,27 +242,22 @@ const playerAbilities = {
         const season = await Season.findOne({});
         const targetId = args.targetId;
         const targetData = await Player.findOne({ userId: targetId });
+        const piDiscord = await client.guilds.fetch(config.guilds.pi);
 
-        if (!targetData) return "This user has no data.";
-        if (targetData.flags.get("alive")) return "This user is not dead.";
+        if (!targetData) return failure("This user has no data.");
+        if (targetData.flags.get("alive"))
+            return failure("This user is not dead.");
 
         if (checkOnly) return success();
 
         const timeOfDeath = targetData.timeOfDeath;
-        const autopsyLogs = (await client.channels.fetch(
-            config.channels.autopsyLogs
-        )) as TextChannel;
 
         // fetch all messages after and including earliest
         const earliest = timeOfDeath - util.hrsToMs(3);
         const allMessagesArrays = await Promise.all(
             season.messageLoggedChannels.map(async (channelId) => {
-                const channel = await client.channels
-                    .fetch(channelId)
-                    .catch(() => null);
-                if (!channel) return [];
                 return util.fetchAllMessages(
-                    channel,
+                    channelId,
                     earliest,
                     (msg) => msg.author.id === targetId
                 );
@@ -274,21 +272,21 @@ const playerAbilities = {
         let currentBlock = [];
         const CHUNK_LIMIT = 2000;
 
-        // send autopsy notifier
-        const beginMessage = await autopsyLogs.send({
-            content: `Autopsy logs for <@${targetId}>:`,
-        });
-        await beginMessage.pin().catch(console.error);
-        await autopsyLogs.send({
-            content:
-                "==========================<START OF AUTOPSY>==========================",
-        });
-
-        await new Promise((res) => setTimeout(res, 5000));
+        // create autopsy channel
+        const autopsyLogs = (await util.createTemporaryChannel(
+            guilds.pi,
+            `autopsy-${await names.getAlias(targetId)}`,
+            config.categoryPrefixes.autopsy,
+            [
+                {
+                    ids: [piDiscord.roles.everyone.id],
+                    perms: config.logChannelPermissions,
+                },
+            ]
+        )) as TextChannel;
 
         // Send a block as chunks, ensuring no message is split
         async function sendBlock(blockLines: string[]) {
-            console.log(blockLines);
             if (blockLines.length === 0) return;
             let chunk = "";
             for (let i = 0; i < blockLines.length; i++) {
@@ -296,7 +294,7 @@ const playerAbilities = {
                 // If adding this line would exceed the limit, send the chunk and start a new one (fixes timestamp being cut off and looking very bad lol)
                 if (chunk.length + line.length > CHUNK_LIMIT) {
                     await autopsyLogs.send({ content: chunk });
-                    await new Promise((res) => setTimeout(res, 5000));
+                    await util.sleep(5);
                     // Start new chunk with prefix and current line
                     chunk = line;
                 } else {
@@ -306,7 +304,7 @@ const playerAbilities = {
 
             if (chunk.length > 0) {
                 await autopsyLogs.send({ content: chunk });
-                await new Promise((res) => setTimeout(res, 5000));
+                await util.sleep(5);
             }
         }
         // send all messages in autopsy logs
@@ -317,7 +315,7 @@ const playerAbilities = {
             // Check for image attachments without links (if an img is sent without a link, the bot sends an empty string as a log)
             let imageLinks = [];
             if (msg.attachments && msg.attachments.size > 0) {
-                msg.attachments.forEach((att) => {
+                msg.attachments.forEach((att: Attachment) => {
                     if (
                         att.contentType &&
                         att.contentType.startsWith("image/") &&
@@ -341,10 +339,7 @@ const playerAbilities = {
         // Send last block
         await sendBlock(currentBlock);
 
-        await autopsyLogs.send({
-            content:
-                "==========================<END OF AUTOPSY>==========================",
-        });
+        return success();
     },
 };
 

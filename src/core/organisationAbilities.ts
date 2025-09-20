@@ -1,4 +1,4 @@
-import { Client, TextChannel } from "discord.js";
+import { Client, Message, TextChannel } from "discord.js";
 import { OrganisationAbilityName } from "../configs/organisationAbilities";
 import { OrganisationName } from "../configs/organisations";
 import { OrganisationAbilityArgs } from "../configs/abilityArgs";
@@ -9,6 +9,8 @@ import names from "./names";
 import Organisation from "../models/organisation";
 import game from "./game";
 import Season from "../models/season";
+import Lounge from "../models/lounge";
+import util from "./util";
 
 export const kidnapperAbilities: Set<OrganisationAbilityName> = new Set();
 kidnapperAbilities.add("Public Kidnap");
@@ -45,6 +47,9 @@ async function kidnapCheck(orgName: OrganisationName, args: any) {
     const kidnapperData = await Player.findOne({
         userId: args.kidnapperId,
     });
+    // if the kidnapper is the person being kidnapped, should return a failure
+    if (args.kidnapperId === args.targetId)
+        return failure("The kidnapper cannot kidnap themselves.");
     if (!kidnapperData) return failure("The kidnapper is not a player.");
     // if they are not part of the org, they cannot be the kidnapper.
     const orgData = await Organisation.findOne({ name: orgName });
@@ -100,9 +105,11 @@ const orgAbilities = {
         if (checkOnly) return success();
 
         const orgConfig = config.organisations[orgName];
-        await game.kidnap(args.targetId, orgConfig.guild, {
+        await game.kidnap(args.targetId, config.guilds[orgConfig.guild], {
             kidnapperId: args.kidnapperId,
             duration: config.organisationAbilities["Public Kidnap"].duration,
+            announce: true,
+            kidnapperOrg: orgName,
         });
 
         return success();
@@ -119,8 +126,10 @@ const orgAbilities = {
         if (checkOnly) return success();
 
         const orgConfig = config.organisations[orgName];
-        await game.kidnap(args.targetId, orgConfig.guild, {
+        await game.kidnap(args.targetId, config.guilds[orgConfig.guild], {
             duration: config.organisationAbilities["Anonymous Kidnap"].duration,
+            announce: true,
+            kidnapperOrg: orgName,
         });
 
         return success();
@@ -182,7 +191,146 @@ const orgAbilities = {
             return failure("A blackout is already active.");
 
         if (checkOnly) return success();
+
+        await game.startBlackout(
+            config.organisationAbilities.Blackout.duration
+        );
+
+        return success();
     },
+
+    "Tap In": async (
+        orgName: OrganisationName,
+        args: OrganisationAbilityArgs["Tap In"],
+        checkOnly?: boolean
+    ) => {
+        const lounge = await Lounge.findOne({ loungeId: args.loungeNumber });
+        if (!lounge) return failure("This is not a valid lounge number.");
+
+        if (checkOnly) return success();
+
+        // get display names
+        const contactorData = await Player.findOne({
+            userId: lounge.contactorId,
+        });
+        const displayNames: { [userId: string]: string } = {
+            [lounge.contactorId]: lounge.anonymous
+                ? contactorData.role
+                : await names.getAlias(lounge.contactorId),
+            [lounge.contactedId]: await names.getAlias(lounge.contactedId),
+        };
+
+        // create tap in channel
+        const logChannel = (await util.createTemporaryChannel(
+            config.guilds[config.organisations[orgName].guild],
+            `tap-in-${args.loungeNumber}`,
+            config.categoryPrefixes.tapIn
+        )) as TextChannel;
+
+        // for anonymous lounges, we will need to get all messages from both channels and then combined them into an array,
+        // then sort that array in reverse order
+        const fetchPromises = lounge.channelIds.map(async (id) => {
+            return await util.fetchAllMessages(
+                id,
+                null,
+                (msg) => !msg.author.bot
+            );
+        });
+        const allMessages = (await Promise.all(fetchPromises))
+            .flat()
+            .sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+
+        let lastSpeakerId = null;
+        let currentBlock = [];
+        let currentBlockName = "";
+        const CHUNK_LIMIT = 2000;
+
+        // Send a block as chunks, ensuring no message is split
+        async function sendBlock(blockName, blockLines) {
+            if (blockLines.length === 0) return;
+            let prefix = `\`\`\`${blockName}:\`\`\`\n`;
+            let chunk = prefix;
+            for (let i = 0; i < blockLines.length; i++) {
+                let line = blockLines[i];
+                // If adding this line would exceed the limit, send the chunk and start a new one (fixes timestamp being cut off and looking very bad lol)
+                if (chunk.length + line.length > CHUNK_LIMIT) {
+                    await logChannel.send(chunk);
+                    await util.sleep(1);
+                    // Start new chunk with prefix and current line
+                    chunk = prefix + line;
+                } else {
+                    chunk += (chunk === prefix ? "" : "\n") + line;
+                }
+            }
+            // Send any remaining chunk
+            if (chunk.length > prefix.length) {
+                await logChannel.send(chunk);
+                await util.sleep(1);
+            }
+        }
+
+        await util.sleep(1);
+
+        for (const msg of allMessages) {
+            const displayName = displayNames[msg.author.id];
+            if (!displayName) continue;
+
+            // Check for image attachments without links (if an img is sent without a link, the bot sends an empty string as a log)
+            let imageLinks = [];
+            if (msg.attachments && msg.attachments.size > 0) {
+                msg.attachments.forEach((att) => {
+                    if (
+                        att.contentType &&
+                        att.contentType.startsWith("image/") &&
+                        att.url
+                    ) {
+                        imageLinks.push(att.url);
+                    }
+                });
+            }
+
+            let msgContent = msg.content;
+            if (imageLinks.length > 0) {
+                msgContent += (msgContent ? "\n" : "") + imageLinks.join("\n");
+            }
+
+            // Format line with timestamp
+            const timestamp = `<t:${Math.floor(msg.createdTimestamp / 1000)}>`;
+            const line = `"${msgContent}" ${timestamp}`;
+
+            if (msg.author.id !== lastSpeakerId) {
+                // Send previous block if exists
+                await sendBlock(currentBlockName, currentBlock);
+                // Start new block
+                currentBlock = [line];
+                currentBlockName = displayName;
+                lastSpeakerId = msg.author.id;
+            } else {
+                currentBlock.push(line);
+            }
+        }
+        // Send last block
+        await sendBlock(currentBlockName, currentBlock);
+
+        // send notif message
+        const notifPromises = lounge.channelIds.map(async (id) => {
+            const channel = (await client.channels.fetch(id)) as TextChannel;
+            await channel.send(
+                `@everyone This lounge has been tapped into by ${util.orgMention(
+                    orgName
+                )}. All messages up to this point have been logged.`
+            );
+        });
+        await Promise.all(notifPromises);
+
+        return success();
+    },
+
+    "Civilian Arrest": async (
+        orgName: OrganisationName,
+        args: OrganisationAbilityArgs["Civilian Arrest"],
+        checkOnly?: boolean
+    ) => {},
 };
 
 export default orgAbilities;

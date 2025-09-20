@@ -285,7 +285,10 @@ const abilities = {
                 owner: userId,
                 ability: abilityName,
             });
-            if (existingAbility) continue;
+            if (existingAbility) {
+                existingAbility.roleRestrictions = [playerData.role];
+                continue;
+            }
             // give the ability
             await Ability.create({
                 type: "player",

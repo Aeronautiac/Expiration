@@ -164,11 +164,6 @@ const death = {
         // Determine the role/affiliation reveal message
         let revealMsg = "";
 
-        const orgMention = (org: OrganisationName) => {
-            const id = config.discordRoles[org];
-            return id ? `<@&${id}>` : org;
-        };
-
         function joinWithAnd(items: string[]): string {
             if (items.length === 0) return "";
             if (items.length === 1) return items[0];
@@ -222,12 +217,14 @@ const death = {
 
             // member of org
             orgParts.push(
-                `${starter} ${rank} of ${article}${orgMention(member.org)}`
+                `${starter} ${rank} of ${article}${util.orgMention(member.org)}`
             );
 
             // leader of org
             if (isLeader)
-                noNewMembersParts.push(`${article}${orgMention(member.org)}`);
+                noNewMembersParts.push(
+                    `${article}${util.orgMention(member.org)}`
+                );
         }
 
         if (orgParts.length > 0) {

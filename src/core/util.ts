@@ -298,7 +298,7 @@ const util = {
 
     async fetchAllMessages(
         channelId: string,
-        earliestTimestamp: number,
+        earliestTimestamp?: number,
         predicate: (msg: Message) => boolean = () => true
     ) {
         const channel = await client.channels.fetch(channelId);
@@ -307,7 +307,7 @@ const util = {
                 "Channel must be text based in order to fetch messages."
             );
 
-        let allMessages = [];
+        let allMessages: Message[] = [];
         let lastId: string;
         let done = false;
 
@@ -325,7 +325,10 @@ const util = {
             if (messages.size === 0) break;
 
             for (const msg of Array.from(messages.values())) {
-                if (msg.createdTimestamp < earliestTimestamp) {
+                if (
+                    earliestTimestamp &&
+                    msg.createdTimestamp < earliestTimestamp
+                ) {
                     done = true; // all remaining messages are too old
                     break;
                 }
@@ -337,6 +340,10 @@ const util = {
 
         return allMessages;
     },
+
+    // this function will tokenize long messages and send them in chunks.
+    // eventually I plan to make it include formatting and everything.
+    async sendMessage(channelId: string, message: string) {},
 
     interactionChoice(
         choice: string
@@ -351,6 +358,11 @@ const util = {
         // Try to find role id from config, fallback to plain text
         const id = config.discordRoles[r];
         return id ? `<@&${id}>` : r;
+    },
+
+    orgMention(org: OrganisationName) {
+        const id = config.discordRoles[org];
+        return id ? `<@&${id}>` : org;
     },
 
     hrsToMs(hrs: number) {

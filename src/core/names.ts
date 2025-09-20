@@ -58,8 +58,10 @@ const names = {
         const promises = Object.entries(config.guilds).map(
             async ([name, id]) => {
                 const guild = await client.guilds.fetch(id);
-                const member = await guild.members.fetch(userId);
-                await member.setNickname(nickname).catch(() => {});
+                const member = await guild.members
+                    .fetch(userId)
+                    .catch(() => null);
+                await member?.setNickname(nickname).catch(() => {});
             }
         );
         await Promise.all(promises);

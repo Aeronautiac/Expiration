@@ -1,7 +1,7 @@
 export const channels = {
-    wataridescription: "placeholder",
-    ldescription: "placeholder",
-    legacyledgers: "placeholder",
+    wataridescription: "1406120570554290196",
+    ldescription: "1406120511372787712",
+    legacyledgers: "1410045532658860103",
     hostLogs: "1406169333280804885",
     watariContactLogs: "1406120605001973862",
     news: "1418665004378357892",
@@ -12,6 +12,7 @@ export const channels = {
     stolenContactLogs: "1412998755795599376",
     tfLounge: "1412588001267024002",
     kkLounge: "1413357775379234958",
+    tfChiefDescription: "1406119727230619773",
 } as const satisfies { [channelName: string]: string };
 
 export type ChannelName = keyof typeof channels;

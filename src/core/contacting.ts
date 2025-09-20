@@ -143,6 +143,12 @@ const contacting = {
             // if it's a normal lounge, then they both have the same channel
             targetData.loungeChannelIds.push(contactorChannel.id);
             userData.loungeChannelIds.push(contactorChannel.id);
+            await util.addPermissionsToChannel(contactorChannel.id, [
+                {
+                    perms: config.loungeMemberPermissions,
+                    ids: [targetId],
+                },
+            ]);
         }
 
         // subtract tokens from the user and save all changes up to this point
@@ -171,7 +177,7 @@ const contacting = {
             anonymous,
             channelIds,
             contactorId: userId,
-            contactedId: userId,
+            contactedId: targetId,
             loungeId,
         });
 

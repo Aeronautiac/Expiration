@@ -46,6 +46,16 @@ const orgs = {
             }
         );
 
+        // update channel access
+        await access.revokeChannels(userId);
+        await access.grantChannels(userId);
+        // if leader is changing, update old leader's channel access
+        const oldLeader = org.leaderId;
+        if (oldLeader && leader) {
+            await access.revokeChannels(oldLeader);
+            await access.grantChannels(oldLeader);
+        }
+
         // if they have no lounge blockers, then give them immediate access to the guild
         // if not, then it will be handled when they lose all their lounge blockers
         if (userData.loungeHiders.size === 0) await access.grantGroup(userId);
@@ -77,7 +87,10 @@ const orgs = {
         );
 
         // revoke access
-        await access.revoke(userId, config.guilds[config.organisations[name].guild]);
+        await access.revoke(
+            userId,
+            config.guilds[config.organisations[name].guild]
+        );
 
         return success("Successfully removed user from org.");
     },

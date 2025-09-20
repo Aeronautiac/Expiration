@@ -102,11 +102,13 @@ const game = {
 
         // restricts access to all guilds except main (this is called no matter what because your role could change even while alive.)
         await access.revokeAll(userId);
+        await access.revokeChannels(userId);
 
-        // grants access to role guilds and abilities
-        await abilities.giveRoleAbilities(userId);
+        // grants access to role guilds, abilities, and channels
         await access.grantRole(userId);
         await access.grantGroup(userId);
+        await access.grantChannels(userId);
+        await abilities.giveRoleAbilities(userId);
 
         // roles
         const mainGuild = await client.guilds.fetch(config.guilds.main);
@@ -209,9 +211,58 @@ const game = {
         );
     },
 
-    async startBlackout() {},
+    // just make news and courtroom unviewable. all else is manually handled.
+    async startBlackout(duration?: number) {
+        const mainGuild = await client.guilds.fetch(config.guilds.main);
+        const settings: ChannelPerms = {
+            ids: [mainGuild.roles.everyone.id],
+            perms: {
+                ViewChannel: false,
+            },
+        };
+        await util.addPermissionsToChannel(config.channels.courtroom, [
+            settings,
+        ]);
+        await util.addPermissionsToChannel(config.channels.news, [settings]);
 
-    async stopBlackout() {},
+        await Season.updateOne(
+            {},
+            {
+                $set: { "flags.blackout": true },
+            }
+        );
+
+        // schedule agenda job
+        await agenda.schedule(
+            new Date(Date.now() + util.hrsToMs(duration)),
+            "endBlackout",
+            {}
+        );
+    },
+
+    async endBlackout() {
+        const mainGuild = await client.guilds.fetch(config.guilds.main);
+        const settings: ChannelPerms = {
+            ids: [mainGuild.roles.everyone.id],
+            perms: {
+                ViewChannel: true,
+            },
+        };
+        await util.addPermissionsToChannel(config.channels.courtroom, [
+            settings,
+        ]);
+        await util.addPermissionsToChannel(config.channels.news, [settings]);
+
+        await Season.updateOne(
+            {},
+            {
+                $set: { "flags.blackout": false },
+            }
+        );
+
+        // if agenda job exists, cancel
+        await agenda.cancel({ name: "endBlackout" });
+    },
 
     async nextDay() {
         await game.removeExplicitBugs();
@@ -355,7 +406,7 @@ const game = {
         );
         await util.setChannelLoggable(kidnapperChannel.id);
         const kidnappedChannel = await util.createTemporaryChannel(
-            guildId,
+            config.guilds.main,
             `${await names.getAlias(userId)}-${
                 anonymous ? "anonymous" : "public"
             }`,
@@ -386,10 +437,15 @@ const game = {
         // announcement
         if (args.announce) {
             let announceMessage = `@everyone <@${userId}> has been kidnapped`;
-            if (args.kidnapperOrg)
-                announceMessage += ` by <@&${
+            if (args.kidnapperOrg) {
+                const orgConfig = config.organisations[args.kidnapperOrg];
+                const article = orgConfig["article"]
+                    ? ` ${orgConfig["article"]} `
+                    : "";
+                announceMessage += ` by ${article}<@&${
                     config.discordRoles[args.kidnapperOrg]
                 }>`;
+            }
 
             announceMessage += `. Authorities have begun rescue efforts, but it may be a while before they succeed.`;
             await game.announce(announceMessage);
@@ -440,7 +496,7 @@ const game = {
             );
         await util.sleep(config.announcementDelay);
         await releaseMessage.reply(
-            `They have been returned to society and may now resume their normal activities.`
+            `They have returned to society and can now continue their life as normal.`
         );
     },
 

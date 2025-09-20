@@ -44,9 +44,9 @@ export const roles = {
         ],
         guilds: ["2kira"],
         abilityOverrides: {
-            "nameReveal": {
-                charges: [1, 2]
-            }
+            nameReveal: {
+                charges: [1, 2],
+            },
         },
         guildChannels: {},
     },
@@ -55,7 +55,7 @@ export const roles = {
         guildChannels: {
             main: ["news"],
         },
-        guilds: [],
+        guilds: ["newsAnchor"],
         abilityOverrides: {},
     },
     Civilian: {
@@ -67,7 +67,7 @@ export const roles = {
     "Rogue Civilian": {
         abilities: [],
         guildChannels: {},
-        guilds: [],
+        guilds: ["rogueCivilian"],
         abilityOverrides: {},
     },
 } as const satisfies { [roleName: string]: Role };

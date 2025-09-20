@@ -17,6 +17,7 @@ export const organisations = {
             member: "member",
             leader: "chief",
         },
+        leaderChannel: "tfChiefDescription",
     },
     "Kira's Kingdom": {
         guild: "kk",

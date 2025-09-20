@@ -34,6 +34,7 @@ export interface Organisation {
         member: string;
         leader?: string;
     };
+    leaderChannel?: ChannelName;
 }
 
 export type AbilityOverrides = Partial<

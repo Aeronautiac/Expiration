@@ -106,7 +106,7 @@ export default {
         interaction.editReply("Vote started.");
 
         // poll message
-        let pollMessage = `A vote has been started by <@${userId}> to use ability **${ability}**.`;
+        let pollMessage = `@everyone A vote has been started by <@${userId}> to use ability **${ability}**.`;
         if (targetId && targetAbilities.has(ability))
             pollMessage += `\nTarget: <@${targetId}>`;
         if (kidnapperId && kidnapperAbilities.has(ability))

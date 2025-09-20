@@ -35,7 +35,7 @@ export default {
         await game.kidnapRelease(target.id);
 
         await interaction.editReply({
-            content: `Player ${target} has been released from custody.`,
+            content: `Player ${target} has been released from their kidnapping.`,
         });
     },
 };

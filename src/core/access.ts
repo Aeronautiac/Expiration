@@ -4,6 +4,7 @@ import { config } from "../configs/config";
 import Player from "../models/player";
 import { OrganisationName } from "../configs/organisations";
 import util from "./util";
+import { ChannelName } from "../configs/channels";
 
 let client: Client;
 
@@ -15,6 +16,9 @@ interface access {
     grantRole: (userId: string) => Promise<void>;
     revokeGroup: (userId: string) => Promise<void>;
     grantGroup: (userId: string) => Promise<void>;
+    grantChannels: (userId: string) => Promise<void>;
+    grantOrgChannels: (userId: string) => Promise<void>;
+    revokeChannels: (userId: string) => Promise<void>;
 }
 
 const access: Partial<access> = {};
@@ -26,7 +30,7 @@ access.init = function (newClient) {
 //////////////////////////////////////////////////////
 
 access.grant = async function (userId, guildId) {
-    console.log("called");
+    console.log(`granting access to: ${guildId}`);
     const user = await client.users.fetch(userId);
     const guild = await client.guilds.fetch(guildId);
 
@@ -102,6 +106,7 @@ access.grant = async function (userId, guildId) {
 
 // restricts access to a server by banning the player and deleting their invite if they have one
 access.revoke = async function (userId, guildId) {
+    console.log(`Revoking access to ${guildId}`);
     const guild = await client.guilds.fetch(guildId);
 
     // we need player data to handle this. if there is no player data, return false.
@@ -142,6 +147,68 @@ access.revokeAll = async function (userId) {
         }
     );
     await Promise.all(promises);
+};
+
+// grants access to role and org locked channels based on the player's role and org rank
+access.grantChannels = async function (userId) {
+    const playerData = await Player.findOne({ userId });
+    if (!playerData) {
+        console.warn("Player has no data. Cannot add to channels.");
+        return;
+    }
+
+    // role stuff
+    const roleChannels = Object.values(
+        config.roles[playerData.role].guildChannels
+    ).flat();
+
+    // group stuff
+    const memberObjects = await util.getMemberObjects(userId);
+    const groupChannels = memberObjects
+        .map((obj) => {
+            if (obj.leader)
+                return config.organisations[obj.org]["leaderChannel"];
+        })
+        .filter(Boolean);
+
+    const channelsToGrant = Array.from(
+        new Set<ChannelName>([...roleChannels, ...groupChannels])
+    );
+    const channelPermPromises = channelsToGrant.map(async (ch) => {
+        await util
+            .addPermissionsToChannel(config.channels[ch], [
+                {
+                    ids: [userId],
+                    perms: {
+                        ViewChannel: true,
+                    },
+                },
+            ])
+            .catch(() => {});
+    });
+    await Promise.all(channelPermPromises);
+};
+
+// revokes access from all restricted channels
+access.revokeChannels = async function (userId) {
+    const playerData = await Player.findOne({ userId });
+    if (!playerData) {
+        console.warn("Player has no data. Cannot revoke from channels.");
+        return;
+    }
+    const channels = Array.from(
+        new Set<ChannelName>(
+            Object.values(config.roles)
+                .map((role) => Object.values(role.guildChannels))
+                .flat()
+        )
+    );
+    const channelPermPromises = channels.map(async (ch) => {
+        await util
+            .deletePermissionsToChannel(config.channels[ch], [userId])
+            .catch(() => {});
+    });
+    await Promise.all(channelPermPromises);
 };
 
 // grants access to role guilds based on the player's role
