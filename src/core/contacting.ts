@@ -9,6 +9,7 @@ import GroupChat from "../models/groupChat";
 import names from "./names";
 import contact from "../commands/playerCommands/contact";
 import abilities from "./abilities";
+import Season from "../models/season";
 
 let client: Client;
 
@@ -209,6 +210,11 @@ const contacting = {
     },
 
     async canContact(userId: string) {
+        const season = await Season.findOne({});
+        if (!season) return failure("No season currently exists.");
+        if (!season.flags.get("active"))
+            return failure("The season is not yet active.");
+
         // if the player is dead or is not a player, return a failure
         const playerData = await Player.findOne({ userId });
         if (!playerData) return failure("You are not a player.");
