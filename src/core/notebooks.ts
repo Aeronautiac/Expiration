@@ -181,9 +181,7 @@ const notebooks = {
 
         // if the user is under ipp, then return a success, but say the user survived because of IPP.
         if (targetPlayer.flags.get("ipp"))
-            return success(
-                `${names.toReadable(trueName)} was protected by IPP.`
-            );
+            return failure(`Something saved them...`);
 
         // if the target has any deaths scheduled, then delete the scheduled death and return a success.
         // (need to rewrite scheduled deaths using agenda)
@@ -198,9 +196,7 @@ const notebooks = {
                     await job.remove();
                 })
             );
-            return success(
-                `${names.toReadable(trueName)} is already scheduled to die.`
-            );
+            return failure(`Something saved them...`);
         }
 
         // if the user chose to schedule the death, then schedule it and return a success.

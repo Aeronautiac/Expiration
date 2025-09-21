@@ -45,6 +45,10 @@ export interface PlayerAbilityArgs {
     notebookReveal: {
         targetId: string;
     };
+
+    trueNameReroll: {
+        targetId: string;
+    };
 }
 
 export interface OrganisationAbilityArgs {
@@ -69,6 +73,11 @@ export interface OrganisationAbilityArgs {
 
     "Unlawful Arrest": {
         targetId: string;
+    };
+
+    "Shinigami Sacrifice": {
+        targetId: string;
+        memberId: string;
     };
 }
 

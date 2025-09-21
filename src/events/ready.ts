@@ -1,6 +1,8 @@
 import { Client, Events } from "discord.js";
 import fs from "node:fs";
 import path from "node:path";
+import agenda from "../jobs";
+import polls from "../core/polls";
 
 function bold(text: string) {
     return `\x1b[1m${text}\x1b[0m`;
@@ -53,5 +55,9 @@ module.exports = {
     execute(client: Client) {
         console.log(cyan("[INFO]"), `Logged in as ${client.user.tag}`);
         logCommands(client);
+        // start agenda
+        agenda.start().catch(console.error);
+        // start polls
+        polls.start().catch(console.error);
     },
 };

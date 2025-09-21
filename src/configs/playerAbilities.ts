@@ -11,7 +11,7 @@ export type PlayerAbilityName =
     | "ipp"
     | "anonymousContact"
     | "Civilian Arrest"
-    | "anonymousProsecution";
+    | "trueNameReroll";
 
 export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
     autopsy: {
@@ -65,7 +65,7 @@ export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
         cooldown: 1,
         bypasses: [],
     },
-    anonymousProsecution: {
+    trueNameReroll: {
         charges: 1,
         cooldown: 999,
         bypasses: [],

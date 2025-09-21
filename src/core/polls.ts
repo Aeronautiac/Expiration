@@ -30,6 +30,7 @@ const polls = {
             .fetch(poll.location.channelId)
             .catch(() => null)) as TextChannel;
         if (!channel) {
+            console.log("The channel does not exist.");
             await polls.resolve(poll, "cancelled");
             return;
         }
@@ -37,6 +38,7 @@ const polls = {
             .fetch(poll.location.messageId)
             .catch(() => null);
         if (!message) {
+            console.log("The message does not exist.");
             await polls.resolve(poll, "cancelled");
             return;
         }
@@ -50,6 +52,7 @@ const polls = {
         // if the poll cannot continue, resolve with "cancelled"
         const canContinueResult = await canContinueCallback(poll);
         if (!canContinueResult) {
+            console.log("The poll cannot continue.");
             await polls.resolve(poll, "cancelled");
             return;
         }

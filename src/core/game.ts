@@ -1,4 +1,4 @@
-import { Client, Message, PermissionOverwriteOptions } from "discord.js";
+import { Client, Message, PermissionOverwriteOptions, User } from "discord.js";
 import names from "./names";
 import { config } from "../configs/config";
 import access from "./access";
@@ -225,6 +225,9 @@ const game = {
             settings,
         ]);
         await util.addPermissionsToChannel(config.channels.news, [settings]);
+        await util.addPermissionsToChannel(config.channels.anonymousCourtroom, [
+            settings,
+        ]);
 
         await Season.updateOne(
             {},
@@ -253,6 +256,9 @@ const game = {
             settings,
         ]);
         await util.addPermissionsToChannel(config.channels.news, [settings]);
+        await util.addPermissionsToChannel(config.channels.anonymousCourtroom, [
+            settings,
+        ]);
 
         await Season.updateOne(
             {},
@@ -546,6 +552,21 @@ const game = {
             newName = displayName + "*";
         }
         await names.setNick(userId, newName);
+    },
+
+    async newTrueName(userId: string, trueName?: string) {
+        const newTrueName = trueName ? trueName : await names.getUnique();
+        await Player.updateOne(
+            { userId },
+            {
+                trueName: names.toInternal(newTrueName),
+            }
+        );
+        const user: User = await client.users.fetch(userId).catch(() => null);
+        if (user)
+            await user.send(
+                `Your new true name is **${names.toReadable(newTrueName)}**.`
+            );
     },
 
     async bug(

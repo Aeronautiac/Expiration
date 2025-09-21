@@ -9,6 +9,7 @@ import { config } from "../configs/config";
 import polls from "./polls";
 import util from "./util";
 import { OrganisationName } from "../configs/organisations";
+import Season from "../models/season";
 
 let client: Client;
 
@@ -21,6 +22,9 @@ const sharedAbilities = {
         owner: string,
         args: SharedAbilityArgs["Civilian Arrest"]
     ) {
+        const season = await Season.findOne({});
+        if (season.flags.get("blackout"))
+            return failure("Cannot civilian arrest during a blackout.");
         const targetData = await Player.findOne({ userId: args.targetId });
         if (!targetData) return failure("The target is not a valid player.");
         if (!targetData.flags.get("alive"))

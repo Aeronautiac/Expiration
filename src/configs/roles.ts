@@ -22,7 +22,7 @@ export const roles = {
         },
     },
     L: {
-        abilities: ["anonymousAnnouncement", "anonymousProsecution"],
+        abilities: ["anonymousAnnouncement"],
         guilds: ["lwatari"],
         abilityOverrides: {},
         guildChannels: {
@@ -30,7 +30,7 @@ export const roles = {
         },
     },
     "Private Investigator": {
-        abilities: ["autopsy", "ipp", "anonymousContact"],
+        abilities: ["autopsy", "ipp", "anonymousContact", "trueNameReroll"],
         guilds: ["pi"],
         abilityOverrides: {},
         guildChannels: {},
@@ -52,9 +52,7 @@ export const roles = {
     },
     "News Anchor": {
         abilities: ["Civilian Arrest"],
-        guildChannels: {
-            main: ["news"],
-        },
+        guildChannels: {},
         guilds: ["newsAnchor"],
         abilityOverrides: {},
     },

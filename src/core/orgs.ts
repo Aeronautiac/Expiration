@@ -25,7 +25,10 @@ const orgs = {
     async addToOrg(
         userId: string,
         name: OrganisationName,
-        leader?: boolean
+        args: {
+            og?: boolean;
+            leader?: boolean;
+        }
     ): Promise<Result> {
         const userData = await Player.findOne({ userId });
         if (!userData) return failure("This person is not a player.");
@@ -42,16 +45,21 @@ const orgs = {
             { name },
             {
                 $addToSet: { memberIds: userId },
-                leaderId: leader ? userId : org.leaderId,
+                leaderId: args.leader ? userId : org.leaderId,
             }
         );
+        if (args.og)
+            await Organisation.updateOne(
+                { name },
+                { $addToSet: { ogMemberIds: userId } }
+            );
 
         // update channel access
         await access.revokeChannels(userId);
         await access.grantChannels(userId);
         // if leader is changing, update old leader's channel access
         const oldLeader = org.leaderId;
-        if (oldLeader && leader) {
+        if (oldLeader && args.leader) {
             await access.revokeChannels(oldLeader);
             await access.grantChannels(oldLeader);
         }
@@ -81,7 +89,7 @@ const orgs = {
         await Organisation.updateOne(
             { name },
             {
-                $pull: { memberIds: userId },
+                $pull: { memberIds: userId, ogMemberIds: userId },
                 leaderId: userId === org.leaderId ? undefined : org.leaderId,
             }
         );

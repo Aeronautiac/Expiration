@@ -76,12 +76,6 @@ for (const folder of commandFolders) {
     }
 }
 
-// start agenda
-agenda.start().catch(console.error);
-
-// start polls
-polls.start().catch(console.error);
-
 // load events
 const eventsPath = path.join(__dirname, "events");
 const eventFiles = fs

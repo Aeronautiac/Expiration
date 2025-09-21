@@ -350,6 +350,23 @@ const playerAbilities = {
     ) => {
         return sharedAbilities.civilianArrest(userId, args, checkOnly);
     },
+
+    async trueNameReroll(
+        userId: string,
+        args: PlayerAbilityArgs["notebookReveal"],
+        checkOnly?: boolean
+    ) {
+        const targetData = await Player.findOne({ userId: args.targetId });
+        if (!targetData) return failure("This is not a valid player.");
+        if (!targetData.flags.get("alive"))
+            return failure("This user is dead.");
+
+        if (checkOnly) return success();
+
+        await game.newTrueName(args.targetId);
+
+        return success();
+    },
 };
 
 export default playerAbilities;

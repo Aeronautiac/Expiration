@@ -13,6 +13,7 @@ export type OrganisationAbilityName =
     | "Background Check"
     | "Civilian Arrest"
     | "Unlawful Arrest"
+    | "Shinigami Sacrifice"
     | "PI+Watari Unlawful Arrest";
 
 export const organisationAbilities: Record<
@@ -22,7 +23,7 @@ export const organisationAbilities: Record<
     Blackout: {
         charges: 1,
         cooldown: 999,
-        membersRequired: 5,
+        membersRequired: 0,//5,
         rolesRequired: [],
         duration: BLACKOUT_DURATION,
     },
@@ -78,5 +79,11 @@ export const organisationAbilities: Record<
         membersRequired: 0,
         rolesRequired: ["Private Investigator", "Watari"],
         duration: ARREST_DURATION,
+    },
+    "Shinigami Sacrifice": {
+        charges: 1,
+        cooldown: 0,
+        membersRequired: 0,
+        rolesRequired: [],
     },
 };

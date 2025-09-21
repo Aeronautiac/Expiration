@@ -28,6 +28,7 @@ export const organisations = {
             "Anonymous Kidnap",
             "Tap In",
             "2nd Kira+Kira Anonymous Kidnap",
+            "Shinigami Sacrifice",
         ],
         abilityOverrides: {},
         rankNames: {

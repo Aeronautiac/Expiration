@@ -25,7 +25,7 @@ export default {
             kidnappedChannelId: message.channelId,
         });
         if (victim) {
-            const senderName = await names.getAlias(message.author.id);
+            const senderName = await names.getDisplay(message.author.id);
             await util.relayMessage(
                 message,
                 [victim.kidnapperChannelId],
@@ -39,7 +39,7 @@ export default {
             kidnapperChannelId: message.channelId,
         });
         if (kidnapper) {
-            const name = kidnapper.kidnapperId ? await names.getAlias(message.author.id) : "???";
+            const name = kidnapper.kidnapperId ? await names.getDisplay(message.author.id) : "???";
             await util.relayMessage(
                 message,
                 [kidnapper.kidnappedChannelId],

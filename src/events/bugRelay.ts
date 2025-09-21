@@ -20,7 +20,7 @@ export default {
         if (!senderData) return;
         if (!senderData.flags.get("alive")) return;
 
-        const senderName = await names.getAlias(message.author.id);
+        const senderName = await names.getDisplay(message.author.id);
 
         const bugs = await Bug.find({
             targetId: message.author.id,

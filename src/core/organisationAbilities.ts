@@ -15,9 +15,13 @@ import Season from "../models/season";
 import Lounge from "../models/lounge";
 import util from "./util";
 import sharedAbilities from "./sharedAbilities";
+import death from "./death";
+import orgs from "./orgs";
+import kill from "../commands/hostCommands/kill";
 
-export const kidnapperAbilities: Set<OrganisationAbilityName> = new Set();
-kidnapperAbilities.add("Public Kidnap");
+export const memberAbilities: Set<OrganisationAbilityName> = new Set();
+memberAbilities.add("Public Kidnap");
+memberAbilities.add("Shinigami Sacrifice");
 
 export const targetAbilities: Set<OrganisationAbilityName> = new Set();
 targetAbilities
@@ -27,7 +31,8 @@ targetAbilities
     .add("Civilian Arrest")
     .add("PI+Watari Unlawful Arrest")
     .add("Public Kidnap")
-    .add("Unlawful Arrest");
+    .add("Unlawful Arrest")
+    .add("Shinigami Sacrifice");
 
 export const loungeNumberAbilities: Set<OrganisationAbilityName> = new Set();
 loungeNumberAbilities.add("Tap In");
@@ -344,6 +349,50 @@ const orgAbilities = {
         checkOnly?: boolean
     ) => {
         return sharedAbilities.civilianArrest(orgName, args, checkOnly);
+    },
+
+    "Shinigami Sacrifice": async (
+        orgName: OrganisationName,
+        args: OrganisationAbilityArgs["Shinigami Sacrifice"],
+        checkOnly?: boolean
+    ) => {
+        const targetData = await Player.findOne({ userId: args.targetId });
+        // if the target is dead or is not a player, they cannot be arrested
+        if (!targetData) return failure("This person is not a player.");
+        if (!targetData.flags.get("alive"))
+            return failure("This person is dead.");
+        const orgData = await Organisation.findOne({ name: orgName });
+        if (!orgData.ogMemberIds.includes(args.memberId))
+            return failure("This is not an og member.");
+        const memberData = await Player.findOne({ userId: args.memberId });
+        if (!memberData) return failure("The chosen member is not a player.");
+        if (!targetData.flags.get("alive"))
+            return failure("The chosen member is already dead.");
+
+        if (checkOnly) return success();
+
+        // the killer should be a person who could have voted
+        const killerPool = (await orgs.getVotingMembers(orgName)).filter(
+            (memberId) => memberId !== args.memberId
+        );
+        await death.kill(args.memberId, {
+            killerId: killerPool[Math.floor(Math.random() * killerPool.length)],
+            deathMessage: `They were sacrificed to a shinigami.`,
+            bypassIPP: true,
+        });
+
+        // send message
+        const channel = (await client.channels.fetch(
+            config.channels[config.organisations[orgName].mainChannel]
+        )) as TextChannel;
+        const msg: Message = await channel.send(
+            `The true name of **${await names.getAlias(
+                args.targetId
+            )}** is **${names.toReadable(targetData.trueName)}**.`
+        );
+        await msg.pin();
+
+        return success();
     },
 };
 

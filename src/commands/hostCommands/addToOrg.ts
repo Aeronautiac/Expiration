@@ -1,4 +1,8 @@
-import { ChatInputCommandInteraction, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import {
+    ChatInputCommandInteraction,
+    PermissionFlagsBits,
+    SlashCommandBuilder,
+} from "discord.js";
 import orgs from "../../core/orgs";
 import { OrganisationName } from "../../configs/organisations";
 import { config } from "../../configs/config";
@@ -21,28 +25,41 @@ export default {
                 .setDescription("The organisation to add them to")
                 .setRequired(true)
                 .addChoices(
-                    ...(Object.keys(config.organisations).map(util.interactionChoice))
+                    ...Object.keys(config.organisations).map(
+                        util.interactionChoice
+                    )
                 )
         )
-        .addBooleanOption(option =>
+        .addBooleanOption((option) =>
             option
                 .setName("leader")
-                .setDescription("Whether or not they are the leader of the organisation")
+                .setDescription(
+                    "Whether or not they are the leader of the organisation"
+                )
+                .setRequired(false)
+        )
+        .addBooleanOption((option) =>
+            option
+                .setName("og")
+                .setDescription(
+                    "Whether or not they are considered an og member"
+                )
                 .setRequired(false)
         ),
-        // .addBooleanOption(option =>
-        //     option
-        //         .setName("og")
-        //         .setDescription("Whether or not they are considered an og member")
-        //         .setRequired(false)
-        // ),
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
         });
 
-        await orgs.addToOrg(interaction.options.getUser("target").id, interaction.options.getString("organisation") as OrganisationName, interaction.options.getBoolean("leader"));
+        await orgs.addToOrg(
+            interaction.options.getUser("target").id,
+            interaction.options.getString("organisation") as OrganisationName,
+            {
+                leader: interaction.options.getBoolean("leader"),
+                og: interaction.options.getBoolean("og"),
+            }
+        );
 
         await interaction.editReply({
             content: "Success.",
