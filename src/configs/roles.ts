@@ -18,7 +18,7 @@ export const roles = {
         guilds: ["lwatari"],
         abilityOverrides: {},
         guildChannels: {
-            lwatari: ["wataridescription"],
+            lwatari: ["wataridescription", "legacyledgers"],
         },
     },
     L: {
