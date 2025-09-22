@@ -130,7 +130,7 @@ const orgs = {
                 return userId;
         });
         const votingMembers = await Promise.all(votingMembersPromises);
-        return votingMembers;
+        return votingMembers.filter((id): id is string => id !== undefined);
     },
 };
 
