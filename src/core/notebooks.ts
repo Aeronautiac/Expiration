@@ -242,10 +242,7 @@ const notebooks = {
             return failure("You cannot pass death notes while dead.");
 
         // does the user possess the death note?
-        if (
-            notebook.currentOwner !== userId &&
-            notebook.temporaryOwner !== userId
-        )
+        if (notebook.currentOwner !== userId)
             return failure("You do not currently possess this death note.");
 
         // does the user have any pass restrictions?
