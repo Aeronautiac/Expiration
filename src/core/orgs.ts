@@ -114,7 +114,7 @@ const orgs = {
             if (userData && userData.flags.get("alive")) return userId;
         });
         const livingMembers = await Promise.all(livingMembersPromises);
-        return livingMembers;
+        return livingMembers.filter((id) => id !== undefined);
     },
 
     // returns an array of userids for members that are able to vote
@@ -130,7 +130,7 @@ const orgs = {
                 return userId;
         });
         const votingMembers = await Promise.all(votingMembersPromises);
-        return votingMembers.filter((id): id is string => id !== undefined);
+        return votingMembers.filter((id) => id !== undefined);
     },
 };
 
