@@ -1,5 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 import notebooks from "../../core/notebooks";
+import { config } from "../../configs/config";
 
 export default {
     data: new SlashCommandBuilder()
@@ -32,7 +33,9 @@ export default {
         const name = interaction.options.getString("name");
         const deathMessage = interaction.options.getString("message");
         const delayArg = interaction.options.getNumber("delay");
-        const delay = delayArg ? Math.max(delayArg) : undefined;
+        const delay = delayArg
+            ? Math.min(Math.max(delayArg, 0), config.deathNoteDelayCap)
+            : undefined;
 
         let relayed = `${name}`;
         if (delay) relayed = relayed.concat(`, dies in ${delay} minutes`);
