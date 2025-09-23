@@ -20,6 +20,7 @@ export const config = {
     orgPollDuration: 8, // in hours
     civArrestVoteDuration: 6, // hours
     civArrestDuration: 24, // hours
+    deathNoteDelayCap: 20160, // min
     pollYesEmoji: `✅`,
     pollNoEmoji: `❌`,
     groupGuilds: ["lwatari", "kk", "tf"],

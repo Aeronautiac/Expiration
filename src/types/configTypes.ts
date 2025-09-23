@@ -65,6 +65,7 @@ export interface PlayerAbility extends BaseAbility {
 }
 
 export interface Config {
+    deathNoteDelayCap: number; // min
     dailyContactTokens: number;
     maxChannelsPerCategory: number;
     maxGroupChatSize: number;
