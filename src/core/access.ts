@@ -11,6 +11,7 @@ let client: Client;
 interface access {
     init: (newClient: Client) => void;
     grant: (userId: string, guildId: string) => Promise<void>;
+    grantAll: (userId: string) => Promise<void>;
     revoke: (userId: string, guildId: string) => Promise<void>;
     revokeAll: (userId: string) => Promise<void>;
     grantRole: (userId: string) => Promise<void>;
@@ -102,6 +103,16 @@ access.grant = async function (userId, guildId) {
     await sendInvite(invite.code);
 
     return;
+};
+
+// grants access to all organisation servers & role servers
+access.grantAll = async function (userId) {
+    const promises = Object.entries(config.guilds).map(
+        async ([guildName, guildId]) => {
+            await access.grant(userId, guildId);
+        }
+    );
+    await Promise.all(promises);
 };
 
 // restricts access to a server by banning the player and deleting their invite if they have one

@@ -27,6 +27,8 @@ export const organisations = {
             "Public Kidnap",
             "Anonymous Kidnap",
             "Tap In",
+            "Kira's Kingdom Invite",
+            "Kira's Kingdom Kick",
             "2nd Kira+Kira Anonymous Kidnap",
             "Shinigami Sacrifice",
         ],

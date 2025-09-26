@@ -22,7 +22,8 @@ export interface IPlayer {
     timeOfDeath?: number;
     eyes: number;
     invites: Map<string, string>;
-    playersKilled: string[]; // array of userIds of players this player has killed
+    playersKilled: string[]; // array of userIds of players this player has killed;
+    didPublicKidnap: boolean; // whether the player has done a public kidnap this game
 }
 
 // Interface for Mongoose Document

@@ -1,5 +1,6 @@
 import { Document, Schema, Model, model } from "mongoose";
 import { PlayerAbilityName } from "../configs/playerAbilities";
+import { AbilityName } from "../configs/abilityArgs";
 
 // this can be expanded to work with organisations as well.
 // add a "type" field which is either "player" or "organisation"
@@ -14,7 +15,7 @@ export interface IAbility extends Document {
   type: "player" | "organisation";
   queuedCooldown?: Number;
   owner: string;
-  ability: PlayerAbilityName;
+  ability: AbilityName;
   cooldown: number;
   charges?: number;
   roleRestrictions: string[];

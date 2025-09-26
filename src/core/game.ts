@@ -17,7 +17,11 @@ import { OrganisationName, organisations } from "../configs/organisations";
 import Kidnapping from "../models/kidnapping";
 import agenda from "../jobs";
 import orgs from "./orgs";
-import { DiscordRoleName } from "../configs/discordRoles";
+import { channels } from "../configs/channels";
+import { discordRoles } from "../configs/discordRoles";
+import Organisation from "../models/organisation";
+import Ability from "../models/ability";
+import death from "./death";
 
 let client: Client;
 
@@ -148,12 +152,71 @@ const game = {
         return success("Season started. Run /endseason to end.");
     },
 
-    async endSeason() {
+    async endSeason(announce: boolean) {
         const season = await Season.findOne({});
         if (!season)
             return failure("No season exists. Create one with /newseason.");
 
-        await Season.updateOne({}, { "flags.active": false });
+        // await Season.updateOne({}, { "flags.active": false });
+
+        agenda.cancel({}); // cancel all delayed actions
+
+        if (announce) {
+            await game.announce(`@everyone The season has now ended. Thank you all for participating! Roles will be revealed and spectator will be given out shortly.`).catch(console.error);
+           
+            await util.sleep(config.announcementDelay);
+
+            const rolesInOrder = [ "Kira", "2nd Kira", "", "L", "Watari", "", "Beyond Birthday", "Rogue Civilian", "Private Investigator", "News Anchor" ]
+            let roleRevealMessage = `The roles for this season were:\n\n`;
+
+            for (const roleName of rolesInOrder) {
+                if (roleName === "") {
+                    roleRevealMessage += `\n`;
+                    continue;
+                }
+
+                const playerData = await Player.findOne({ role: roleName });
+                if (playerData) {
+                    roleRevealMessage += `<@&${discordRoles[roleName]}> was <@${playerData.userId}>\n`;
+                }
+            }
+
+            const KirasKingdomOrgData = await Organisation.findOne({name: "Kira's Kingdom"});
+            const TaskForceOrgData = await Organisation.findOne({name: "Task Force"});
+
+            roleRevealMessage += `\nThe original members for <@&${discordRoles["Kira's Kingdom"]}> were:`;
+            for (const memberId of KirasKingdomOrgData.ogMemberIds) {
+                roleRevealMessage += `\n<@${memberId}>`;
+            }
+            roleRevealMessage += `\nThe original members for <@&${discordRoles["Task Force"]}> were:`;
+            for (const memberId of TaskForceOrgData.ogMemberIds) {
+                roleRevealMessage += `\n<@${memberId}>`;
+            }
+
+            await game.announce(roleRevealMessage).catch(console.error);
+
+            await util.sleep(config.announcementDelay);
+
+            await game.announce(`Invites to role servers as well as spectator roles will now be given out.`).catch(console.error);
+
+            await util.sleep(config.announcementDelay);
+
+            // give spectator role to all players
+            const mainGuild = await client.guilds.fetch(config.guilds.main);
+            for (const playerData of await Player.find({})) {
+                const member = await mainGuild.members
+                    .fetch(playerData.userId)
+                    .catch(() => null);
+
+                if (member) {
+                    await member.roles
+                        .add(discordRoles.Spectator)
+                        .catch(console.error);
+                    // invite to role guilds
+                    await access.grantAll(playerData.userId);
+                }
+            }
+        }
 
         return success(
             "Season ended. Run /cleanslate to clear all data, messages, and channels that are associated with the season."
@@ -322,6 +385,34 @@ const game = {
             await member.roles
                 .remove(config.discordRoles.Custody)
                 .catch(console.error);
+    },
+
+    async silentProsecute(prosecutorId: string, targetId: string) {
+        const userData = await Player.findOne({ userId: prosecutorId });
+        const targetData = await Player.findOne({ userId: targetId });
+
+        if (!targetData) throw new Error("Target does not exist.");
+        if (!targetData.flags.get("alive")) throw new Error("Target is not alive.");
+
+        let fail: boolean = false;
+
+        const KirasKingdomOrgData = await Organisation.findOne({name: "Kira's Kingdom"});
+        if (!KirasKingdomOrgData.memberIds.includes(targetId)) fail = true;
+        
+        const abilityData = await Ability.findOne({ abilityName: "Blackout", cooldown: { $gt: 0 } });
+        if (!abilityData && !targetData.didPublicKidnap) fail = true;
+
+        if (fail) {
+            // reveal prosecutor
+            game.announce(`@everyone a Task Force member by the name of <@${prosecutorId}> (${names.toReadable(userData.trueName)}) attempted a silent prosecution, but it was caught out as fraudulent. They have been blacklisted from the Task Force for this crime.`).catch(console.error);
+            orgs.removeFromOrg(prosecutorId, "Task Force").catch(console.error);
+            // TODO: ADD BLACKLISTED TO TF ORG HERE ALBINO
+            return;
+        }
+
+        // kill target
+        game.announce(`@everyone the Task Force have performed a silent prosecution on <@${targetId}>. They have been found guilty of being a part of the Kira's Kingdom after the cult participated in major crime.`).catch(console.error);
+        death.kill(targetId, { bypassIPP: true, killerId: prosecutorId, deathMessage: "They were executed on the spot in the name of the Law." }).catch(console.error);
     },
 
     async announce(message: string): Promise<Message> {

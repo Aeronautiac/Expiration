@@ -5,13 +5,18 @@ import {
 } from "discord.js";
 import Season from "../../models/season";
 import game from "../../core/game";
+import { channels } from "../../configs/channels";
 
 export default {
     data: new SlashCommandBuilder()
         .setName("endseason")
         .setDescription("End the current season")
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
-
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+        .addBooleanOption((option) =>
+            option
+                .setName("announce")
+                .setDescription("Announces season end and gives roles and announces roles.")
+        ),
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
@@ -31,7 +36,7 @@ export default {
             return;
         }
 
-        await game.endSeason();
+        await game.endSeason(interaction.options.getBoolean("announce") ?? false);
 
         await interaction.editReply({
             content: "Successfully ended the season.",

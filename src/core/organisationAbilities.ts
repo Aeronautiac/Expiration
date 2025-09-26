@@ -18,6 +18,8 @@ import sharedAbilities from "./sharedAbilities";
 import death from "./death";
 import orgs from "./orgs";
 import kill from "../commands/hostCommands/kill";
+import { guilds } from "../configs/guilds";
+import access from "./access";
 
 export const memberAbilities: Set<OrganisationAbilityName> = new Set();
 memberAbilities.add("Public Kidnap");
@@ -120,6 +122,12 @@ const orgAbilities = {
             announce: true,
             kidnapperOrg: orgName,
         });
+
+        const playerData = await Player.findOne({ userId: args.kidnapperId });
+        if (playerData) {
+            playerData.didPublicKidnap = true;
+            await playerData.save();
+        }
 
         return success();
     },
@@ -340,6 +348,46 @@ const orgAbilities = {
         });
         await Promise.all(notifPromises);
 
+        return success();
+    },
+
+    "Kira's Kingdom Invite": async (
+        orgName: OrganisationName,
+        args: OrganisationAbilityArgs["Kira's Kingdom Invite"],
+        checkOnly?: boolean
+    ) => {
+        const targetData = await Player.findOne({ userId: args.targetId });
+        if (!targetData) return failure("This person is not a player.");
+        if (!targetData.flags.get("alive"))
+            return failure("This person is dead.");
+        const orgData = await Organisation.findOne({ name: orgName });
+        if (orgData.memberIds.includes(args.targetId))
+            return failure("This is already a member of the Kira's Kingdom.");
+
+        if (checkOnly) return success();
+
+        orgs.addToOrg(args.targetId, orgName, {});
+        
+        return success();
+    },
+
+    "Kira's Kingdom Kick": async (
+        orgName: OrganisationName,
+        args: OrganisationAbilityArgs["Kira's Kingdom Kick"],
+        checkOnly?: boolean
+    ) => {
+        const targetData = await Player.findOne({ userId: args.targetId });
+        if (!targetData) return failure("This person is not a player.");
+        if (!targetData.flags.get("alive"))
+            return failure("This person is dead.");
+        const orgData = await Organisation.findOne({ name: orgName });
+        if (!orgData.memberIds.includes(args.targetId))
+            return failure("This is not a member of the Kira's Kingdom.");
+
+        if (checkOnly) return success();
+
+        orgs.removeFromOrg(args.targetId, orgName);
+        
         return success();
     },
 

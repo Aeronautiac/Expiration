@@ -63,6 +63,13 @@ export interface OrganisationAbilityArgs {
         targetId: string;
     };
 
+    "Kira's Kingdom Invite": {
+        targetId: string;
+    };
+    "Kira's Kingdom Kick": {
+        targetId: string;
+    };
+
     "Tap In": {
         loungeNumber: number;
     };

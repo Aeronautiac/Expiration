@@ -8,6 +8,8 @@ export type OrganisationAbilityName =
     | "Blackout"
     | "Public Kidnap"
     | "Anonymous Kidnap"
+    | "Kira's Kingdom Invite"
+    | "Kira's Kingdom Kick"
     | "2nd Kira+Kira Anonymous Kidnap"
     | "Tap In"
     | "Background Check"
@@ -40,6 +42,18 @@ export const organisationAbilities: Record<
         membersRequired: 5,
         rolesRequired: [],
         duration: KIDNAP_DURATION,
+    },
+    "Kira's Kingdom Invite": {
+        charges: 2,
+        cooldown: 0,
+        membersRequired: 0,
+        rolesRequired: [],
+    },
+    "Kira's Kingdom Kick": {
+        charges: 999,
+        cooldown: 0,
+        membersRequired: 0,
+        rolesRequired: [],
     },
     "2nd Kira+Kira Anonymous Kidnap": {
         charges: 1,

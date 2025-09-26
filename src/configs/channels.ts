@@ -14,6 +14,7 @@ export const channels = {
     kkLounge: "1419379499711074425",
     tfChiefDescription: "1406119727230619773",
     anonymousCourtroom: "1419078492792033463",
+    announcements: "1406115826876284973",
 } as const satisfies { [channelName: string]: string };
 
 export type ChannelName = keyof typeof channels;
