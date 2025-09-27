@@ -2,7 +2,7 @@ import { Document, Schema, Model, model } from "mongoose";
 import { RoleName } from "../configs/roles";
 import { PlayerStateName } from "../configs/playerStates";
 
-export type ExtraPlayerFlag = "ipp" | "underTheRadar" | "kiraConnection" | "alive";
+export type ExtraPlayerFlag = "ipp" | "underTheRadar" | "kiraConnection" | "alive" | "didPublicKidnap";
 export type PlayerFlag = ExtraPlayerFlag | PlayerStateName;
 
 // Interface representing a player
@@ -23,7 +23,6 @@ export interface IPlayer {
     eyes: number;
     invites: Map<string, string>;
     playersKilled: string[]; // array of userIds of players this player has killed;
-    didPublicKidnap: boolean; // whether the player has done a public kidnap this game
 }
 
 // Interface for Mongoose Document

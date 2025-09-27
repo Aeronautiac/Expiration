@@ -123,12 +123,6 @@ const orgAbilities = {
             kidnapperOrg: orgName,
         });
 
-        const playerData = await Player.findOne({ userId: args.kidnapperId });
-        if (playerData) {
-            playerData.didPublicKidnap = true;
-            await playerData.save();
-        }
-
         return success();
     },
 

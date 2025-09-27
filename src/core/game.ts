@@ -157,16 +157,31 @@ const game = {
         if (!season)
             return failure("No season exists. Create one with /newseason.");
 
-        // await Season.updateOne({}, { "flags.active": false });
+        await Season.updateOne({}, { "flags.active": false });
 
         agenda.cancel({}); // cancel all delayed actions
 
         if (announce) {
-            await game.announce(`@everyone The season has now ended. Thank you all for participating! Roles will be revealed and spectator will be given out shortly.`).catch(console.error);
-           
+            await game
+                .announce(
+                    `@everyone The season has now ended. Thank you all for participating! Roles will be revealed and spectator will be given out shortly.`
+                )
+                .catch(console.error);
+
             await util.sleep(config.announcementDelay);
 
-            const rolesInOrder = [ "Kira", "2nd Kira", "", "L", "Watari", "", "Beyond Birthday", "Rogue Civilian", "Private Investigator", "News Anchor" ]
+            const rolesInOrder = [
+                "Kira",
+                "2nd Kira",
+                "",
+                "L",
+                "Watari",
+                "",
+                "Beyond Birthday",
+                "Rogue Civilian",
+                "Private Investigator",
+                "News Anchor",
+            ];
             let roleRevealMessage = `The roles for this season were:\n\n`;
 
             for (const roleName of rolesInOrder) {
@@ -181,8 +196,12 @@ const game = {
                 }
             }
 
-            const KirasKingdomOrgData = await Organisation.findOne({name: "Kira's Kingdom"});
-            const TaskForceOrgData = await Organisation.findOne({name: "Task Force"});
+            const KirasKingdomOrgData = await Organisation.findOne({
+                name: "Kira's Kingdom",
+            });
+            const TaskForceOrgData = await Organisation.findOne({
+                name: "Task Force",
+            });
 
             roleRevealMessage += `\nThe original members for <@&${discordRoles["Kira's Kingdom"]}> were:`;
             for (const memberId of KirasKingdomOrgData.ogMemberIds) {
@@ -197,9 +216,13 @@ const game = {
 
             await util.sleep(config.announcementDelay);
 
-            await game.announce(`Invites to role servers as well as spectator roles will now be given out.`).catch(console.error);
+            await game
+                .announce(
+                    `Invites to role servers as well as spectator roles will now be given out.`
+                )
+                .catch(console.error);
 
-            await util.sleep(config.announcementDelay);
+            await util.sleep(config.announcementDelay * 2);
 
             // give spectator role to all players
             const mainGuild = await client.guilds.fetch(config.guilds.main);
@@ -275,7 +298,7 @@ const game = {
         );
     },
 
-    // just make news and courtroom unviewable. all else is manually handled.
+    // just set flag and make news and courtroom unviewable. all else is manually handled.
     async startBlackout(duration?: number) {
         const mainGuild = await client.guilds.fetch(config.guilds.main);
         const settings: ChannelPerms = {
@@ -387,32 +410,83 @@ const game = {
                 .catch(console.error);
     },
 
-    async silentProsecute(prosecutorId: string, targetId: string) {
+    async silentProsecute(
+        prosecutorId: string,
+        asOrg: OrganisationName,
+        targetId: string
+    ): Promise<Result> {
         const userData = await Player.findOne({ userId: prosecutorId });
         const targetData = await Player.findOne({ userId: targetId });
 
-        if (!targetData) throw new Error("Target does not exist.");
-        if (!targetData.flags.get("alive")) throw new Error("Target is not alive.");
+        const orgData = await Organisation.findOne({ name: asOrg });
+        if (!orgData) return failure("This organisation has no data.");
+        if (!orgData.memberIds.includes(prosecutorId))
+            return failure("You are not a member of this organisation.");
+        if (!userData) return failure("You are not a player.");
+        if (!userData.flags.get("alive")) return failure("You are dead.");
+        if (!targetData) return failure("The target is not a player.");
+        if (!targetData.flags.get("alive"))
+            return failure("The target is not alive.");
 
         let fail: boolean = false;
 
-        const KirasKingdomOrgData = await Organisation.findOne({name: "Kira's Kingdom"});
-        if (!KirasKingdomOrgData.memberIds.includes(targetId)) fail = true;
-        
-        const abilityData = await Ability.findOne({ abilityName: "Blackout", cooldown: { $gt: 0 } });
-        if (!abilityData && !targetData.didPublicKidnap) fail = true;
+        // get all prosecutable orgs (atp orgs that have used blackout)
+        const blackoutAbilities = await Ability.find({
+            abilityName: "Blackout",
+            cooldown: { $gt: 0 },
+        });
+        const orgSet = new Set(Object.keys(organisations));
+        const orgsProsecutable = new Set(
+            blackoutAbilities.map((a) => a.owner).filter((a) => orgSet.has(a))
+        );
+
+        // check if the player is a member of any of those orgs
+        const targetMemberObjects = await util.getMemberObjects(targetId);
+        const memberOfProsecutableOrgs = targetMemberObjects
+            .filter((memberObj) => orgsProsecutable.has(memberObj.org))
+            .map((orgMember) => orgMember.org);
+
+        // if the target is not a member of an org that can currently be prosecuted, or they have not performed a public kidnapping and been revealed,
+        // then the prosecution was a failure
+        fail = !(
+            memberOfProsecutableOrgs.length > 0 ||
+            targetData.flags.get("didPublicKidnap")
+        );
 
         if (fail) {
             // reveal prosecutor
-            game.announce(`@everyone a Task Force member by the name of <@${prosecutorId}> (${names.toReadable(userData.trueName)}) attempted a silent prosecution, but it was caught out as fraudulent. They have been blacklisted from the Task Force for this crime.`).catch(console.error);
-            orgs.removeFromOrg(prosecutorId, "Task Force").catch(console.error);
-            // TODO: ADD BLACKLISTED TO TF ORG HERE ALBINO
-            return;
+            game.announce(
+                `@everyone a ${
+                    config.organisations[asOrg].rankNames.member
+                } of ${util.articledOrgMention(
+                    asOrg
+                )}, <@${prosecutorId}> (${names.toReadable(
+                    userData.trueName
+                )}) has attempted to carry out a silent prosecution against someone they suspected of being involved in nationwide acts of terrorism.\nAfter further investigation, it was determined that this person was **not guilty**.\nDespite this, <@${prosecutorId}> persisted with their efforts.\nAs a result, they have been **permanently banned** from the ${util.roleMention(
+                    asOrg
+                )}.`
+            ).catch(console.error);
+
+            // kick and blacklist from the org they used the ability in
+            orgs.removeFromOrg(prosecutorId, asOrg, true).catch(console.error);
+
+            return success();
         }
 
         // kill target
-        game.announce(`@everyone the Task Force have performed a silent prosecution on <@${targetId}>. They have been found guilty of being a part of the Kira's Kingdom after the cult participated in major crime.`).catch(console.error);
-        death.kill(targetId, { bypassIPP: true, killerId: prosecutorId, deathMessage: "They were executed on the spot in the name of the Law." }).catch(console.error);
+        game.announce(
+            `@everyone the ${util.roleMention(
+                asOrg
+            )} has carried out a silent prosecution against <@${targetId}>. They have been found guilty of being involved in nationwide acts of terrorism.`
+        ).catch(console.error);
+        death
+            .kill(targetId, {
+                killerId: prosecutorId,
+                deathMessage: "They were executed on the spot.",
+            })
+            .catch(console.error);
+
+        return success();
     },
 
     async announce(message: string): Promise<Message> {
@@ -596,16 +670,22 @@ const game = {
 
         // if the victim is still alive, announce their release
         // if the kidnapping was public, then reveal the kidnapper in this announcement
+        // and set the performed public kidnapping flag of the kidnapper to true
         if (!userData.flags.get("alive")) return;
         const releaseMessage = await game.announce(
             `@everyone <@${userId}> has been rescued by authorities.`
         );
         await util.sleep(config.announcementDelay);
-        if (kidnapData.kidnapperId)
+        if (kidnapData.kidnapperId) {
             await releaseMessage.reply(
                 `When questioned, they identified their kidnapper as <@${kidnapperId}>.`
             );
-        else
+            // update kidnapper data
+            await Player.updateOne(
+                { userId: kidnapperId },
+                { "flags.didPublicKidnap": true }
+            );
+        } else
             await releaseMessage.reply(
                 `When questioned, they were unable to identify their kidnapper.`
             );

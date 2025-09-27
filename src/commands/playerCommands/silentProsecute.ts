@@ -10,6 +10,7 @@ import game from "../../core/game";
 import Organisation from "../../models/organisation";
 import { guilds } from "../../configs/guilds";
 import { OrganisationName, organisations } from "../../configs/organisations";
+import util from "../../core/util";
 
 export default {
     data: new SlashCommandBuilder()
@@ -25,14 +26,6 @@ export default {
         await interaction.deferReply({
             ephemeral: true,
         });
-
-        const orgData = await Organisation.findOne({ name: "Task Force" });
-        if (!orgData.memberIds.includes(interaction.user.id)) {
-            await interaction.editReply({
-                content: "You are not a member of the Task Force.",
-            });
-            return;
-        }
 
         const guildId = interaction.guildId;
         let orgName: OrganisationName;
@@ -59,7 +52,8 @@ export default {
         );
 
         await interaction.editReply({
-            content: "Are you sure you want to do this? A false silent prosecution will result in your target being unaffected and your identity being revealed and you being blacklisted from the Task Force.",
+            content:
+                "Are you sure you want to do this? A false silent prosecution will result in your target being unaffected, your identity being revealed, and you being blacklisted from the Task Force.",
             components: [row],
         });
 
@@ -75,10 +69,17 @@ export default {
                     content: "Performing silent prosecution.",
                     components: [],
                 });
-                game.silentProsecute(
+                const result = await game.silentProsecute(
                     interaction.user.id,
-                    interaction.options.getString("target", true)
+                    orgName,
+                    interaction.options.getString("target")
                 );
+                if (!result.success) {
+                    interaction.editReply(
+                        `Failed to silent prosecute. ${result.message}`
+                    );
+                    return;
+                } else interaction.editReply("Success.");
             } else {
                 await i.update({ content: "Cancelled.", components: [] });
             }

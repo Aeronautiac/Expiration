@@ -354,15 +354,15 @@ const util = {
         };
     },
 
-    roleMention(r: RoleName) {
+    roleMention(r: DiscordRoleName) {
         // Try to find role id from config, fallback to plain text
         const id = config.discordRoles[r];
-        return id ? `<@&${id}>` : r;
+        return id ? `<@&${id}>` : `**${r}**`;
     },
 
     orgMention(org: OrganisationName) {
         const id = config.discordRoles[org];
-        return id ? `<@&${id}>` : org;
+        return id ? `<@&${id}>` : `**${org}**`;
     },
 
     articledOrgMention(org: OrganisationName) {

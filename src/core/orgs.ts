@@ -22,12 +22,31 @@ const orgs = {
         await abilities.initializeOrganisationAbilities("Kira's Kingdom");
     },
 
+    async blacklist(userId: string, name: OrganisationName) {
+        Organisation.updateOne(
+            { name },
+            {
+                $addToSet: { blacklist: userId },
+            }
+        );
+    },
+
+    async unblacklist(userId: string, name: OrganisationName) {
+        Organisation.updateOne(
+            { name },
+            {
+                $pull: { blacklist: userId },
+            }
+        );
+    },
+
     async addToOrg(
         userId: string,
         name: OrganisationName,
         args: {
             og?: boolean;
             leader?: boolean;
+            unblacklist?: boolean;
         }
     ): Promise<Result> {
         const userData = await Player.findOne({ userId });
@@ -36,44 +55,72 @@ const orgs = {
         const org = await Organisation.findOne({ name });
         if (!org) return failure("This organisation has not been created yet.");
 
-        // if user is already a member, return a failure
-        if (org.memberIds.includes(userId))
-            return failure("This user is already part of this organisation.");
-
-        // add them to org data
-        await Organisation.updateOne(
-            { name },
-            {
-                $addToSet: { memberIds: userId },
-                leaderId: args.leader ? userId : org.leaderId,
-            }
-        );
-        if (args.og)
-            await Organisation.updateOne(
-                { name },
-                { $addToSet: { ogMemberIds: userId } }
+        const isBlacklisted =
+            org.blacklist.includes(userId) && !args.unblacklist;
+        if (isBlacklisted)
+            return failure(
+                "This user is blacklisted from this org. If you wish to remove them from the blacklist, then set the unblacklist argument to true."
             );
+
+        const oldLeader = org.leaderId;
+        let leaderChanging = oldLeader && args.leader && oldLeader !== userId;
+
+        // if user is already a member, then just update the existing org data to reflect the new arguments
+        // otherwise, add them to the org
+        if (org.memberIds.includes(userId)) {
+            const update: Record<string, any> = {};
+
+            // if they're og, then add them to the og members array, otherwise, remove them
+            if (args.og && !org.ogMemberIds.includes(userId)) {
+                update.$addToSet = { ogMemberIds: userId };
+            } else if (!args.og && org.ogMemberIds.includes(userId)) {
+                update.$pull = { ogMemberIds: userId };
+            }
+
+            // set as leader if they are meant to be the leader
+            if (args.leader && org.leaderId !== userId)
+                update.leaderId = userId;
+
+            // if they are not being set as the leader, but they were the previous leader of the org, then the org no longer has a leader.
+            if (org.leaderId === userId && !args.leader)
+                update.$unset = { leaderId: "" };
+
+            if (Object.keys(update).length > 0) {
+                await Organisation.updateOne({ name }, update);
+            }
+        } else {
+            if (isBlacklisted && args.unblacklist)
+                await orgs.unblacklist(userId, name);
+
+            // add them to org data and handle blacklist removal
+            const addData: any = { $addToSet: { memberIds: userId } };
+            if (args.og) addData.$addToSet.ogMemberIds = userId;
+            if (args.leader) addData.leaderId = userId;
+            await Organisation.updateOne({ name }, addData);
+
+            // if they have no lounge blockers, then give them immediate access to the guild
+            // if not, then it will be handled when they lose all their lounge blockers
+            if (userData.loungeHiders.size === 0)
+                await access.grantGroup(userId);
+        }
 
         // update channel access
         await access.revokeChannels(userId);
         await access.grantChannels(userId);
+
         // if leader is changing, update old leader's channel access
-        const oldLeader = org.leaderId;
-        if (oldLeader && args.leader) {
+        if (leaderChanging) {
             await access.revokeChannels(oldLeader);
             await access.grantChannels(oldLeader);
         }
 
-        // if they have no lounge blockers, then give them immediate access to the guild
-        // if not, then it will be handled when they lose all their lounge blockers
-        if (userData.loungeHiders.size === 0) await access.grantGroup(userId);
-
-        return success("Successfully added user to org.");
+        return success("Success.");
     },
 
     async removeFromOrg(
         userId: string,
-        name: OrganisationName
+        name: OrganisationName,
+        blacklist?: boolean
     ): Promise<Result> {
         const userData = await Player.findOne({ userId });
         if (!userData) return failure("This person is not a player.");
@@ -85,14 +132,13 @@ const orgs = {
         if (!org.memberIds.includes(userId))
             return failure("This user is not a member of this organisation.");
 
-        // remove them from org data
-        await Organisation.updateOne(
-            { name },
-            {
-                $pull: { memberIds: userId, ogMemberIds: userId },
-                leaderId: userId === org.leaderId ? undefined : org.leaderId,
-            }
-        );
+        // remove them from org data, blacklist them if blacklist is true
+        const update: Record<string, any> = {
+            $pull: { memberIds: userId, ogMemberIds: userId },
+        };
+        if (userId === org.leaderId) update.$unset = { leaderId: "" };
+        if (blacklist) await orgs.blacklist(userId, name);
+        await Organisation.updateOne({ name }, update);
 
         // revoke access
         await access.revoke(
