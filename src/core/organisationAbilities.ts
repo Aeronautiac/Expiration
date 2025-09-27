@@ -356,12 +356,12 @@ const orgAbilities = {
             return failure("This person is dead.");
         const orgData = await Organisation.findOne({ name: orgName });
         if (orgData.memberIds.includes(args.targetId))
-            return failure("This is already a member of the Kira's Kingdom.");
+            return failure("This is already a member of Kira's Kingdom.");
 
         if (checkOnly) return success();
 
-        orgs.addToOrg(args.targetId, orgName, {});
-        
+        await orgs.addToOrg(args.targetId, orgName, {});
+
         return success();
     },
 
@@ -376,12 +376,12 @@ const orgAbilities = {
             return failure("This person is dead.");
         const orgData = await Organisation.findOne({ name: orgName });
         if (!orgData.memberIds.includes(args.targetId))
-            return failure("This is not a member of the Kira's Kingdom.");
+            return failure("This is not a member of Kira's Kingdom.");
 
         if (checkOnly) return success();
 
-        orgs.removeFromOrg(args.targetId, orgName);
-        
+        await orgs.removeFromOrg(args.targetId, orgName);
+
         return success();
     },
 
@@ -433,6 +433,91 @@ const orgAbilities = {
             )}** is **${names.toReadable(targetData.trueName)}**.`
         );
         await msg.pin();
+
+        return success();
+    },
+
+    "Task Force Invite": async (
+        orgName: OrganisationName,
+        args: OrganisationAbilityArgs["Task Force Invite"],
+        checkOnly?: boolean
+    ) => {
+        // is the person using the command allowed to do a task force invite?
+        const orgData = await Organisation.findOne({ name: orgName });
+        if (orgData.leaderId !== args.userId)
+            return failure("You are not the chief of the Task Force.");
+        if (!orgData.memberIds.includes(args.userId))
+            return failure("You are not a member of the Task Force.");
+        const userData = await Player.findOne({ userId: args.userId });
+        if (!userData) return failure("You are not a player.");
+        if (!userData.flags.get("alive")) return failure("You are dead.");
+
+        // is the target allowed to be invited with the arguments supplied?
+        const targetData = await Player.findOne({ userId: args.targetId });
+        if (!targetData) return failure("This person is not a player.");
+        if (!targetData.flags.get("alive"))
+            return failure("This person is dead.");
+        if (orgData.memberIds.includes(args.targetId))
+            return failure(
+                "This person is already a member of the Task Force."
+            );
+        if (targetData.trueName !== names.toInternal(args.trueName))
+            return failure("This is not the target's true name.");
+
+        if (checkOnly) return success();
+
+        // send true name in task force channel
+        const mainChannel = (await client.channels.fetch(
+            config.channels[config.organisations[orgName].mainChannel]
+        )) as TextChannel;
+        const nameRevealMessage = await mainChannel.send(
+            `@everyone **${await names.getAlias(
+                args.targetId
+            )}** has been added to the Task Force. Their true name is **${names.toReadable(
+                targetData.trueName
+            )}**.`
+        );
+        await nameRevealMessage.pin();
+
+        await orgs.addToOrg(args.targetId, orgName, {});
+
+        return success();
+    },
+
+    "Task Force Kick": async (
+        orgName: OrganisationName,
+        args: OrganisationAbilityArgs["Task Force Kick"],
+        checkOnly?: boolean
+    ) => {
+        // is the person using the command allowed to do a task force kick?
+        const orgData = await Organisation.findOne({ name: orgName });
+        if (orgData.leaderId !== args.userId)
+            return failure("You are not the chief of the Task Force.");
+        if (!orgData.memberIds.includes(args.userId))
+            return failure("You are not a member of the Task Force.");
+        const userData = await Player.findOne({ userId: args.userId });
+        if (!userData) return failure("You are not a player.");
+        if (!userData.flags.get("alive")) return failure("You are dead.");
+
+        // is the target allowed to be invited with the arguments supplied?
+        const targetData = await Player.findOne({ userId: args.targetId });
+        if (!targetData) return failure("This person is not a player.");
+        if (!orgData.memberIds.includes(args.targetId))
+            return failure("This person is not a member of the Task Force.");
+
+        if (checkOnly) return success();
+
+        await orgs.removeFromOrg(args.targetId, orgName);
+
+        // send notifier in task force channel
+        const mainChannel = (await client.channels.fetch(
+            config.channels[config.organisations[orgName].mainChannel]
+        )) as TextChannel;
+        await mainChannel.send(
+            `@everyone **${await names.getAlias(
+                args.targetId
+            )}** has been kicked from the Task Force.`
+        );
 
         return success();
     },

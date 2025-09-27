@@ -7,20 +7,12 @@ import abilities from "../../core/abilities";
 
 export default {
     data: new SlashCommandBuilder()
-        .setName("tfinvite")
-        .setDescription("Invite someone to the Task Force.")
+        .setName("tfkick")
+        .setDescription("Kick someone from the Task Force.")
         .addStringOption((option) =>
             option
                 .setName("targetid")
-                .setDescription("The userid of the person you intend to invite")
-                .setRequired(true)
-        )
-        .addStringOption((option) =>
-            option
-                .setName("truename")
-                .setDescription(
-                    "The true name of the person you intend to invite"
-                )
+                .setDescription("The userid of the person you intend to kick")
                 .setRequired(true)
         ),
 
@@ -36,14 +28,13 @@ export default {
             return;
         }
 
-        const result = await abilities.useAbility(orgName, "Task Force Invite", {
+        const result = await abilities.useAbility(orgName, "Task Force Kick", {
             userId: interaction.user.id,
-            trueName: interaction.options.getString("truename"),
             targetId: interaction.options.getString("targetid"),
         });
         if (!result.success)
             await interaction.editReply({
-                content: result.message || "Failed to invite.",
+                content: result.message || "Failed to kick.",
             });
         else
             await interaction.editReply({

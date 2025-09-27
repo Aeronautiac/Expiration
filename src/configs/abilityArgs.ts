@@ -66,6 +66,7 @@ export interface OrganisationAbilityArgs {
     "Kira's Kingdom Invite": {
         targetId: string;
     };
+
     "Kira's Kingdom Kick": {
         targetId: string;
     };
@@ -85,6 +86,17 @@ export interface OrganisationAbilityArgs {
     "Shinigami Sacrifice": {
         targetId: string;
         memberId: string;
+    };
+
+    "Task Force Invite": {
+        userId: string;
+        targetId: string;
+        trueName: string;
+    };
+
+    "Task Force Kick": {
+        userId: string;
+        targetId: string;
     };
 }
 

@@ -16,6 +16,8 @@ export type OrganisationAbilityName =
     | "Civilian Arrest"
     | "Unlawful Arrest"
     | "Shinigami Sacrifice"
+    | "Task Force Invite"
+    | "Task Force Kick"
     | "PI+Watari Unlawful Arrest";
 
 export const organisationAbilities: Record<
@@ -25,7 +27,7 @@ export const organisationAbilities: Record<
     Blackout: {
         charges: 1,
         cooldown: 999,
-        membersRequired: 0,//5,
+        membersRequired: 0, //5,
         rolesRequired: [],
         duration: BLACKOUT_DURATION,
     },
@@ -42,6 +44,18 @@ export const organisationAbilities: Record<
         membersRequired: 5,
         rolesRequired: [],
         duration: KIDNAP_DURATION,
+    },
+    "Task Force Invite": {
+        charges: 2,
+        cooldown: 0,
+        membersRequired: 0,
+        rolesRequired: [],
+    },
+    "Task Force Kick": {
+        charges: 1,
+        cooldown: 0,
+        membersRequired: 0,
+        rolesRequired: [],
     },
     "Kira's Kingdom Invite": {
         charges: 2,

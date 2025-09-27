@@ -7,13 +7,14 @@ export default {
     data: new SlashCommandBuilder()
         .setName("resign")
         .setDescription("Resign as the leader of an org.")
-        .addStringOption((option) =>
-            option
-                .setName("newleaderid")
-                .setDescription(
-                    "The userid of the person you intend to pass leadership to."
-                )
-        ),
+        // .addStringOption((option) =>
+        //     option
+        //         .setName("newleaderid")
+        //         .setDescription(
+        //             "The userid of the person you intend to pass leadership to."
+        //         )
+        // ),
+        ,
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
@@ -36,11 +37,11 @@ export default {
         const result = await orgs.leaderResign(
             interaction.user.id,
             orgName,
-            interaction.options.getString("newleaderid")
+            // interaction.options.getString("newleaderid")
         );
         if (!result.success)
             await interaction.editReply({
-                content: result.message || "Failed to transfer leadship.",
+                content: result.message || "Failed to transfer leadership.",
             });
         else
             await interaction.editReply({
