@@ -55,9 +55,8 @@ const orgs = {
         const org = await Organisation.findOne({ name });
         if (!org) return failure("This organisation has not been created yet.");
 
-        const isBlacklisted =
-            org.blacklist.includes(userId) && !args.unblacklist;
-        if (isBlacklisted)
+        const isBlacklisted = org.blacklist.includes(userId);
+        if (isBlacklisted && !args.unblacklist)
             return failure(
                 "This user is blacklisted from this org. If you wish to remove them from the blacklist, then set the unblacklist argument to true."
             );
@@ -147,6 +146,59 @@ const orgs = {
         );
 
         return success("Successfully removed user from org.");
+    },
+
+    async leaderResign(
+        userId: string,
+        orgName: OrganisationName,
+        newLeaderId?: string
+    ) {
+        const userData = await Player.findOne({ userId });
+        if (!userData) return failure("You are not a player.");
+
+        const org = await Organisation.findOne({ name: orgName });
+        if (!org) return failure("This organisation has not been created yet.");
+        if (org.leaderId !== userId)
+            return failure("You are not the leader of this org.");
+        if (!org.memberIds.includes(userId))
+            return failure("You are not a member of this org.");
+
+        let newLeader: string;
+        if (newLeaderId) {
+            const targetData = await Player.findOne({ userId: newLeaderId });
+            if (!targetData)
+                return failure("The specified user is not a player.");
+            if (!targetData.flags.get("alive"))
+                return failure("The specified user is not alive.");
+            if (!org.memberIds.includes(newLeaderId))
+                return failure(
+                    "The specified user is not a member of this org."
+                );
+
+            newLeader = newLeaderId;
+        } else {
+            const options = (await orgs.getLivingMembers(orgName)).filter(
+                (a) => a !== userId
+            );
+            if (options.length === 0)
+                return failure(
+                    "You are the only person who can be the leader right now."
+                );
+
+            newLeader = options[Math.floor(Math.random() * options.length)];
+        }
+
+        // update org data
+        await orgs.addToOrg(userId, orgName, {
+            og: org.ogMemberIds.includes(userId),
+            leader: false,
+        });
+        await orgs.addToOrg(newLeader, orgName, {
+            og: org.ogMemberIds.includes(newLeader),
+            leader: true,
+        });
+
+        return success();
     },
 
     async getLivingMembers(orgName: OrganisationName) {
