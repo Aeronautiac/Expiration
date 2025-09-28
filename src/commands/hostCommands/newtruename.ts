@@ -17,7 +17,8 @@ export default {
                 .setName("newname")
                 .setDescription("The new true name")
                 .setRequired(false)
-        ),
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
