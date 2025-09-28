@@ -372,7 +372,9 @@ const game = {
     async announceDayNumber() {
         // announce day change
         const season = await Season.findOne({});
-        await game.announce(`@everyone Day **${season.day}/${config.seasonDuration}**`);
+        await game.announce(
+            `@everyone Day **${season.day}/${config.seasonDuration}**`
+        );
     },
 
     async nextDay() {
@@ -847,7 +849,7 @@ const game = {
             return "";
         })();
         notifierMessage += `\nAs a result, anything you send in shared channels will be viewable by ${viewableBy}.`;
-        notifierMessage += `\nA shared channel is any channel which is not solely visible to you at all times.`;
+        notifierMessage += `\nA shared channel is any channel which is not solely visible to you at all times. (This does not include death notes)`;
 
         try {
             await target.send(notifierMessage);
