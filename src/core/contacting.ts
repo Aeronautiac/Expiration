@@ -10,6 +10,7 @@ import names from "./names";
 import contact from "../commands/playerCommands/contact";
 import abilities from "./abilities";
 import Season from "../models/season";
+import { group } from "node:console";
 
 let client: Client;
 
@@ -346,6 +347,9 @@ const contacting = {
         const groupchat = await GroupChat.findOne({ channelId: groupchatId });
         if (groupchat.memberIds.includes(targetId))
             return failure("This person is already in the group chat.");
+
+        // if the group chat already has 5 people, don't allow it
+        if (groupchat.memberIds.length === config.maxGroupChatSize) return failure("You cannot add any more people to the group chat.");
 
         // add the target to the group chat
         await util.addPermissionsToChannel(groupchatId, [

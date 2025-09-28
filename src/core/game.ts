@@ -1,4 +1,10 @@
-import { Client, Message, PermissionOverwriteOptions, User } from "discord.js";
+import {
+    Client,
+    Message,
+    PermissionOverwriteOptions,
+    TextChannel,
+    User,
+} from "discord.js";
 import names from "./names";
 import { config } from "../configs/config";
 import access from "./access";
@@ -53,6 +59,7 @@ const game = {
         let playerData = await Player.findOne({ userId });
         const user = await client.users.fetch(userId);
 
+        let sentDmSuccess = true;
         if (!playerData) {
             const name = trueName
                 ? names.toReadable(trueName)
@@ -68,7 +75,9 @@ const game = {
 
             await user
                 .send(`Your true name is **${names.toReadable(name)}**`)
-                .catch(console.error);
+                .catch(() => {
+                    sentDmSuccess = false;
+                });
         } else {
             // revive them
             await Player.updateOne(
