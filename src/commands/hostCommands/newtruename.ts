@@ -1,4 +1,8 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
+import {
+    ChatInputCommandInteraction,
+    SlashCommandBuilder,
+    PermissionFlagsBits,
+} from "discord.js";
 import abilities from "../../core/abilities";
 import game from "../../core/game";
 
