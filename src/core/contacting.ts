@@ -158,7 +158,7 @@ const contacting = {
         await userData.save();
 
         const contactorStr = anonymous
-            ? util.roleMention(userData.role)
+            ? util.roleMention(userData.role, config.guilds.main)
             : `<@${userId}>`;
         const contactedStr = `<@${targetId}>`;
         const sendPromises = channels.map(async (channel) => {
@@ -438,6 +438,12 @@ const contacting = {
         // if the player is trying to make themself the owner, return a failure
         if (targetId === userId)
             return failure("You are already the owner of this group chat.");
+
+        // if the target is dead or has no data, return a failure
+        const targetData = await Player.findOne({ userId: targetId });
+        if (!targetData) return failure("This person is not a player.");
+        if (!targetData.flags.get("alive"))
+            return failure("This person is dead.");
 
         await GroupChat.updateOne({ channelId }, { ownerId: targetId });
 

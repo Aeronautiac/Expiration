@@ -24,6 +24,8 @@ export const config = {
     pollYesEmoji: `✅`,
     pollNoEmoji: `❌`,
     groupGuilds: ["lwatari", "kk", "tf"],
+    loggableChannels: ["news", "courtroom", "anonymousCourtroom", "tfLounge", "kkLounge", "lwatariLounge", "general", "media"],
+    seasonDuration: 10, // days, only used for day announcement display atm
 
     loungeMemberPermissions: {
         ViewChannel: true,

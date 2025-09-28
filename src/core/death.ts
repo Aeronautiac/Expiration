@@ -1,4 +1,4 @@
-import { Client, roleMention } from "discord.js";
+import { Client } from "discord.js";
 import access from "./access";
 import game from "./game";
 import { config } from "../configs/config";
@@ -9,10 +9,7 @@ import Notebook from "../models/notebook";
 import Ability from "../models/ability";
 import names from "./names";
 import util from "./util";
-import { OrganisationName } from "../configs/organisations";
 import { RoleName } from "../configs/roles";
-import { pseudoRandomBytes } from "node:crypto";
-import Organisation from "../models/organisation";
 import { OrgMember } from "../types/OrgMember";
 
 let client: Client;
@@ -211,19 +208,16 @@ const death = {
             const rank = isLeader
                 ? orgConfig.rankNames["leader"]
                 : orgConfig.rankNames["member"];
-            const article = orgConfig["article"]
-                ? orgConfig["article"] + " "
-                : "";
 
             // member of org
             orgParts.push(
-                `${starter} ${rank} of ${article}${util.orgMention(member.org)}`
+                `${starter} ${rank} of ${util.articledOrgMention(member.org)}`
             );
 
             // leader of org
             if (isLeader)
                 noNewMembersParts.push(
-                    `${article}${util.orgMention(member.org)}`
+                    `${util.articledOrgMention(member.org)}`
                 );
         }
 

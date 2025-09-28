@@ -10,9 +10,11 @@ export const organisations = {
             "Civilian Arrest",
             "Unlawful Arrest",
             "PI+Watari Unlawful Arrest",
+            "Task Force Invite",
+            "Task Force Kick",
         ],
         abilityOverrides: {},
-        article: "the ",
+        article: "the",
         rankNames: {
             member: "member",
             leader: "chief",

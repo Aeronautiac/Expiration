@@ -130,12 +130,22 @@ const game = {
         }
     },
 
+    async initializeLoggableChannels() {
+        const setLoggablePromises = config.loggableChannels.map(
+            async (name) => {
+                await util.setChannelLoggable(config.channels[name], true);
+            }
+        );
+        await Promise.all(setLoggablePromises);
+    },
+
     async newSeason() {
         const existingSeason = await Season.findOne({});
         if (existingSeason) return failure("A season already exists.");
 
         await Season.create({});
         await orgs.createDefaults();
+        await game.initializeLoggableChannels();
 
         return success(
             "Successfully created a new season. Run /startseason to begin."
@@ -148,6 +158,8 @@ const game = {
             return failure("No season exists. Create one with /newseason.");
 
         await Season.updateOne({}, { "flags.active": true });
+
+        await game.announceDayNumber();
 
         return success("Season started. Run /endseason to end.");
     },
@@ -357,6 +369,12 @@ const game = {
         await agenda.cancel({ name: "endBlackout" });
     },
 
+    async announceDayNumber() {
+        // announce day change
+        const season = await Season.findOne({});
+        await game.announce(`@everyone Day **${season.day}/${config.seasonDuration}**`);
+    },
+
     async nextDay() {
         await game.removeExplicitBugs();
         await Player.updateMany(
@@ -369,6 +387,7 @@ const game = {
         await notebooks.resetDailyUsage();
         await notebooks.returnNotebooks();
         await Season.updateOne({}, { $inc: { day: 1 } });
+        await game.announceDayNumber();
     },
 
     async unlock2ndKira() {
@@ -419,6 +438,8 @@ const game = {
         const targetData = await Player.findOne({ userId: targetId });
 
         const orgData = await Organisation.findOne({ name: asOrg });
+        if (prosecutorId === targetId)
+            return failure("You cannot prosecute yourself.");
         if (!orgData) return failure("This organisation has no data.");
         if (!orgData.memberIds.includes(prosecutorId))
             return failure("You are not a member of this organisation.");
@@ -427,13 +448,17 @@ const game = {
         if (!targetData) return failure("The target is not a player.");
         if (!targetData.flags.get("alive"))
             return failure("The target is not alive.");
+        if (targetData.flags.get("ipp"))
+            return failure(
+                "A silent prosecution cannot be performed on a target who is under IPP."
+            );
 
         let fail: boolean = false;
 
         // get all prosecutable orgs (atp orgs that have used blackout)
         const blackoutAbilities = await Ability.find({
-            abilityName: "Blackout",
-            cooldown: { $gt: 0 },
+            ability: "Blackout",
+            $or: [{ cooldown: { $gt: 0 } }, { queuedCooldown: { $gt: 0 } }],
         });
         const orgSet = new Set(Object.keys(organisations));
         const orgsProsecutable = new Set(
@@ -462,7 +487,7 @@ const game = {
                     asOrg
                 )}, <@${prosecutorId}> (${names.toReadable(
                     userData.trueName
-                )}) has attempted to carry out a silent prosecution against someone they suspected of being involved in nationwide acts of terrorism.\nAfter further investigation, it was determined that this person was **not guilty**.\nDespite this, <@${prosecutorId}> persisted with their efforts.\nAs a result, they have been **permanently banned** from the ${util.roleMention(
+                )}) has attempted to carry out a silent prosecution against someone they suspected of being involved in acts of terrorism.\nAfter further investigation, it was determined that this person was **not guilty**.\nDespite this, <@${prosecutorId}> persisted with their efforts.\nAs a result, they have been **permanently banned** from ${util.articledOrgMention(
                     asOrg
                 )}.`
             ).catch(console.error);
@@ -475,9 +500,9 @@ const game = {
 
         // kill target
         game.announce(
-            `@everyone the ${util.roleMention(
+            `@everyone ${util.articledOrgMention(
                 asOrg
-            )} has carried out a silent prosecution against <@${targetId}>. They have been found guilty of being involved in nationwide acts of terrorism.`
+            )} has carried out a silent prosecution against <@${targetId}>. They have been found guilty of being involved in acts of terrorism.`
         ).catch(console.error);
         death
             .kill(targetId, {
@@ -626,19 +651,22 @@ const game = {
         // announcement
         if (args.announce) {
             let announceMessage = `@everyone <@${userId}> has been kidnapped`;
-            if (args.kidnapperOrg) {
-                const orgConfig = config.organisations[args.kidnapperOrg];
-                const article = orgConfig["article"]
-                    ? ` ${orgConfig["article"]} `
-                    : "";
-                announceMessage += ` by ${article}<@&${
-                    config.discordRoles[args.kidnapperOrg]
-                }>`;
-            }
-
+            if (args.kidnapperOrg)
+                announceMessage += ` by ${util.articledOrgMention(
+                    args.kidnapperOrg
+                )}`;
             announceMessage += `. Authorities have begun rescue efforts, but it may be a while before they succeed.`;
             await game.announce(announceMessage);
         }
+
+        // handle roles
+        const member = await mainGuild.members.fetch(userId).catch(() => null);
+        await member?.roles
+            .add(config.discordRoles.Kidnapped)
+            .catch(console.error);
+        await member?.roles
+            .remove(config.discordRoles.Civilian)
+            .catch(console.error);
     },
 
     async kidnapRelease(userId: string) {

@@ -21,6 +21,28 @@ import kill from "../commands/hostCommands/kill";
 import { guilds } from "../configs/guilds";
 import access from "./access";
 
+async function canDoLeaderAction(userId: string, orgName: OrganisationName) {
+    // is the person using the command allowed to do a task force invite?
+    const orgData = await Organisation.findOne({ name: orgName });
+    if (orgData.leaderId !== userId)
+        return failure(
+            `You are not the ${
+                config.organisations[orgName].rankNames["leader"] ?? "leader"
+            } of ${util.articledOrgMention(orgName, null)}`
+        );
+    if (!orgData.memberIds.includes(userId))
+        return failure(
+            `You are not a ${
+                config.organisations[orgName].rankNames.member
+            } of the ${util.articledOrgMention(orgName, null)}.`
+        );
+    const userData = await Player.findOne({ userId });
+    if (!userData) return failure("You are not a player.");
+    if (!userData.flags.get("alive")) return failure("You are dead.");
+
+    return success();
+}
+
 export const memberAbilities: Set<OrganisationAbilityName> = new Set();
 memberAbilities.add("Public Kidnap");
 memberAbilities.add("Shinigami Sacrifice");
@@ -335,7 +357,7 @@ const orgAbilities = {
         const notifPromises = lounge.channelIds.map(async (id) => {
             const channel = (await client.channels.fetch(id)) as TextChannel;
             await channel.send(
-                `@everyone This lounge has been tapped into by ${util.orgMention(
+                `@everyone This lounge has been tapped into by ${util.articledOrgMention(
                     orgName
                 )}. All messages up to this point have been logged.`
             );
@@ -404,6 +426,8 @@ const orgAbilities = {
         if (!targetData.flags.get("alive"))
             return failure("This person is dead.");
         const orgData = await Organisation.findOne({ name: orgName });
+        if (!orgData.memberIds.includes(args.memberId))
+            return failure("This person is not a member.");
         if (!orgData.ogMemberIds.includes(args.memberId))
             return failure("This is not an og member.");
         const memberData = await Player.findOne({ userId: args.memberId });
@@ -419,7 +443,9 @@ const orgAbilities = {
         );
         await death.kill(args.memberId, {
             killerId: killerPool[Math.floor(Math.random() * killerPool.length)],
-            deathMessage: `They were sacrificed to a shinigami.`,
+            deathMessage: `Their soul was sold to a shinigami by ${util.articledOrgMention(
+                orgName
+            )} in exchange for a true name.`,
             bypassIPP: true,
         });
 
@@ -442,17 +468,14 @@ const orgAbilities = {
         args: OrganisationAbilityArgs["Task Force Invite"],
         checkOnly?: boolean
     ) => {
-        // is the person using the command allowed to do a task force invite?
-        const orgData = await Organisation.findOne({ name: orgName });
-        if (orgData.leaderId !== args.userId)
-            return failure("You are not the chief of the Task Force.");
-        if (!orgData.memberIds.includes(args.userId))
-            return failure("You are not a member of the Task Force.");
-        const userData = await Player.findOne({ userId: args.userId });
-        if (!userData) return failure("You are not a player.");
-        if (!userData.flags.get("alive")) return failure("You are dead.");
+        // is the person inviting allowed to do it?
+        const result = await canDoLeaderAction(args.userId, orgName);
+        if (!result.success) return result;
 
         // is the target allowed to be invited with the arguments supplied?
+        if (args.targetId === args.userId)
+            return failure("You cannot invite yourself.");
+        const orgData = await Organisation.findOne({ name: orgName });
         const targetData = await Player.findOne({ userId: args.targetId });
         if (!targetData) return failure("This person is not a player.");
         if (!targetData.flags.get("alive"))
@@ -490,18 +513,15 @@ const orgAbilities = {
         checkOnly?: boolean
     ) => {
         // is the person using the command allowed to do a task force kick?
-        const orgData = await Organisation.findOne({ name: orgName });
-        if (orgData.leaderId !== args.userId)
-            return failure("You are not the chief of the Task Force.");
-        if (!orgData.memberIds.includes(args.userId))
-            return failure("You are not a member of the Task Force.");
-        const userData = await Player.findOne({ userId: args.userId });
-        if (!userData) return failure("You are not a player.");
-        if (!userData.flags.get("alive")) return failure("You are dead.");
+        const result = await canDoLeaderAction(args.userId, orgName);
+        if (!result.success) return result;
 
-        // is the target allowed to be invited with the arguments supplied?
+        // is the target allowed to be kicked with the arguments supplied?
+        if (args.targetId === args.userId)
+            return failure("You cannot kick yourself.");
         const targetData = await Player.findOne({ userId: args.targetId });
         if (!targetData) return failure("This person is not a player.");
+        const orgData = await Organisation.findOne({ name: orgName });
         if (!orgData.memberIds.includes(args.targetId))
             return failure("This person is not a member of the Task Force.");
 

@@ -22,16 +22,21 @@ export default {
         });
 
         const guildId = interaction.guildId;
-        let orgName: OrganisationName = "Task Force";
-        if (guildId !== config.guilds[config.organisations["Task Force"].guild]) {
+        if (
+            guildId !== config.guilds[config.organisations["Task Force"].guild]
+        ) {
             await interaction.editReply("This is not the Task Force server.");
             return;
         }
 
-        const result = await abilities.useAbility(orgName, "Task Force Kick", {
-            userId: interaction.user.id,
-            targetId: interaction.options.getString("targetid"),
-        });
+        const result = await abilities.useAbility(
+            "Task Force",
+            "Task Force Kick",
+            {
+                userId: interaction.user.id,
+                targetId: interaction.options.getString("targetid"),
+            }
+        );
         if (!result.success)
             await interaction.editReply({
                 content: result.message || "Failed to kick.",

@@ -1,8 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 import { OrganisationName } from "../../configs/organisations";
 import { config } from "../../configs/config";
-import orgs from "../../core/orgs";
-import orgAbilities from "../../core/organisationAbilities";
 import abilities from "../../core/abilities";
 
 export default {
@@ -30,13 +28,12 @@ export default {
         });
 
         const guildId = interaction.guildId;
-        let orgName: OrganisationName = "Task Force";
         if (guildId !== config.guilds[config.organisations["Task Force"].guild]) {
             await interaction.editReply("This is not the Task Force server.");
             return;
         }
 
-        const result = await abilities.useAbility(orgName, "Task Force Invite", {
+        const result = await abilities.useAbility("Task Force", "Task Force Invite", {
             userId: interaction.user.id,
             trueName: interaction.options.getString("truename"),
             targetId: interaction.options.getString("targetid"),

@@ -15,6 +15,9 @@ export const channels = {
     tfChiefDescription: "1406119727230619773",
     anonymousCourtroom: "1419078492792033463",
     announcements: "1406115826876284973",
+    general: "1418665152060063915",
+    media: "1418665186302361750",
+    lwatariLounge: "1418777257505194035",
 } as const satisfies { [channelName: string]: string };
 
 export type ChannelName = keyof typeof channels;

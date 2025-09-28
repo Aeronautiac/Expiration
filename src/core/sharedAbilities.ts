@@ -1,10 +1,7 @@
-import { Client, roleMention } from "discord.js";
-import { DiscordRoleName } from "../configs/discordRoles";
-import { failure, Result, success } from "../types/Result";
+import { Client } from "discord.js";
+import { failure, success } from "../types/Result";
 import { SharedAbilityArgs } from "../configs/abilityArgs";
-import Organisation from "../models/organisation";
 import Player from "../models/player";
-import game from "./game";
 import { config } from "../configs/config";
 import polls from "./polls";
 import util from "./util";

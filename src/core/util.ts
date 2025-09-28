@@ -6,6 +6,7 @@ import {
     Message,
     NewsChannel,
     PermissionOverwriteOptions,
+    roleMention,
     StageChannel,
     TextChannel,
     VoiceChannel,
@@ -21,6 +22,7 @@ import { failure, Result, success } from "../types/Result";
 import Organisation from "../models/organisation";
 import { OrgMember } from "../types/OrgMember";
 import { OrganisationName } from "../configs/organisations";
+import { configDotenv } from "dotenv";
 
 let client: Client;
 
@@ -354,22 +356,21 @@ const util = {
         };
     },
 
-    roleMention(r: DiscordRoleName) {
+    roleMention(r: DiscordRoleName, guildId: string = config.guilds.main) {
         // Try to find role id from config, fallback to plain text
         const id = config.discordRoles[r];
-        return id ? `<@&${id}>` : `**${r}**`;
+        return id && guildId === config.guilds.main ? `<@&${id}>` : `**${r}**`;
     },
 
-    orgMention(org: OrganisationName) {
-        const id = config.discordRoles[org];
-        return id ? `<@&${id}>` : `**${org}**`;
+    orgMention(org: OrganisationName, guildId?: string) {
+        return util.roleMention(org, guildId);
     },
 
-    articledOrgMention(org: OrganisationName) {
+    articledOrgMention(org: OrganisationName, guildId?: string) {
         const article = config.organisations[org]["article"];
-        const start = article ? article : ``;
-        const orgPing = util.orgMention(org);
-        return `${start} ${orgPing}`;
+        const start = article ? article + " " : ``;
+        const orgPing = util.orgMention(org, guildId);
+        return `${start}${orgPing}`;
     },
 
     hrsToMs(hrs: number) {

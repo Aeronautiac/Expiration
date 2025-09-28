@@ -1,12 +1,12 @@
-import { Client, Guild } from "discord.js";
+import { Client } from "discord.js";
 import Organisation from "../models/organisation";
 import { OrganisationName } from "../configs/organisations";
 import { failure, Result, success } from "../types/Result";
 import Player from "../models/player";
 import access from "./access";
 import { config } from "../configs/config";
-import { GuildName } from "../configs/guilds";
 import abilities from "./abilities";
+import util from "./util";
 
 let client: Client;
 
@@ -23,7 +23,7 @@ const orgs = {
     },
 
     async blacklist(userId: string, name: OrganisationName) {
-        Organisation.updateOne(
+        await Organisation.updateOne(
             { name },
             {
                 $addToSet: { blacklist: userId },
@@ -32,12 +32,59 @@ const orgs = {
     },
 
     async unblacklist(userId: string, name: OrganisationName) {
-        Organisation.updateOne(
+        await Organisation.updateOne(
             { name },
             {
                 $pull: { blacklist: userId },
             }
         );
+    },
+
+    async changeLeader(
+        newLeaderId: string | undefined,
+        name: OrganisationName
+    ) {
+        const org = await Organisation.findOne({ name });
+        if (!org) return;
+        if (newLeaderId === org.leaderId) return;
+        if (!config.organisations[name].rankNames["leader"]) return; // this org can not have a leader
+
+        const oldLeaderId = org.leaderId;
+
+        // update org data
+        if (newLeaderId) {
+            await Organisation.updateOne({
+                leaderId: newLeaderId,
+            });
+        } else {
+            await Organisation.updateOne({
+                $unset: { leaderId: "" },
+            });
+        }
+
+        // update channel access and notify
+        if (newLeaderId) {
+            await access.updateChannels(newLeaderId).catch(console.error);
+            const user = await client.users.fetch(newLeaderId);
+            await user
+                .send(
+                    `You are now the ${
+                        config.organisations[name].rankNames["leader"]
+                    } of ${util.articledOrgMention(name, null)}.`
+                )
+                .catch(console.error);
+        }
+        if (oldLeaderId) {
+            await access.updateChannels(oldLeaderId).catch(console.error);
+            const user = await client.users.fetch(oldLeaderId);
+            await user
+                .send(
+                    `You are no longer the ${
+                        config.organisations[name].rankNames["leader"]
+                    } of ${util.articledOrgMention(name, null)}.`
+                )
+                .catch(console.error);
+        }
     },
 
     async addToOrg(
@@ -58,43 +105,34 @@ const orgs = {
         const isBlacklisted = org.blacklist.includes(userId);
         if (isBlacklisted && !args.unblacklist)
             return failure(
-                "This user is blacklisted from this org. If you wish to remove them from the blacklist, then set the unblacklist argument to true."
+                "This user is blacklisted from this org. If you wish to remove them from the blacklist and invite them anyway, then set the unblacklist argument to true."
             );
 
-        const oldLeader = org.leaderId;
-        let leaderChanging = oldLeader && args.leader && oldLeader !== userId;
+        const newLeaderId = args.leader ? userId : undefined;
 
         // if user is already a member, then just update the existing org data to reflect the new arguments
         // otherwise, add them to the org
         if (org.memberIds.includes(userId)) {
             const update: Record<string, any> = {};
 
-            // if they're og, then add them to the og members array, otherwise, remove them
-            if (args.og && !org.ogMemberIds.includes(userId)) {
+            // if og is explicity stated as true, then add them to the og members array, and vice versa
+            if (args.og === true && !org.ogMemberIds.includes(userId)) {
                 update.$addToSet = { ogMemberIds: userId };
-            } else if (!args.og && org.ogMemberIds.includes(userId)) {
+            } else if (args.og === false && org.ogMemberIds.includes(userId)) {
                 update.$pull = { ogMemberIds: userId };
             }
-
-            // set as leader if they are meant to be the leader
-            if (args.leader && org.leaderId !== userId)
-                update.leaderId = userId;
-
-            // if they are not being set as the leader, but they were the previous leader of the org, then the org no longer has a leader.
-            if (org.leaderId === userId && !args.leader)
-                update.$unset = { leaderId: "" };
 
             if (Object.keys(update).length > 0) {
                 await Organisation.updateOne({ name }, update);
             }
         } else {
+            // if they are being added despite a blacklist, then remove their blacklist
             if (isBlacklisted && args.unblacklist)
                 await orgs.unblacklist(userId, name);
 
             // add them to org data and handle blacklist removal
             const addData: any = { $addToSet: { memberIds: userId } };
-            if (args.og) addData.$addToSet.ogMemberIds = userId;
-            if (args.leader) addData.leaderId = userId;
+            if (args.og === true) addData.$addToSet.ogMemberIds = userId;
             await Organisation.updateOne({ name }, addData);
 
             // if they have no lounge blockers, then give them immediate access to the guild
@@ -103,15 +141,10 @@ const orgs = {
                 await access.grantGroup(userId);
         }
 
-        // update channel access
-        await access.revokeChannels(userId);
-        await access.grantChannels(userId);
-
-        // if leader is changing, update old leader's channel access
-        if (leaderChanging) {
-            await access.revokeChannels(oldLeader);
-            await access.grantChannels(oldLeader);
-        }
+        // handle leader changes
+        if (args.leader) await orgs.changeLeader(newLeaderId, name);
+        if (!args.leader && org.leaderId === userId)
+            await orgs.changeLeader(undefined, name);
 
         return success("Success.");
     },
@@ -133,7 +166,7 @@ const orgs = {
 
         // remove them from org data, blacklist them if blacklist is true
         const update: Record<string, any> = {
-            $pull: { memberIds: userId, ogMemberIds: userId },
+            $pull: { memberIds: userId },
         };
         if (userId === org.leaderId) update.$unset = { leaderId: "" };
         if (blacklist) await orgs.blacklist(userId, name);
@@ -188,15 +221,8 @@ const orgs = {
             newLeader = options[Math.floor(Math.random() * options.length)];
         }
 
-        // update org data
-        await orgs.addToOrg(userId, orgName, {
-            og: org.ogMemberIds.includes(userId),
-            leader: false,
-        });
-        await orgs.addToOrg(newLeader, orgName, {
-            og: org.ogMemberIds.includes(newLeader),
-            leader: true,
-        });
+        // handle leader change
+        await orgs.changeLeader(newLeader, orgName);
 
         return success();
     },

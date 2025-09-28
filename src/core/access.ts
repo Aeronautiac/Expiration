@@ -20,6 +20,7 @@ interface access {
     grantChannels: (userId: string) => Promise<void>;
     grantOrgChannels: (userId: string) => Promise<void>;
     revokeChannels: (userId: string) => Promise<void>;
+    updateChannels: (userId: string) => Promise<void>;
 }
 
 const access: Partial<access> = {};
@@ -207,19 +208,29 @@ access.revokeChannels = async function (userId) {
         console.warn("Player has no data. Cannot revoke from channels.");
         return;
     }
-    const channels = Array.from(
-        new Set<ChannelName>(
-            Object.values(config.roles)
-                .map((role) => Object.values(role.guildChannels))
-                .flat()
-        )
-    );
+    const orgChannels = Object.values(config.organisations)
+        .map((org) => org["leaderChannel"])
+        .filter(Boolean);
+    const roleChannels = Object.values(config.roles)
+        .map((role) => Object.values(role.guildChannels))
+        .flat();
+    const channelsToRevoke = new Set<ChannelName>([
+        ...orgChannels,
+        ...roleChannels,
+    ]);
+    const channels = Array.from(channelsToRevoke);
     const channelPermPromises = channels.map(async (ch) => {
         await util
             .deletePermissionsToChannel(config.channels[ch], [userId])
             .catch(() => {});
     });
     await Promise.all(channelPermPromises);
+};
+
+// revokes and then grants access to restricted channe;s
+access.updateChannels = async function (userId) {
+    await access.revokeChannels(userId);
+    await access.grantChannels(userId);
 };
 
 // grants access to role guilds based on the player's role

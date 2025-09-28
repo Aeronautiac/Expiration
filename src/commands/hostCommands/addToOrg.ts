@@ -45,24 +45,35 @@ export default {
                     "Whether or not they are considered an og member"
                 )
                 .setRequired(false)
+        )
+        .addBooleanOption((option) =>
+            option
+                .setName("unblacklist")
+                .setDescription(
+                    "Whether or not to unblacklist and invite this user"
+                )
+                .setRequired(false)
         ),
-
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
         });
 
-        await orgs.addToOrg(
+        const result = await orgs.addToOrg(
             interaction.options.getUser("target").id,
             interaction.options.getString("organisation") as OrganisationName,
             {
                 leader: interaction.options.getBoolean("leader"),
                 og: interaction.options.getBoolean("og"),
+                unblacklist: interaction.options.getBoolean("unblacklist")
             }
         );
-
-        await interaction.editReply({
-            content: "Success.",
-        });
+        if (!result.success) {
+            await interaction.editReply(`Failure: ${result.message}`);
+            return;
+        } else
+            await interaction.editReply({
+                content: "Success.",
+            });
     },
 };

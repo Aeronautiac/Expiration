@@ -27,7 +27,7 @@ export const organisationAbilities: Record<
     Blackout: {
         charges: 1,
         cooldown: 999,
-        membersRequired: 0, //5,
+        membersRequired: 5,
         rolesRequired: [],
         duration: BLACKOUT_DURATION,
     },

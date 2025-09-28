@@ -79,6 +79,8 @@ export interface Config {
     pollNoEmoji: string;
     orgPollDuration: number;
     groupGuilds: GuildName[];
+    loggableChannels: ChannelName[];
+    seasonDuration: number;
 
     loungeMemberPermissions: PermissionOverwriteOptions;
     spectatorPermissions: PermissionOverwriteOptions;
