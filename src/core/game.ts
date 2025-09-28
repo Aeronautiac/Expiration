@@ -66,10 +66,9 @@ const game = {
                 flags: new Map([["alive", true]]),
             });
 
-            await user.send(`Your true name is **${names.toReadable(name)}**`);
-
-            // create monologue
-            await game.createMonologue(userId);
+            await user
+                .send(`Your true name is **${names.toReadable(name)}**`)
+                .catch(console.error);
         } else {
             // revive them
             await Player.updateOne(
@@ -104,6 +103,9 @@ const game = {
                 }
             }
         }
+
+        // if the user has not had their monologue created yet, then create it now.
+        if (!playerData.monologueChannelId) await game.createMonologue(userId);
 
         // restricts access to all guilds except main (this is called no matter what because your role could change even while alive.)
         await access.revokeAll(userId);

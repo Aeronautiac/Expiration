@@ -52,7 +52,9 @@ export default {
         );
 
         if (result.success) {
-            await interaction.editReply({ content: relayed });
+            await interaction.editReply({ 
+                content: relayed
+             });
         } else {
             await interaction.editReply({ content: relayed });
             await interaction.followUp({
