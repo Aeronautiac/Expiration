@@ -9,7 +9,7 @@ export default {
     data: new SlashCommandBuilder()
         .setName("unlock2ndkira")
         .setDescription("Unlocks 2nd Kira's notebook.")
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({

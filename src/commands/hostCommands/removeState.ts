@@ -27,7 +27,7 @@ export default {
                     Object.keys(config.playerStates).map(util.interactionChoice)
                 )
         )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({

@@ -9,13 +9,13 @@ export default {
     data: new SlashCommandBuilder()
         .setName("setnotebookowner")
         .setDescription("Set a channel as a notebook.")
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
         .addStringOption((option) =>
             option
                 .setName("ownerid")
                 .setDescription("The userid of the owner of the notebook")
                 .setRequired(true)
-        ),
+        ).setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        ,
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({

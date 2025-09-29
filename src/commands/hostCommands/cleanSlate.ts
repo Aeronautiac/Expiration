@@ -13,7 +13,7 @@ export default {
     data: new SlashCommandBuilder()
         .setName("cleanslate")
         .setDescription("Clears all game data. (USE WITH CAUTION)")
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({

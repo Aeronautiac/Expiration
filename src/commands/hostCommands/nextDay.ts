@@ -11,7 +11,7 @@ export default {
         .setDescription(
             "Progress to the next day. (resets contact tokens, decreases cooldowns, etc...)"
         )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({

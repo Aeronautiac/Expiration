@@ -15,7 +15,7 @@ export default {
                 .setDescription("the message to send")
                 .setRequired(true)
         )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({

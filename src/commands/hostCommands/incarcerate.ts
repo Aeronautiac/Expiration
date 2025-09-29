@@ -16,7 +16,7 @@ export default {
                 .setDescription("The person you want to incarcerate")
                 .setRequired(true)
         )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({

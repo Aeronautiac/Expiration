@@ -11,12 +11,15 @@ export default {
     data: new SlashCommandBuilder()
         .setName("endseason")
         .setDescription("End the current season")
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
         .addBooleanOption((option) =>
             option
                 .setName("announce")
-                .setDescription("Announces season end and gives roles and announces roles.")
-        ),
+                .setDescription(
+                    "Announces season end and gives roles and announces roles."
+                )
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
@@ -36,7 +39,9 @@ export default {
             return;
         }
 
-        await game.endSeason(interaction.options.getBoolean("announce") ?? false);
+        await game.endSeason(
+            interaction.options.getBoolean("announce") ?? false
+        );
 
         await interaction.editReply({
             content: "Successfully ended the season.",

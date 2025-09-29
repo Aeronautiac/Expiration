@@ -9,7 +9,7 @@ export default {
     data: new SlashCommandBuilder()
         .setName("syncnicknames")
         .setDescription("Sync nicknames with the main server.")
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageNicknames),
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({

@@ -12,7 +12,6 @@ export default {
     data: new SlashCommandBuilder()
         .setName("addtoorg")
         .setDescription("Add a member to an organisation.")
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
         .addUserOption((option) =>
             option
                 .setName("target")
@@ -53,7 +52,9 @@ export default {
                     "Whether or not to unblacklist and invite this user"
                 )
                 .setRequired(false)
-        ),
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,

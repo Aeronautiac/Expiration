@@ -29,7 +29,8 @@ export default {
                         util.interactionChoice
                     )
                 )
-        ),
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({

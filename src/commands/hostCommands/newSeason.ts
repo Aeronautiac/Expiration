@@ -10,7 +10,7 @@ export default {
     data: new SlashCommandBuilder()
         .setName("newseason")
         .setDescription("Create a new season")
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({

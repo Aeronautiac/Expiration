@@ -36,7 +36,7 @@ export default {
                 .setDescription("The death message to announce.")
                 .setRequired(false)
         )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
