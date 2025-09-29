@@ -1,6 +1,7 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 import notebooks from "../../core/notebooks";
 import { config } from "../../configs/config";
+import Notebook from "../../models/notebook";
 
 export default {
     data: new SlashCommandBuilder()
@@ -30,6 +31,17 @@ export default {
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({});
 
+        // is the server a death note server?
+        const notebook = await Notebook.findOne({
+            guildId: interaction.guildId,
+        });
+        if (!notebook) {
+            await interaction.editReply({
+                content: "You can only use this command in a notebook server.",
+            });
+            return;
+        }
+
         const name = interaction.options.getString("name");
         const deathMessage = interaction.options.getString("message");
         const delayArg = interaction.options.getNumber("delay");
@@ -52,9 +64,9 @@ export default {
         );
 
         if (result.success) {
-            await interaction.editReply({ 
-                content: relayed
-             });
+            await interaction.editReply({
+                content: relayed,
+            });
         } else {
             await interaction.editReply({ content: relayed });
             await interaction.followUp({
