@@ -447,6 +447,11 @@ const game = {
         asOrg: OrganisationName,
         targetId: string
     ): Promise<Result> {
+        const season = await Season.findOne({});
+        if (!season) return failure("No season currently exists");
+        if (!season.flags.get("active"))
+            return failure("The season is not currently active.");
+
         const userData = await Player.findOne({ userId: prosecutorId });
         const targetData = await Player.findOne({ userId: targetId });
 
