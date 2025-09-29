@@ -118,7 +118,7 @@ const orgAbilities = {
             config.channels[config.organisations[orgName].mainChannel]
         )) as TextChannel;
         const nameRevealMessage = await mainChannel.send(
-            `The true name of **${await names.getAlias(
+            `@everyone The true name of **${await names.getAlias(
                 args.targetId
             )}** is **${names.toReadable(targetData.trueName)}**.`
         );
@@ -454,7 +454,7 @@ const orgAbilities = {
             config.channels[config.organisations[orgName].mainChannel]
         )) as TextChannel;
         const msg: Message = await channel.send(
-            `The true name of **${await names.getAlias(
+            `@everyone The true name of **${await names.getAlias(
                 args.targetId
             )}** is **${names.toReadable(targetData.trueName)}**.`
         );
