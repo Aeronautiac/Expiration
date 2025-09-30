@@ -260,7 +260,9 @@ const playerAbilities = {
                 return util.fetchAllMessages(
                     channelId,
                     earliest,
-                    (msg) => msg.author.id === targetId
+                    (msg) =>
+                        msg.author.id === targetId &&
+                        msg.createdTimestamp >= earliest
                 );
             })
         );
