@@ -191,50 +191,9 @@ const game = {
                 )
                 .catch(console.error);
 
-            await util.sleep(config.announcementDelay);
+            await util.sleep(config.announcementDelay * 2);
 
-            const rolesInOrder = [
-                "Kira",
-                "2nd Kira",
-                "",
-                "L",
-                "Watari",
-                "",
-                "Beyond Birthday",
-                "Rogue Civilian",
-                "Private Investigator",
-                "News Anchor",
-            ];
-            let roleRevealMessage = `The roles for this season were:\n\n`;
-
-            for (const roleName of rolesInOrder) {
-                if (roleName === "") {
-                    roleRevealMessage += `\n`;
-                    continue;
-                }
-
-                const playerData = await Player.findOne({ role: roleName });
-                if (playerData) {
-                    roleRevealMessage += `<@&${discordRoles[roleName]}> was <@${playerData.userId}>\n`;
-                }
-            }
-
-            const KirasKingdomOrgData = await Organisation.findOne({
-                name: "Kira's Kingdom",
-            });
-            const TaskForceOrgData = await Organisation.findOne({
-                name: "Task Force",
-            });
-
-            roleRevealMessage += `\nThe original members for <@&${discordRoles["Kira's Kingdom"]}> were:`;
-            for (const memberId of KirasKingdomOrgData.ogMemberIds) {
-                roleRevealMessage += `\n<@${memberId}>`;
-            }
-            roleRevealMessage += `\nThe original members for <@&${discordRoles["Task Force"]}> were:`;
-            for (const memberId of TaskForceOrgData.ogMemberIds) {
-                roleRevealMessage += `\n<@${memberId}>`;
-            }
-
+            const roleRevealMessage = await util.produceListOfRoles(true);
             await game.announce(roleRevealMessage).catch(console.error);
 
             await util.sleep(config.announcementDelay);

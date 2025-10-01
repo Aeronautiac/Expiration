@@ -1,4 +1,4 @@
-import { Channel, Client } from "discord.js";
+import { Channel, Client, managerToFetchingStrategyOptions, TextChannel } from "discord.js";
 import Player from "../models/player";
 import access from "./access";
 import { config } from "../configs/config";
@@ -32,6 +32,8 @@ const contacting = {
         if (oldSize > 0) return;
 
         // hide lounges if we went from having no blockers to having at least one
+        contacting.removeFromConference(null, [userId], null); // also remove from conference if they are in it
+
         const promises = playerData.loungeChannelIds.map(async (channelId) => {
             try {
                 const lounge = await client.channels.fetch(channelId);
@@ -681,6 +683,106 @@ const contacting = {
             logMessage,
             userData.flags.get("underTheRadar")
         );
+    },
+
+    async canAddOrRemoveToConference(userId: string, channelId: string): Promise<true | Result> {
+        const season = await Season.findOne({});
+        if (!season) return failure("No season currently exists.");
+        if (!season.flags.get("active"))
+            return failure("The season is not yet active.");
+
+        // if the player is dead or is not a player, return a failure
+        const playerData = await Player.findOne({ userId });
+        if (!playerData) return failure("You are not a player.");
+        if (!playerData.flags.get("alive")) return failure("You are dead.");
+        if (playerData.role !== "News Anchor") return failure("Only the News Anchor can add to and from Press Conferences.");
+        if (channelId !== config.channels.news) return failure("This can only be done in the News channel.");
+
+        return true;
+    },
+
+    async addToConference(userId: string | null, targetIds: string[], channelId: string | null): Promise<Result> {
+        if (userId) {
+            const canAdd = await contacting.canAddOrRemoveToConference(userId, channelId);
+            if (canAdd !== true) return canAdd;
+        }
+
+        const playersInConference: string[] = [];
+        const mainGuild = await client.guilds.fetch(config.guilds.main);
+        for (const member of await mainGuild.members.fetch()) {
+            if (member[1].roles.cache.has(config.discordRoles["Press Conference"])) {
+                playersInConference.push(member[0]);
+            }
+        }
+
+        if (playersInConference.length + targetIds.length > config.maxPlayersInConference || playersInConference.length >= config.maxPlayersInConference) {
+            return failure("The conference is either full or will be too crowded after this command. There are currently " + playersInConference.length + " players in the conference, and the maximum is " + config.maxPlayersInConference + ".");
+        }
+
+        for (const targetId of targetIds) {
+            const targetData = await Player.findOne({ userId: targetId });
+            if (!targetData) return failure(`The user <@${targetId}> is not a player.`);
+            if (!targetData.flags.get("alive")) return failure(`The user <@${targetId}> is dead.`);
+            if (targetData.flags.get("kidnapped")) return failure(`The user <@${targetId}> is kidnapped and cannot be added to the Conference.`);
+            if (targetData.flags.get("incarcerated")) return failure(`The user <@${targetId}> is incarcerated and cannot be added to the Conference.`);
+            if (playersInConference.includes(targetId)) return failure(`The user <@${targetId}> is already in the Conference.`);
+            if (userId !== null && userId == targetId) return failure("You cannot add yourself to the Conference.");
+
+            const member = await mainGuild.members
+                .fetch(targetId)
+                .catch(console.error);
+            if (member) {
+                await member.roles
+                    .add(config.discordRoles["Press Conference"])
+                    .catch(console.error);
+            }
+        }
+
+        const newsChannel = await mainGuild.channels.fetch(config.channels.news) as TextChannel;
+        newsChannel.send(`${targetIds.map(id => `<@${id}>`).join(", ")} has been added to the Press Conference`).catch(console.error);
+
+        return { success: true };
+    },
+
+    async removeFromConference(userId: string | null, targetIds: string[], channelId: string | null): Promise<Result> {
+        if (userId) {
+            const canRemove = await contacting.canAddOrRemoveToConference(userId, channelId);
+            if (canRemove !== true) return canRemove;
+        }
+
+        const playersInConference: string[] = [];
+        const mainGuild = await client.guilds.fetch(config.guilds.main);
+        for (const member of await mainGuild.members.fetch()) {
+            if (member[1].roles.cache.has(config.discordRoles["Press Conference"])) {
+                playersInConference.push(member[0]);
+            }
+        }
+
+        if (targetIds.length == 0) {
+            // If no target Ids are provided, remove all players from the conference
+            targetIds = playersInConference;
+        }
+
+        for (const targetId of targetIds) {
+            const targetData = await Player.findOne({ userId: targetId });
+            if (!targetData) return failure(`The user <@${targetId}> is not a player.`);
+            if (!playersInConference.includes(targetId)) return failure(`The user <@${targetId}> is not in the Conference.`);
+            if (userId !== null && userId == targetId) return failure("You cannot remove yourself from the Conference.");
+
+            const member = await mainGuild.members
+                .fetch(targetId)
+                .catch(console.error);
+            if (member) {
+                await member.roles
+                    .remove(config.discordRoles["Press Conference"])
+                    .catch(console.error);
+            }
+        }
+
+        const newsChannel = await mainGuild.channels.fetch(config.channels.news) as TextChannel;
+        newsChannel.send(`${targetIds.map(id => `<@${id}>`).join(", ")} has been removed from the Press Conference`).catch(console.error);
+
+        return { success: true };
     },
 };
 

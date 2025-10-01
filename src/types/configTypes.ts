@@ -71,6 +71,7 @@ export interface Config {
     maxGroupChatSize: number;
     groupChatTokenCost: number;
     maxGroupChatsInGame: number;
+    maxPlayersInConference: number;
     civArrestVoteDuration: number;
     civArrestDuration: number;
     announcementDelay: number; // in seconds
@@ -81,6 +82,9 @@ export interface Config {
     groupGuilds: GuildName[];
     loggableChannels: ChannelName[];
     seasonDuration: number;
+
+    postGameDiscussionMessage: string;
+    postDeathDiscussionMessage: string;
 
     loungeMemberPermissions: PermissionOverwriteOptions;
     spectatorPermissions: PermissionOverwriteOptions;

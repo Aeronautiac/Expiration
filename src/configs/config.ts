@@ -15,6 +15,7 @@ export const config = {
     maxGroupChatSize: 5,
     groupChatTokenCost: 5,
     maxGroupChatsInGame: 3,
+    maxPlayersInConference: 5,
     announcementDelay: 5, // in seconds
     pollUpdateRate: 5,
     orgPollDuration: 8, // in hours
@@ -26,6 +27,8 @@ export const config = {
     groupGuilds: ["lwatari", "kk", "tf"],
     loggableChannels: ["news", "courtroom", "anonymousCourtroom", "tfLounge", "kkLounge", "lwatariLounge", "general", "media"],
     seasonDuration: 10, // days, only used for day announcement display atm
+    postGameDiscussionMessage: "# --- POST GAME DISCUSSION --- #",
+    postDeathDiscussionMessage: "# --- POST DEATH DISCUSSION --- #",
 
     loungeMemberPermissions: {
         ViewChannel: true,

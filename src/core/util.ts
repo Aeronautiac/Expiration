@@ -16,7 +16,7 @@ import { config } from "../configs/config";
 import { PlayerStateName } from "../configs/playerStates";
 import Player from "../models/player";
 import contacting from "./contacting";
-import { DiscordRoleName } from "../configs/discordRoles";
+import { DiscordRoleName, discordRoles } from "../configs/discordRoles";
 import { RoleName } from "../configs/roles";
 import { failure, Result, success } from "../types/Result";
 import Organisation from "../models/organisation";
@@ -346,6 +346,61 @@ const util = {
     // this function will tokenize long messages and send them in chunks.
     // eventually I plan to make it include formatting and everything.
     async sendMessage(channelId: string, message: string) {},
+
+    async produceListOfRoles(includeTrueNames: boolean = false): Promise<string> {
+        const getTrueNameIfNeededHelper = async (userId: string): Promise<string> => {
+            return new Promise(async (resolve, reject) => {
+                const playerData = await Player.findOne({ userId });
+                if (playerData) {
+                    if (includeTrueNames) {
+                        resolve(`<@${userId}> (${playerData.trueName})`);
+                    } else {
+                        resolve(`<@${userId}>`);
+                    }
+                } else {
+                    reject("Player not found");
+                }
+            });
+        }
+
+        const rolesInOrder = [
+            "Kira",
+            "2nd Kira",
+            "",
+            "L",
+            "Watari",
+            "",
+            "Beyond Birthday",
+            "Rogue Civilian",
+            "Private Investigator",
+            "News Anchor",
+        ];
+        const orgsInOrder = ["Kira's Kingdom", "Task Force"];
+
+        let roleRevealMessage = `The roles for this season:\n\n`;
+
+        for (const roleName of rolesInOrder) {
+            if (roleName === "") {
+                roleRevealMessage += `\n`;
+                continue;
+            }
+
+            const playerData = await Player.findOne({ role: roleName });
+            if (playerData) {
+                roleRevealMessage += `<@&${discordRoles[roleName]}> -- ${await getTrueNameIfNeededHelper(playerData.userId)}\n`;
+            }
+        }
+
+        for (const orgName of orgsInOrder) {
+            const orgData = await Organisation.findOne({ name: orgName });
+            roleRevealMessage += `\nThe original members for <@&${discordRoles[orgName]}>:\n`;
+            for (const memberId of orgData.ogMemberIds) {
+                roleRevealMessage += await getTrueNameIfNeededHelper(memberId) + "\n";
+            }
+        }
+
+        return roleRevealMessage;
+    },
 
     interactionChoice(
         choice: string

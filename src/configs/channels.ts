@@ -15,6 +15,7 @@ export const channels = {
     general: "1421729455587725372",
     media: "1418665186302361750",
     lwatariLounge: "1421729673557311529",
+    "playerList": "1406115827274612752",
 } as const satisfies { [channelName: string]: string };
 
 export type ChannelName = keyof typeof channels;
