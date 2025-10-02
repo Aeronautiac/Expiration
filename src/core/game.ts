@@ -206,20 +206,8 @@ const game = {
 
             await util.sleep(config.announcementDelay * 2);
 
-            // give spectator role to all players
-            const mainGuild = await client.guilds.fetch(config.guilds.main);
             for (const playerData of await Player.find({})) {
-                const member = await mainGuild.members
-                    .fetch(playerData.userId)
-                    .catch(() => null);
-
-                if (member) {
-                    await member.roles
-                        .add(discordRoles.Spectator)
-                        .catch(console.error);
-                    // invite to role guilds
-                    await access.grantAll(playerData.userId);
-                }
+                await game.makeSpectator(playerData.userId);
             }
         }
 
@@ -234,6 +222,20 @@ const game = {
         return success(
             "The season has been cleared. You may now create a new season with /newseason."
         );
+    },
+
+    async makeSpectator(userId: string): Promise<boolean> {
+        const mainGuild = await client.guilds.fetch(config.guilds.main);
+        const member = await mainGuild.members.fetch(userId).catch(() => null);
+        if (member) {
+            await member.roles.add(discordRoles.Spectator).catch(console.error);
+            // invite to role guilds
+            await access.grantAll(userId);
+
+            return true;
+        };
+
+        return false;
     },
 
     async createMonologue(userId: string) {
@@ -352,6 +354,10 @@ const game = {
         await Player.updateMany(
             { "flags.underTheRadar": true },
             { $unset: { "flags.underTheRadar": "" } }
+        );
+        await Player.updateMany(
+            { "flags.kiraConnectionCooldown": true },
+            { $unset: { "flags.kiraConnectionCooldown": "" } }
         );
         await game.resetContactTokens();
         await game.removeIPPs();

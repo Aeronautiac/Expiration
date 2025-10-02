@@ -69,5 +69,5 @@ export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
         charges: 1,
         cooldown: 999,
         bypasses: [],
-    },
+    }
 };

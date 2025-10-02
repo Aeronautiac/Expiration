@@ -13,6 +13,7 @@ import Season from "../models/season";
 import Notebook from "../models/notebook";
 import { guilds } from "../configs/guilds";
 import sharedAbilities from "./sharedAbilities";
+import Lounge from "../models/lounge";
 
 let client: Client;
 

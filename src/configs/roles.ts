@@ -40,14 +40,10 @@ export const roles = {
             "nameReveal",
             "notebookReveal",
             "underTheRadar",
-            "anonymousAnnouncement",
+            "anonymousAnnouncement"
         ],
         guilds: ["2kira"],
-        abilityOverrides: {
-            nameReveal: {
-                charges: [1, 2],
-            },
-        },
+        abilityOverrides: {},
         guildChannels: {},
     },
     "News Anchor": {

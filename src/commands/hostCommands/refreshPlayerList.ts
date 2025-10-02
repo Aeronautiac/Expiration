@@ -21,7 +21,7 @@ export default {
 
         const roleRevealMessage = await util.produceListOfRoles(true);
         const mainGuild = await interaction.client.guilds.fetch(config.guilds.main);
-        const playerListChannel = (await mainGuild.channels.fetch()).find(channel => channel.name === config.channels.playerList) as TextChannel;
+        const playerListChannel = (await mainGuild.channels.fetch()).find(channel => channel.id === config.channels.playerList) as TextChannel;
 
         await playerListChannel.send(roleRevealMessage);
 

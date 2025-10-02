@@ -2,7 +2,7 @@ import { Document, Schema, Model, model } from "mongoose";
 import { RoleName } from "../configs/roles";
 import { PlayerStateName } from "../configs/playerStates";
 
-export type ExtraPlayerFlag = "ipp" | "underTheRadar" | "kiraConnection" | "alive" | "didPublicKidnap";
+export type ExtraPlayerFlag = "ipp" | "underTheRadar" | "kiraConnection" | "kiraConnectionCooldown" | "alive" | "didPublicKidnap";
 export type PlayerFlag = ExtraPlayerFlag | PlayerStateName;
 
 // Interface representing a player
