@@ -44,6 +44,7 @@ access.grant = async function (userId, guildIds) {
     }
 
     let inviteMessage: string = `${user} You have been invited to: `
+    let secondInviteMessage: string = "" // This is for when the number of invites are over 10.
     let guildsInvitedTo: number = 0;
     for (const guildId of guildIds) {
         const guild = await client.guilds.fetch(guildId);
@@ -95,13 +96,15 @@ access.grant = async function (userId, guildIds) {
 
         playerData.invites.set(guildId, invite.code);
         guildsInvitedTo += 1;
-        inviteMessage += `${invitePrefix}${invite.code}\n`;
+        if (guildsInvitedTo <= 10) inviteMessage += `\n${invitePrefix}${invite.code}`;
+        if (guildsInvitedTo > 10) secondInviteMessage += `\n${invitePrefix}${invite.code}`;
     }
 
     await playerData.save();
 
     if (guildsInvitedTo === 0) return;
     await util.sendToUser(userId, inviteMessage);
+    if (secondInviteMessage !== "") await util.sendToUser(userId, secondInviteMessage);
 
     return;
 };
