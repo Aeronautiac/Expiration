@@ -709,9 +709,9 @@ const contacting = {
 
         const playersInConference: string[] = [];
         const mainGuild = await client.guilds.fetch(config.guilds.main);
-        for (const member of await mainGuild.members.fetch()) {
-            if (member[1].roles.cache.has(config.discordRoles["Press Conference"])) {
-                playersInConference.push(member[0]);
+        for (const [, member] of await mainGuild.members.fetch()) {
+            if (member.roles.cache.has(config.discordRoles["Press Conference"])) {
+                playersInConference.push(member.id);
             }
         }
 
@@ -752,9 +752,9 @@ const contacting = {
 
         const playersInConference: string[] = [];
         const mainGuild = await client.guilds.fetch(config.guilds.main);
-        for (const member of await mainGuild.members.fetch()) {
-            if (member[1].roles.cache.has(config.discordRoles["Press Conference"])) {
-                playersInConference.push(member[0]);
+        for (const [, member] of await mainGuild.members.fetch()) {
+            if (member.roles.cache.has(config.discordRoles["Press Conference"])) {
+                playersInConference.push(member.id);
             }
         }
 
