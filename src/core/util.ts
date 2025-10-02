@@ -23,6 +23,8 @@ import Organisation from "../models/organisation";
 import { OrgMember } from "../types/OrgMember";
 import { OrganisationName } from "../configs/organisations";
 import { configDotenv } from "dotenv";
+import names from "./names";
+import game from "./game";
 
 let client: Client;
 
@@ -347,13 +349,38 @@ const util = {
     // eventually I plan to make it include formatting and everything.
     async sendMessage(channelId: string, message: string) {},
 
+    // use this instead of user.send(). This sends to a monologue channel instead of DMs
+    async sendToUser(userId: string, message: string) {
+        const playerData = await Player.findOne({ userId: userId });
+        if (!playerData) throw new Error("Player data not found for user ID: " + userId);
+
+        let monologueChannel: TextChannel;
+        if (!playerData.monologueChannelId) {
+            monologueChannel = await game.createMonologue(userId)
+        } else {
+            monologueChannel = await client.channels
+                .fetch(playerData.monologueChannelId)
+                .catch(() => null) as TextChannel;
+        };
+
+        if (monologueChannel) {
+            monologueChannel.send(message).catch(async (err) => {
+                console.error(
+                    `Failed to send message to monologue channel ${playerData.monologueChannelId} for user ${userId}:`, err
+                );
+            });
+        } else {
+           console.log(`Monologue channel not set for user ID: ${userId}`)
+        };
+    },
+
     async produceListOfRoles(includeTrueNames: boolean = false): Promise<string> {
         const getTrueNameIfNeededHelper = async (userId: string): Promise<string> => {
             return new Promise(async (resolve, reject) => {
                 const playerData = await Player.findOne({ userId });
                 if (playerData) {
                     if (includeTrueNames) {
-                        resolve(`<@${userId}> (${playerData.trueName})`);
+                        resolve(`<@${userId}> (${names.toReadable(playerData.trueName)})`);
                     } else {
                         resolve(`<@${userId}>`);
                     }
@@ -387,7 +414,7 @@ const util = {
 
             const playerData = await Player.findOne({ role: roleName });
             if (playerData) {
-                roleRevealMessage += `<@&${discordRoles[roleName]}> -- ${await getTrueNameIfNeededHelper(playerData.userId)}\n`;
+                roleRevealMessage += `<@&${discordRoles[roleName]}> ${await getTrueNameIfNeededHelper(playerData.userId)}\n`;
             }
         }
 

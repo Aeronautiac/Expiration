@@ -727,7 +727,8 @@ const contacting = {
             if (targetData.flags.get("incarcerated")) return failure(`The user <@${targetId}> is incarcerated and cannot be added to the Conference.`);
             if (playersInConference.includes(targetId)) return failure(`The user <@${targetId}> is already in the Conference.`);
             if (userId !== null && userId == targetId) return failure("You cannot add yourself to the Conference.");
-
+        }
+        for (const targetId of targetIds) {
             const member = await mainGuild.members
                 .fetch(targetId)
                 .catch(console.error);
@@ -768,7 +769,8 @@ const contacting = {
             if (!targetData) return failure(`The user <@${targetId}> is not a player.`);
             if (!playersInConference.includes(targetId)) return failure(`The user <@${targetId}> is not in the Conference.`);
             if (userId !== null && userId == targetId) return failure("You cannot remove yourself from the Conference.");
-
+        }
+        for (const targetId of targetIds) {
             const member = await mainGuild.members
                 .fetch(targetId)
                 .catch(console.error);

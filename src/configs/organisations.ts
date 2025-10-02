@@ -3,7 +3,7 @@ import type { Organisation } from "../types/configTypes";
 // if there is no rank name for leader, then the org cannot have a leader.
 export const organisations = {
     "Task Force": {
-        guild: "tf",
+        guild: "Task Force",
         mainChannel: "tfLounge",
         abilities: [
             "Background Check",
@@ -22,7 +22,7 @@ export const organisations = {
         leaderChannel: "tfChiefDescription",
     },
     "Kira's Kingdom": {
-        guild: "kk",
+        guild: "Kira's Kingdom",
         mainChannel: "kkLounge",
         abilities: [
             "Blackout",

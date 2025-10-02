@@ -56,22 +56,21 @@ export default {
             return;
         }
 
-        await interaction.deferReply({
-            ephemeral: false
+        await interaction.editReply({
+            content: "Success.",
         });
 
+        playerData.flags.set("kiraConnectionCooldown", true);
+        await playerData.save();
+        
         const kiraPlayerUserId = (await Player.findOne({ role: "Kira" })).userId;
         const kiraIsInLounge = lounge.contactedId === kiraPlayerUserId || lounge.contactorId == kiraPlayerUserId;
         if (kiraIsInLounge) {
             game.unlock2ndKira();
 
-            await interaction.editReply({
-                content: `@everyone <@&${discordRoles.Kira}> is present in this lounge. <@&${discordRoles["2nd Kira"]}> can now write in their Death Note.`,
-            });
+            currentChannel.send(`<@&${discordRoles["2nd Kira"]}> has confirmed that <@&${discordRoles.Kira}> is present in this lounge. <@&${discordRoles["2nd Kira"]}> can now write in their Death Note.`);
         } else {
-            await interaction.editReply({
-                content: `@everyone <@&${discordRoles.Kira}> is not present in this lounge.`,
-            });
+            currentChannel.send(`@everyone <@&${discordRoles.Kira}> is not present in this lounge.`);
         }
     },
 };

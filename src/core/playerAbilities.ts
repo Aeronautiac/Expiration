@@ -68,6 +68,7 @@ const playerAbilities = {
             Date.now() +
                 util.hrsToMs(config.playerAbilities.pseudocide.duration)
         );
+
         await agenda.schedule(reviveAt, "pseudocideRevival", {
             userId: args.targetId,
             roleOnDeath: targetData.role,
@@ -166,11 +167,12 @@ const playerAbilities = {
         if (checkOnly) return success();
 
         const user = await client.users.fetch(userId);
-        await user.send(
-            `The true name of **${await names.getDisplay(
-                args.targetId
-            )}** is **${names.toReadable(targetData.trueName)}**.`
-        );
+        await util.sendToUser(userId, `The true name of **${await names.getDisplay(args.targetId)}** is **${names.toReadable(targetData.trueName)}**.`);
+        // await user.send(
+        //     `The true name of **${await names.getDisplay(
+        //         args.targetId
+        //     )}** is **${names.toReadable(targetData.trueName)}**.`
+        // );
 
         return success();
     },
@@ -213,22 +215,25 @@ const playerAbilities = {
 
         const user = await client.users.fetch(userId);
         if (temporaryOwner || notebooksNotPassed > 0) {
-            await user.send(
-                `**${await names.getAlias(
-                    targetData.userId
-                )}** currently possesses a notebook.`
-            );
+            await util.sendToUser(userId, `**${await names.getAlias(targetData.userId)}** currently possesses a notebook.`);
+            
+            // await user.send(
+            //     `**${await names.getAlias(
+            //         targetData.userId
+            //     )}** currently possesses a notebook.`
+            // );
         } else {
             if (userData.role === "Beyond Birthday")
                 await Player.updateOne(
                     { userId: user.id },
                     { $inc: { eyes: -1 } }
                 );
-            await user.send(
-                `**${await names.getAlias(
-                    targetData.userId
-                )}** does not currently possess a notebook.`
-            );
+            await util.sendToUser(userId, `**${await names.getAlias(targetData.userId)}** does not currently possess a notebook.`);
+            // await user.send(
+            //     `**${await names.getAlias(
+            //         targetData.userId
+            //     )}** does not currently possess a notebook.`
+            // );
         }
 
         return success();
@@ -244,7 +249,7 @@ const playerAbilities = {
         const season = await Season.findOne({});
         const targetId = args.targetId;
         const targetData = await Player.findOne({ userId: targetId });
-        const piDiscord = await client.guilds.fetch(config.guilds.pi);
+        const piDiscord = await client.guilds.fetch(config.guilds["Private Investigator"]);
 
         if (!targetData) return failure("This user has no data.");
         if (targetData.flags.get("alive"))
@@ -278,7 +283,7 @@ const playerAbilities = {
 
         // create autopsy channel
         const autopsyLogs = (await util.createTemporaryChannel(
-            guilds.pi,
+            guilds["Private Investigator"],
             `autopsy-${await names.getAlias(targetId)}`,
             config.categoryPrefixes.autopsy,
             [

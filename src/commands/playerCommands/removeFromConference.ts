@@ -3,7 +3,7 @@ import contacting from "../../core/contacting";
 
 export default {
     data: new SlashCommandBuilder()
-        .setName("remove from conference")
+        .setName("removefromconference")
         .setDescription("Remove user(s) from the conference.")
         .addUserOption((option) =>
             option

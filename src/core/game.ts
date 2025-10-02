@@ -28,6 +28,7 @@ import { discordRoles } from "../configs/discordRoles";
 import Organisation from "../models/organisation";
 import Ability from "../models/ability";
 import death from "./death";
+import { guilds } from "../configs/guilds";
 
 let client: Client;
 
@@ -56,10 +57,8 @@ const game = {
         role: RoleName,
         trueName?: string
     ): Promise<void> {
-        let playerData = await Player.findOne({ userId });
-        const user = await client.users.fetch(userId);
+        let playerData = await Player.findOne({ "userId": userId });
 
-        let sentDmSuccess = true;
         if (!playerData) {
             const name = trueName
                 ? names.toReadable(trueName)
@@ -73,11 +72,12 @@ const game = {
                 flags: new Map([["alive", true]]),
             });
 
-            await user
-                .send(`Your true name is **${names.toReadable(name)}**`)
-                .catch(() => {
-                    sentDmSuccess = false;
-                });
+            await util.sendToUser(userId, `Your true name is **${names.toReadable(name)}**`);
+            // await user
+            //     .send(`Your true name is **${names.toReadable(name)}**`)
+            //     .catch(() => {
+            //         sentDmSuccess = false;
+            //     });
         } else {
             // revive them
             await Player.updateOne(
@@ -112,9 +112,6 @@ const game = {
                 }
             }
         }
-
-        // if the user has not had their monologue created yet, then create it now.
-        if (!playerData.monologueChannelId) await game.createMonologue(userId);
 
         // restricts access to all guilds except main (this is called no matter what because your role could change even while alive.)
         await access.revokeAll(userId);
@@ -172,6 +169,21 @@ const game = {
 
         await game.announceDayNumber();
 
+        for (const guildId of Object.values(guilds)) {
+            if (guildId === config.guilds.main) continue;
+            const guild = await client.guilds.fetch(guildId).catch(() => null);
+            if (!guild) continue;
+            const loungeChannel = guild.channels.cache.find(
+                channel => channel.type === 0 && channel.name === "lounge"
+            );
+            if (loungeChannel) {
+                await loungeChannel.permissionOverwrites.edit(
+                    loungeChannel.guild.roles.everyone,
+                    { SendMessages: false }
+                );
+            }
+        }
+
         return success("Season started. Run /endseason to end.");
     },
 
@@ -209,6 +221,22 @@ const game = {
             for (const playerData of await Player.find({})) {
                 await game.makeSpectator(playerData.userId);
             }
+
+            for (const guildId of Object.values(guilds)) {
+                if (guildId === config.guilds.main) continue;
+                const guild = await client.guilds.fetch(guildId).catch(() => null);
+                if (!guild) continue;
+                const loungeChannel = guild.channels.cache.find(
+                    channel => channel.type === 0 && channel.name === "lounge"
+                );
+                if (loungeChannel) {
+                    await loungeChannel.send(config.postGameDiscussionMessage).catch(console.error);
+                    await loungeChannel.permissionOverwrites.edit(
+                        loungeChannel.guild.roles.everyone,
+                        { SendMessages: true }
+                    );
+                }
+            }
         }
 
         return success(
@@ -228,17 +256,37 @@ const game = {
         const mainGuild = await client.guilds.fetch(config.guilds.main);
         const member = await mainGuild.members.fetch(userId).catch(() => null);
         if (member) {
+            const adminRoleIds = (await mainGuild.roles.fetch())
+                .filter(role => role.permissions.has("Administrator"))
+                .map(role => role.id);
+
+            const rolesToRemove = (await member.roles.cache)
+                .filter(role => !adminRoleIds.includes(role.id))
+                .map(role => role);
+           await Promise.all(
+                rolesToRemove
+                    .filter(role => mainGuild.roles.cache.has(role.id))
+                    .map(role => member.roles.remove(role).catch(console.error))
+            );
+            
+            await member.roles.add(discordRoles.Shinigami).catch(console.error);
             await member.roles.add(discordRoles.Spectator).catch(console.error);
+
             // invite to role guilds
             await access.grantAll(userId);
 
+            const playerData = await Player.findOne({ userId: userId });
+            if (playerData) {
+                playerData.flags.set("spectator", true);
+                await playerData.save();
+            }
             return true;
         };
 
         return false;
     },
 
-    async createMonologue(userId: string) {
+    async createMonologue(userId: string): Promise<TextChannel> {
         const userData = await Player.findOne({ userId });
         if (!userData) throw new Error("Player does not exist.");
 
@@ -273,6 +321,8 @@ const game = {
             await monologueChannel.send(
                 `<@${userId}> this is your monologue channel. It is a completely private channel where you can write down your thoughts or store any information you might find useful. You may do whatever you wish with it.`
             );
+
+        return monologueChannel as TextChannel;
     },
 
     async resetContactTokens() {
@@ -746,9 +796,10 @@ const game = {
         );
         const user: User = await client.users.fetch(userId).catch(() => null);
         if (user)
-            await user.send(
-                `Your new true name is **${names.toReadable(newTrueName)}**.`
-            );
+            await util.sendToUser(userId, `Your new true name is **${names.toReadable(newTrueName)}**.`);
+            // await user.send(
+            //     `Your new true name is **${names.toReadable(newTrueName)}**.`
+            // );
     },
 
     async bug(

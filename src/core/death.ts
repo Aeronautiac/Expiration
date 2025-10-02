@@ -1,4 +1,4 @@
-import { Client } from "discord.js";
+import { Client, TextChannel } from "discord.js";
 import access from "./access";
 import game from "./game";
 import { config } from "../configs/config";
@@ -11,6 +11,8 @@ import names from "./names";
 import util from "./util";
 import { RoleName } from "../configs/roles";
 import { OrgMember } from "../types/OrgMember";
+import { singlePlayerGuilds } from "../configs/singlePlayerRoles";
+import { guilds } from "../configs/guilds";
 
 let client: Client;
 
@@ -96,7 +98,7 @@ const death = {
 
                 // transfer bug ability
                 await access.revoke(userId, config.guilds.watarilaptop);
-                await access.grant(args.killerId, config.guilds.watarilaptop);
+                await access.grant(args.killerId, [config.guilds.watarilaptop]);
                 bugAbility.owner = args.killerId;
                 bugAbility.roleRestrictions = [];
                 await bugAbility.save();
@@ -126,6 +128,20 @@ const death = {
                 role: userData.role,
                 memberObjects: await util.getMemberObjects(userId),
             });
+
+            if (singlePlayerGuilds.includes(userData.role as typeof singlePlayerGuilds[number])) {
+                // announce in role server
+                const roleGuildId = guilds[userData.role];
+                if (roleGuildId) {
+                    const roleGuild = await client.guilds.fetch(roleGuildId);
+                    const loungeChannel = roleGuild.channels.cache.find(
+                        (channel) => channel.type === 0 && channel.name === "lounge"
+                    ) as TextChannel;
+                    if (loungeChannel) {
+                        await loungeChannel.send(config.postDeathDiscussionMessage);
+                    }
+                }
+            }
         }
     },
 

@@ -10,7 +10,7 @@ let client: Client;
 
 interface access {
     init: (newClient: Client) => void;
-    grant: (userId: string, guildId: string) => Promise<void>;
+    grant: (userId: string, guildIds: string[]) => Promise<void>;
     grantAll: (userId: string) => Promise<void>;
     revoke: (userId: string, guildId: string) => Promise<void>;
     revokeAll: (userId: string) => Promise<void>;
@@ -31,11 +31,9 @@ access.init = function (newClient) {
 
 //////////////////////////////////////////////////////
 
-access.grant = async function (userId, guildId) {
-    console.log(`granting access to: ${guildId}`);
+access.grant = async function (userId, guildIds) {
+    console.log(`granting access to: ${guildIds}`);
     const user = await client.users.fetch(userId);
-    const guild = await client.guilds.fetch(guildId);
-
     const invitePrefix = `https://discord.gg/`;
 
     // we need player data to handle this. if there is no player data, return early.
@@ -45,75 +43,72 @@ access.grant = async function (userId, guildId) {
         return;
     }
 
-    async function sendInvite(code: string) {
-        try {
-            await user.send(`${invitePrefix}${code}`);
-        } catch (err) {
-            console.log("Failed to send guild invite to user.", err);
+    let inviteMessage: string = `${user} You have been invited to: `
+    let guildsInvitedTo: number = 0;
+    for (const guildId of guildIds) {
+        const guild = await client.guilds.fetch(guildId);
+
+        // check if the player already has access
+        if (playerData.invites.has(guildId)) continue;
+
+        // check if the guildId is valid
+        if (!(Object.values(config.guilds) as string[]).includes(guildId)) {
+            console.warn(
+                "Cannot grant access to a guild that does not exist (invalid guild id)."
+            );
+            continue;
         }
+
+        // main discord should not be part of the guild access system
+        if (guildId === config.guilds.main) continue;
+
+        // create and add the invite to their data
+        const channels = await guild.channels.fetch().catch(() => new Map());
+        const channel =
+            guild.systemChannel ||
+            [...channels.values()].find(
+                (c) =>
+                    c.isTextBased() &&
+                    c.permissionsFor(guild.members.me).has("CreateInstantInvite")
+            );
+
+        if (!channel) {
+            console.warn(
+                `Cannot create guild invite in ${guild.name}. No suitable channel or invalid permissions.`
+            );
+            continue;
+        }
+
+        // if they were banned, unban them
+        const ban = await guild.bans.fetch(userId).catch(() => null);
+        if (!ban) {
+            console.log(`User ${userId} is not banned, skipping unban.`);
+        } else {
+            await guild.bans.remove(userId);
+            console.log(`Unbanned user ${userId}`);
+        }
+
+        const invite = await channel.createInvite({
+            maxUses: 1,
+            unique: true,
+        });
+
+        playerData.invites.set(guildId, invite.code);
+        guildsInvitedTo += 1;
+        inviteMessage += `${invitePrefix}${invite.code}\n`;
     }
 
-    // check if the player already has access
-    if (playerData.invites.has(guildId)) return;
-
-    // check if the guildId is valid
-    if (!(Object.values(config.guilds) as string[]).includes(guildId)) {
-        console.warn(
-            "Cannot grant access to a guild that does not exist (invalid guild id)."
-        );
-        return;
-    }
-
-    // main discord should not be part of the guild access system
-    if (guildId === config.guilds.main) return;
-
-    // create and add the invite to their data
-    const channels = await guild.channels.fetch().catch(() => new Map());
-    const channel =
-        guild.systemChannel ||
-        [...channels.values()].find(
-            (c) =>
-                c.isTextBased() &&
-                c.permissionsFor(guild.members.me).has("CreateInstantInvite")
-        );
-
-    if (!channel) {
-        console.warn(
-            `Cannot create guild invite in ${guild.name}. No suitable channel or invalid permissions.`
-        );
-        return;
-    }
-
-    // if they were banned, unban them
-    const ban = await guild.bans.fetch(userId).catch(() => null);
-    if (!ban) {
-        console.log(`User ${userId} is not banned, skipping unban.`);
-    } else {
-        await guild.bans.remove(userId);
-        console.log(`Unbanned user ${userId}`);
-    }
-
-    const invite = await channel.createInvite({
-        maxUses: 1,
-        unique: true,
-    });
-
-    playerData.invites.set(guildId, invite.code);
     await playerData.save();
 
-    await sendInvite(invite.code);
+    if (guildsInvitedTo === 0) return;
+    await util.sendToUser(userId, inviteMessage);
 
     return;
 };
 
 // grants access to all organisation servers & role servers
 access.grantAll = async function (userId) {
-    const promises = Object.entries(config.guilds).map(
-        async ([guildName, guildId]) => {
-            await access.grant(userId, guildId);
-        }
-    );
-    await Promise.all(promises);
+    await access.grant(userId, Object.values(config.guilds) as string[]);
 };
 
 // restricts access to a server by banning the player and deleting their invite if they have one
@@ -240,12 +235,8 @@ access.grantRole = async function (userId) {
 
     const role = playerData.role;
     const guildsToGrant: string[] = config.roles[role].guilds || [];
-
-    const promises = guildsToGrant.map(async (guildName) => {
-        const guildId = config.guilds[guildName];
-        await access.grant(userId, guildId);
-    });
-    await Promise.allSettled(promises);
+    const guildIds = guildsToGrant.map((guildName) => config.guilds[guildName]);
+    await access.grant(userId, guildIds);
 };
 
 // restricts access from all group guilds
@@ -279,10 +270,8 @@ access.grantGroup = async function (userId) {
         }
     }
 
-    for (const guildName of guildsToGrant) {
-        const guildId = config.guilds[guildName];
-        await access.grant(userId, guildId);
-    }
+    const guildIds = Array.from(guildsToGrant).map((guildName) => config.guilds[guildName]);
+    await access.grant(userId, guildIds);
 };
 
 //////////////////////////////////////////////////////

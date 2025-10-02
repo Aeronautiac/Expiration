@@ -3,13 +3,13 @@ import type { Role } from "../types/configTypes";
 export const roles = {
     Kira: {
         abilities: ["underTheRadar", "anonymousAnnouncement"],
-        guilds: ["kira"],
+        guilds: ["Kira"],
         abilityOverrides: {},
         guildChannels: {},
     },
     "Beyond Birthday": {
         abilities: ["pseudocide", "nameReveal", "notebookReveal"],
-        guilds: ["bb"],
+        guilds: ["Beyond Birthday"],
         abilityOverrides: {},
         guildChannels: {},
     },
@@ -31,7 +31,7 @@ export const roles = {
     },
     "Private Investigator": {
         abilities: ["autopsy", "ipp", "anonymousContact", "trueNameReroll"],
-        guilds: ["pi"],
+        guilds: ["Private Investigator"],
         abilityOverrides: {},
         guildChannels: {},
     },
@@ -42,14 +42,14 @@ export const roles = {
             "underTheRadar",
             "anonymousAnnouncement"
         ],
-        guilds: ["2kira"],
+        guilds: ["2nd Kira"],
         abilityOverrides: {},
         guildChannels: {},
     },
     "News Anchor": {
         abilities: ["Civilian Arrest"],
         guildChannels: {},
-        guilds: ["newsAnchor"],
+        guilds: ["News Anchor"],
         abilityOverrides: {},
     },
     Civilian: {
@@ -61,7 +61,7 @@ export const roles = {
     "Rogue Civilian": {
         abilities: [],
         guildChannels: {},
-        guilds: ["rogueCivilian"],
+        guilds: ["Rogue Civilian"],
         abilityOverrides: {},
     },
 } as const satisfies { [roleName: string]: Role };

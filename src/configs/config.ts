@@ -24,7 +24,7 @@ export const config = {
     deathNoteDelayCap: 20160, // min
     pollYesEmoji: `✅`,
     pollNoEmoji: `❌`,
-    groupGuilds: ["lwatari", "kk", "tf"],
+    groupGuilds: ["lwatari", "Kira's Kingdom", "Task Force"],
     loggableChannels: ["news", "courtroom", "anonymousCourtroom", "tfLounge", "kkLounge", "lwatariLounge", "general", "media"],
     seasonDuration: 10, // days, only used for day announcement display atm
     postGameDiscussionMessage: "# --- POST GAME DISCUSSION --- #",

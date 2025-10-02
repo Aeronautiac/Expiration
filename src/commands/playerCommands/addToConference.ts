@@ -3,7 +3,7 @@ import contacting from "../../core/contacting";
 
 export default {
     data: new SlashCommandBuilder()
-        .setName("add to conference")
+        .setName("addtoconference")
         .setDescription("Add user(s) to the conference.")
         .addUserOption((option) =>
             option

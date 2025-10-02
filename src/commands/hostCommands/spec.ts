@@ -3,10 +3,6 @@ import {
     PermissionFlagsBits,
     SlashCommandBuilder,
 } from "discord.js";
-import Player from "../../models/player";
-import { guilds } from "../../configs/guilds";
-import { discordRoles } from "../../configs/discordRoles";
-import access from "../../core/access";
 import game from "../../core/game";
 
 export default {

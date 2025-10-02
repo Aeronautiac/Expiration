@@ -54,7 +54,7 @@ const notebooks = {
             // if the person holding the notebook, changed, revoke access from the old and grant to the new.
             if (newHolder !== currentHolder) {
                 await access.revoke(currentHolder, guildId);
-                await access.grant(newHolder, guildId);
+                await access.grant(newHolder, [guildId]);
             }
 
             // if the notebook was being held temporarily before the posession change, then remove the temporary owner field
@@ -74,7 +74,7 @@ const notebooks = {
             originalOwner: ownerId,
         });
 
-        await access.grant(ownerId, guildId);
+        await access.grant(ownerId, [guildId]);
     },
 
     async returnNotebooks() {

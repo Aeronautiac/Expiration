@@ -3,6 +3,7 @@ import game from "./core/game";
 import { ScheduledKillData } from "./types/ScheduledKillData";
 import { RoleName } from "./configs/roles";
 import death from "./core/death";
+import Player from "./models/player";
 
 const agenda = new Agenda({ db: { address: process.env.MONGODB_URI } });
 
