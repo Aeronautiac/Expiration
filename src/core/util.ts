@@ -6,7 +6,6 @@ import {
     Message,
     NewsChannel,
     PermissionOverwriteOptions,
-    roleMention,
     StageChannel,
     TextChannel,
     VoiceChannel,
@@ -17,12 +16,10 @@ import { PlayerStateName } from "../configs/playerStates";
 import Player from "../models/player";
 import contacting from "./contacting";
 import { DiscordRoleName, discordRoles } from "../configs/discordRoles";
-import { RoleName } from "../configs/roles";
 import { failure, Result, success } from "../types/Result";
 import Organisation from "../models/organisation";
 import { OrgMember } from "../types/OrgMember";
 import { OrganisationName } from "../configs/organisations";
-import { configDotenv } from "dotenv";
 import names from "./names";
 import game from "./game";
 
@@ -364,7 +361,7 @@ const util = {
         };
 
         if (monologueChannel) {
-            monologueChannel.send(message).catch(async (err) => {
+            monologueChannel.send(`<@${userId}> ${message}`).catch((err) => {
                 console.error(
                     `Failed to send message to monologue channel ${playerData.monologueChannelId} for user ${userId}:`, err
                 );

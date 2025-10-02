@@ -38,15 +38,13 @@ const playerAbilities = {
         if (checkOnly) return success();
 
         const target = await client.users.fetch(args.targetId);
-        await target
-            .send(
-                "You have been pseudocided. Do not ask any players for information in the shinigami realm. If you do so, you will be punished."
+        await util.sendToUser(target.id,
+            "You have been pseudocided. Do not ask any players for information in the shinigami realm. If you do so, you will be punished."
+        ).catch(() => {
+            console.warn(
+                `Could not notify user ${args.targetId} of pseudocide.`
             )
-            .catch(() => {
-                console.warn(
-                    `Could not notify user ${args.targetId} of pseudocide.`
-                );
-            });
+        });
 
         // kill the target without sending a death announcement
         await death.kill(args.targetId, {
@@ -66,7 +64,7 @@ const playerAbilities = {
         // schedule their revival for after the pseudocide period
         const reviveAt = new Date(
             Date.now() +
-                util.hrsToMs(config.playerAbilities.pseudocide.duration)
+            util.hrsToMs(config.playerAbilities.pseudocide.duration)
         );
 
         await agenda.schedule(reviveAt, "pseudocideRevival", {
@@ -216,7 +214,7 @@ const playerAbilities = {
         const user = await client.users.fetch(userId);
         if (temporaryOwner || notebooksNotPassed > 0) {
             await util.sendToUser(userId, `**${await names.getAlias(targetData.userId)}** currently possesses a notebook.`);
-            
+
             // await user.send(
             //     `**${await names.getAlias(
             //         targetData.userId
@@ -374,6 +372,13 @@ const playerAbilities = {
         await game.newTrueName(args.targetId);
 
         return success();
+    },
+
+    kiraConnection(
+        userId: string,
+        args: PlayerAbilityArgs["kiraConnection"]
+    ) {
+
     },
 };
 

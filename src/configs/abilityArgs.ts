@@ -49,6 +49,10 @@ export interface PlayerAbilityArgs {
     trueNameReroll: {
         targetId: string;
     };
+
+    kiraConnection: {
+        loungeId: number;
+    };
 }
 
 export interface OrganisationAbilityArgs {

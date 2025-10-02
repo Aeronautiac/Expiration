@@ -1,7 +1,9 @@
 import {
     Client,
+    GuildMember,
     Message,
     PermissionOverwriteOptions,
+    Role,
     TextChannel,
     User,
 } from "discord.js";
@@ -73,11 +75,6 @@ const game = {
             });
 
             await util.sendToUser(userId, `Your true name is **${names.toReadable(name)}**`);
-            // await user
-            //     .send(`Your true name is **${names.toReadable(name)}**`)
-            //     .catch(() => {
-            //         sentDmSuccess = false;
-            //     });
         } else {
             // revive them
             await Player.updateOne(
@@ -254,36 +251,35 @@ const game = {
 
     async makeSpectator(userId: string): Promise<boolean> {
         const mainGuild = await client.guilds.fetch(config.guilds.main);
-        const member = await mainGuild.members.fetch(userId).catch(() => null);
-        if (member) {
-            const adminRoleIds = (await mainGuild.roles.fetch())
-                .filter(role => role.permissions.has("Administrator"))
-                .map(role => role.id);
+        const member: GuildMember = await mainGuild.members.fetch(userId).catch(() => null);
+        if (!member) return false;
 
-            const rolesToRemove = (await member.roles.cache)
-                .filter(role => !adminRoleIds.includes(role.id))
-                .map(role => role);
-           await Promise.all(
-                rolesToRemove
-                    .filter(role => mainGuild.roles.cache.has(role.id))
-                    .map(role => member.roles.remove(role).catch(console.error))
-            );
-            
-            await member.roles.add(discordRoles.Shinigami).catch(console.error);
-            await member.roles.add(discordRoles.Spectator).catch(console.error);
+        const adminRoleIds = (await mainGuild.roles.fetch())
+            .filter(role => role.permissions.has("Administrator"))
+            .map(role => role.id);
 
-            // invite to role guilds
-            await access.grantAll(userId);
+        const rolesToRemove = member.roles.cache
+            .filter(role => !adminRoleIds.includes(role.id))
+            .map(role => role);
 
-            const playerData = await Player.findOne({ userId: userId });
-            if (playerData) {
-                playerData.flags.set("spectator", true);
-                await playerData.save();
-            }
-            return true;
-        };
+        await Promise.all(
+            rolesToRemove
+                .filter(role => mainGuild.roles.cache.has(role.id))
+                .map(role => member.roles.remove(role).catch(console.error))
+        );
 
-        return false;
+        await member.roles.add(discordRoles.Shinigami).catch(console.error);
+        await member.roles.add(discordRoles.Spectator).catch(console.error);
+
+        // invite to all guilds
+        await access.grantAll(userId);
+
+        const playerData = await Player.findOne({ userId });
+        if (playerData) {
+            playerData.flags.set("spectator", true);
+            await playerData.save();
+        }
+        return true;
     },
 
     async createMonologue(userId: string): Promise<TextChannel> {
@@ -405,10 +401,6 @@ const game = {
             { "flags.underTheRadar": true },
             { $unset: { "flags.underTheRadar": "" } }
         );
-        await Player.updateMany(
-            { "flags.kiraConnectionCooldown": true },
-            { $unset: { "flags.kiraConnectionCooldown": "" } }
-        );
         await game.resetContactTokens();
         await game.removeIPPs();
         await abilities.progressCooldowns();
@@ -514,8 +506,7 @@ const game = {
         if (fail) {
             // reveal prosecutor
             game.announce(
-                `@everyone a ${
-                    config.organisations[asOrg].rankNames.member
+                `@everyone a ${config.organisations[asOrg].rankNames.member
                 } of ${util.articledOrgMention(
                     asOrg
                 )}, <@${prosecutorId}> (${names.toReadable(
@@ -640,8 +631,7 @@ const game = {
         // create channels and set loggable
         const kidnapperChannel = await util.createTemporaryChannel(
             guildId,
-            `${await names.getAlias(userId)}-${
-                anonymous ? "anonymous" : "public"
+            `${await names.getAlias(userId)}-${anonymous ? "anonymous" : "public"
             }`,
             config.categoryPrefixes.kidnap,
             [
@@ -654,8 +644,7 @@ const game = {
         await util.setChannelLoggable(kidnapperChannel.id);
         const kidnappedChannel = await util.createTemporaryChannel(
             config.guilds.main,
-            `${await names.getAlias(userId)}-${
-                anonymous ? "anonymous" : "public"
+            `${await names.getAlias(userId)}-${anonymous ? "anonymous" : "public"
             }`,
             config.categoryPrefixes.kidnap,
             [{ ids: [userId], perms: config.loungeMemberPermissions }],
@@ -797,9 +786,9 @@ const game = {
         const user: User = await client.users.fetch(userId).catch(() => null);
         if (user)
             await util.sendToUser(userId, `Your new true name is **${names.toReadable(newTrueName)}**.`);
-            // await user.send(
-            //     `Your new true name is **${names.toReadable(newTrueName)}**.`
-            // );
+        // await user.send(
+        //     `Your new true name is **${names.toReadable(newTrueName)}**.`
+        // );
     },
 
     async bug(
@@ -884,7 +873,7 @@ const game = {
         notifierMessage += `\nA shared channel is any channel which is not solely visible to you at all times. (This does not include death notes)`;
 
         try {
-            await target.send(notifierMessage);
+            await util.sendToUser(target.id, notifierMessage);
         } catch (err) {
             console.log("Failed to notify user of bug.", err);
         }

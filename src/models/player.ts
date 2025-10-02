@@ -2,10 +2,9 @@ import { Document, Schema, Model, model } from "mongoose";
 import { RoleName } from "../configs/roles";
 import { PlayerStateName } from "../configs/playerStates";
 
-export type ExtraPlayerFlag = "ipp" | "underTheRadar" | "kiraConnection" | "kiraConnectionCooldown" | "alive" | "didPublicKidnap" | "spectator";
+export type ExtraPlayerFlag = "ipp" | "underTheRadar" | "kiraConnection" | "alive" | "didPublicKidnap" | "spectator";
 export type PlayerFlag = ExtraPlayerFlag | PlayerStateName;
 
-// Interface representing a player
 export interface IPlayer {
     userId: string;
     trueName: string;
@@ -25,10 +24,8 @@ export interface IPlayer {
     playersKilled: string[]; // array of userIds of players this player has killed;
 }
 
-// Interface for Mongoose Document
 export interface IPlayerDocument extends IPlayer, Document {}
 
-// Schema
 const playerSchema = new Schema<IPlayerDocument>({
     userId: { type: String, required: true, unique: true },
     trueName: { type: String, required: true, unique: true },
@@ -48,7 +45,6 @@ const playerSchema = new Schema<IPlayerDocument>({
     playersKilled: { type: [String], required: true, default: [] },
 });
 
-// Model
 const Player: Model<IPlayerDocument> = model<IPlayerDocument>("Player", playerSchema);
 
 export default Player;

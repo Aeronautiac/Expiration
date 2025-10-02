@@ -15,7 +15,7 @@ export default {
         const season = await Season.findOne({});
         if (!season) return;
 
-        // do not send if the bugged person is dead or doesnt exist for some reason
+        // do not send if the person is dead or doesnt exist for some reason
         const senderData = await Player.findOne({ userId: message.author.id });
         if (!senderData) return;
         if (!senderData.flags.get("alive")) return;

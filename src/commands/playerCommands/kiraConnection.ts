@@ -6,11 +6,12 @@ import Lounge from "../../models/lounge";
 import Season from "../../models/season";
 import game from "../../core/game";
 import { discordRoles } from "../../configs/discordRoles";
+import util from "../../core/util";
 
 export default {
     data: new SlashCommandBuilder()
-        .setName("confirmkiraidentity")
-        .setDescription("As 2nd Kira, you need to confirm Kira's identity to use your Death Note."),
+        .setName("kiraconnection")
+        .setDescription("As 2nd Kira, you need to connect with Kira to use your Death Note."),
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({
             ephemeral: true,
@@ -28,12 +29,6 @@ export default {
         if (!playerData || playerData.role !== "2nd Kira" || !playerData.flags.has("alive") || playerData.flags.has("kiraConnection")) {
             await interaction.editReply({
                 content: "You cannot use this command.",
-            });
-            return;
-        }
-        if (playerData.flags.has("kiraConnectionCooldown")) {
-            await interaction.editReply({
-                content: "You are on cooldown.",
             });
             return;
         }
@@ -67,8 +62,7 @@ export default {
         const kiraIsInLounge = lounge.contactedId === kiraPlayerUserId || lounge.contactorId == kiraPlayerUserId;
         if (kiraIsInLounge) {
             game.unlock2ndKira();
-
-            currentChannel.send(`<@&${discordRoles["2nd Kira"]}> has confirmed that <@&${discordRoles.Kira}> is present in this lounge. <@&${discordRoles["2nd Kira"]}> can now write in their Death Note.`);
+            currentChannel.send(`${util.roleMention("2nd Kira")} has confirmed that ${util.roleMention("Kira")} is present in this lounge. ${util.roleMention("2nd Kira")} can now use their Death Note.`);
         } else {
             currentChannel.send(`@everyone <@&${discordRoles.Kira}> is not present in this lounge.`);
         }

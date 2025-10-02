@@ -66,24 +66,14 @@ const orgs = {
         if (newLeaderId) {
             await access.updateChannels(newLeaderId).catch(console.error);
             const user = await client.users.fetch(newLeaderId);
-            await user
-                .send(
-                    `You are now the ${
-                        config.organisations[name].rankNames["leader"]
-                    } of ${util.articledOrgMention(name, null)}.`
-                )
-                .catch(console.error);
+            await util.sendToUser(user.id, `You are now the ${config.organisations[name].rankNames["leader"]
+                } of ${util.articledOrgMention(name, null)}.`).catch(console.error);
         }
         if (oldLeaderId) {
             await access.updateChannels(oldLeaderId).catch(console.error);
             const user = await client.users.fetch(oldLeaderId);
-            await user
-                .send(
-                    `You are no longer the ${
-                        config.organisations[name].rankNames["leader"]
-                    } of ${util.articledOrgMention(name, null)}.`
-                )
-                .catch(console.error);
+            await util.sendToUser(user.id, `You are no longer the ${config.organisations[name].rankNames["leader"]
+                } of ${util.articledOrgMention(name, null)}.`).catch(console.error);
         }
     },
 

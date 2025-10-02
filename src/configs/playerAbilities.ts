@@ -11,6 +11,7 @@ export type PlayerAbilityName =
     | "ipp"
     | "anonymousContact"
     | "Civilian Arrest"
+    | "kiraConnection"
     | "trueNameReroll";
 
 export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
@@ -69,5 +70,10 @@ export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
         charges: 1,
         cooldown: 999,
         bypasses: [],
+    },
+    kiraConnection: {
+        charges: 1,
+        cooldown: 0,
+        bypasses: ["custody"],
     }
 };
