@@ -306,7 +306,7 @@ const playerAbilities = {
             for (let i = 0; i < blockLines.length; i++) {
                 let line = blockLines[i];
                 // If adding this line would exceed the limit, send the chunk and start a new one (fixes timestamp being cut off and looking very bad lol)
-                if (chunk.length + line.length > CHUNK_LIMIT) {
+                if (chunk.length + line.length + 1 > CHUNK_LIMIT) {
                     await autopsyLogs.send({ content: chunk });
                     await util.sleep(5);
                     // Start new chunk with prefix and current line
