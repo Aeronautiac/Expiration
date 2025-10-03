@@ -39,6 +39,7 @@ const death = {
         // mark as dead
         await util.addState(userId, "dead");
         userData.flags.set("alive", false);
+        userData.timeOfDeath = Date.now();
         await userData.save();
 
         // delete any bugs where they were the target
