@@ -7,8 +7,6 @@ export interface IBug extends Document {
     channelIds: Map<string, string>;
 }
 
-export interface IBugDocument extends IBug, Document {}
-
 const bugSchema = new Schema<IBug>({
     buggedBy: String,
     targetId: { type: String, required: true },
@@ -16,5 +14,5 @@ const bugSchema = new Schema<IBug>({
     source: { type: String, required: true },
 });
 
-const Bug: Model<IBugDocument> = model<IBugDocument>("bug", bugSchema);
+const Bug: Model<IBug> = model<IBug>("bug", bugSchema);
 export default Bug;

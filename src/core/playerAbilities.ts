@@ -6,7 +6,7 @@ import { config } from "../configs/config";
 import Player from "../models/player";
 import { failure, success } from "../types/Result";
 import names from "./names";
-import { PlayerAbilityArgs } from "../configs/abilityArgs";
+import { PlayerAbilityArgs, SharedAbilityArgs } from "../configs/abilityArgs";
 import game from "./game";
 import contacting from "./contacting";
 import Season from "../models/season";
@@ -38,13 +38,16 @@ const playerAbilities = {
         if (checkOnly) return success();
 
         const target = await client.users.fetch(args.targetId);
-        await util.sendToUser(target.id,
-            "You have been pseudocided. Do not ask any players for information in the shinigami realm. If you do so, you will be punished."
-        ).catch(() => {
-            console.warn(
-                `Could not notify user ${args.targetId} of pseudocide.`
+        await util
+            .sendToUser(
+                target.id,
+                "You have been pseudocided. Do not ask any players for information in the shinigami realm. If you do so, you will be punished."
             )
-        });
+            .catch(() => {
+                console.warn(
+                    `Could not notify user ${args.targetId} of pseudocide.`
+                );
+            });
 
         // kill the target without sending a death announcement
         await death.kill(args.targetId, {
@@ -64,7 +67,7 @@ const playerAbilities = {
         // schedule their revival for after the pseudocide period
         const reviveAt = new Date(
             Date.now() +
-            util.hrsToMs(config.playerAbilities.pseudocide.duration)
+                util.hrsToMs(config.playerAbilities.pseudocide.duration)
         );
 
         await agenda.schedule(reviveAt, "pseudocideRevival", {
@@ -164,13 +167,12 @@ const playerAbilities = {
 
         if (checkOnly) return success();
 
-        const user = await client.users.fetch(userId);
-        await util.sendToUser(userId, `The true name of **${await names.getDisplay(args.targetId)}** is **${names.toReadable(targetData.trueName)}**.`);
-        // await user.send(
-        //     `The true name of **${await names.getDisplay(
-        //         args.targetId
-        //     )}** is **${names.toReadable(targetData.trueName)}**.`
-        // );
+        await util.sendToUser(
+            userId,
+            `The true name of **${await names.getDisplay(
+                args.targetId
+            )}** is **${names.toReadable(targetData.trueName)}**.`
+        );
 
         return success();
     },
@@ -213,25 +215,28 @@ const playerAbilities = {
 
         const user = await client.users.fetch(userId);
         if (temporaryOwner || notebooksNotPassed > 0) {
-            await util.sendToUser(userId, `**${await names.getAlias(targetData.userId)}** currently possesses a notebook.`);
-
-            // await user.send(
-            //     `**${await names.getAlias(
-            //         targetData.userId
-            //     )}** currently possesses a notebook.`
-            // );
+            await util.sendToUser(
+                userId,
+                `**${await names.getAlias(
+                    targetData.userId
+                )}** currently possesses a notebook.`
+            );
         } else {
             if (userData.role === "Beyond Birthday")
                 await Player.updateOne(
                     { userId: user.id },
                     { $inc: { eyes: -1 } }
                 );
-            await util.sendToUser(userId, `**${await names.getAlias(targetData.userId)}** does not currently possess a notebook.`);
-            // await user.send(
-            //     `**${await names.getAlias(
-            //         targetData.userId
-            //     )}** does not currently possess a notebook.`
-            // );
+            await util.sendToUser(
+                userId,
+                `**${await names.getAlias(
+                    targetData.userId
+                )}** does not currently possess a notebook. ${
+                    userData.role === "Beyond Birthday"
+                        ? `You have ${userData.eyes - 1} eye(s) remaining.`
+                        : ``
+                }`
+            );
         }
 
         return success();
@@ -247,7 +252,9 @@ const playerAbilities = {
         const season = await Season.findOne({});
         const targetId = args.targetId;
         const targetData = await Player.findOne({ userId: targetId });
-        const piDiscord = await client.guilds.fetch(config.guilds["Private Investigator"]);
+        const piDiscord = await client.guilds.fetch(
+            config.guilds["Private Investigator"]
+        );
 
         if (!targetData) return failure("This user has no data.");
         if (targetData.flags.get("alive"))
@@ -351,10 +358,18 @@ const playerAbilities = {
 
     "Civilian Arrest": async (
         userId: string,
-        args: PlayerAbilityArgs["autopsy"],
+        args: SharedAbilityArgs["Civilian Arrest"],
         checkOnly?: boolean
     ) => {
         return sharedAbilities.civilianArrest(userId, args, checkOnly);
+    },
+
+    async cancelCivArrest(
+        userId: string,
+        args: SharedAbilityArgs["cancelCivArrest"],
+        checkOnly?: boolean
+    ) {
+        return sharedAbilities.cancelCivArrest(userId, args, checkOnly);
     },
 
     async trueNameReroll(
@@ -374,11 +389,64 @@ const playerAbilities = {
         return success();
     },
 
-    kiraConnection(
+    async kiraConnection(
         userId: string,
-        args: PlayerAbilityArgs["kiraConnection"]
+        args: PlayerAbilityArgs["kiraConnection"],
+        checkOnly?: boolean
     ) {
+        const playerData = await Player.findOne({ userId });
+        if (playerData.flags.get("kiraConnection"))
+            return failure(
+                `You have already connected with ${util.roleMention("Kira")}`
+            );
 
+        const lounge = await Lounge.findOne({
+            channelIds: args.channelId,
+        });
+        if (!lounge || lounge.anonymous)
+            return failure(
+                "This can only be used in a regular contact lounge."
+            );
+
+        if (checkOnly) return success();
+
+        const currentChannel = (await client.channels.fetch(
+            args.channelId
+        )) as TextChannel;
+
+        const kiraPlayerUserId = (await Player.findOne({ role: "Kira" }))
+            .userId;
+
+        const kiraIsInLounge =
+            lounge.contactedId === kiraPlayerUserId ||
+            lounge.contactorId == kiraPlayerUserId;
+        if (kiraIsInLounge) {
+            await Player.updateOne(
+                { userId },
+                { $set: { "flags.kiraConnection": true } }
+            );
+            await currentChannel.send(
+                `@everyone ${util.roleMention(
+                    "2nd Kira"
+                )} has successfully connected with ${util.roleMention(
+                    "Kira"
+                )} in this lounge. ${util.roleMention(
+                    "2nd Kira"
+                )} can now use their Death Note.`
+            );
+        } else {
+            await currentChannel.send(
+                `@everyone ${util.roleMention(
+                    "2nd Kira"
+                )} [<@${userId}>] has attempted to connect with ${util.roleMention(
+                    "Kira"
+                )}, but ${util.roleMention(
+                    "Kira"
+                )} is not present in this lounge.`
+            );
+        }
+
+        return success();
     },
 };
 

@@ -7,10 +7,7 @@ export interface ILounge {
     loungeId: number;
     channelIds: string[]; // array of channel IDs associated with the lounge
 }
-
-export interface ILoungeDocument extends ILounge, Document {}
-
-const loungeSchema = new Schema<ILoungeDocument>({
+const loungeSchema = new Schema<ILounge>({
     anonymous: Boolean,
     contactorId: { type: String, required: true },
     contactedId: { type: String, required: true },
@@ -18,5 +15,5 @@ const loungeSchema = new Schema<ILoungeDocument>({
     channelIds: { type: [String], required: true },
 });
 
-const Lounge = model<ILoungeDocument>("lounge", loungeSchema);
+const Lounge = model<ILounge>("lounge", loungeSchema);
 export default Lounge;

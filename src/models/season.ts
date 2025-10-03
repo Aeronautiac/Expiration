@@ -5,6 +5,7 @@ export type SeasonFlag = "active" | "blackout";
 export interface ISeason extends Document {
     temporaryChannels: string[]; // array of channel ids
     messageLoggedChannels: string[]; // an array of channel ids of which messages are logged through abilities like bug and autopsy
+    invites: Map<string, string>; // a map of guild ids to invites for the season (used in access system)
     day: number; // starts day 1
     flags: Map<SeasonFlag, boolean>;
 };
@@ -14,6 +15,7 @@ export interface ISeason extends Document {
 const seasonSchema = new Schema<ISeason>({
     _id: { type: String, default: "season" },
     flags: { type: Map, of: Boolean, required: true, default: {} },
+    invites: { type: Map, of: String, required: true, default: {} },
     temporaryChannels: { type: [String], required: true, default: [] },
     messageLoggedChannels: { type: [String], required: true, default: [] }, // an array of channel ids of which messages are logged through abilities like bug and autopsy
     day: { type: Number, required: true, default: 1 }, // starts day 1

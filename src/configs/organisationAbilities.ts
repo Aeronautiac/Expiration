@@ -18,6 +18,7 @@ export type OrganisationAbilityName =
     | "Shinigami Sacrifice"
     | "Task Force Invite"
     | "Task Force Kick"
+    | "cancelCivArrest"
     | "PI+Watari Unlawful Arrest";
 
 export const organisationAbilities: Record<
@@ -110,6 +111,12 @@ export const organisationAbilities: Record<
     },
     "Shinigami Sacrifice": {
         charges: 1,
+        cooldown: 0,
+        membersRequired: 0,
+        rolesRequired: [],
+    },
+    cancelCivArrest: {
+        charges: 999,
         cooldown: 0,
         membersRequired: 0,
         rolesRequired: [],

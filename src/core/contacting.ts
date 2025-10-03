@@ -742,7 +742,7 @@ const contacting = {
         const newsChannel = await mainGuild.channels.fetch(config.channels.news) as TextChannel;
         newsChannel.send(`${targetIds.map(id => `<@${id}>`).join(", ")} has been added to the Press Conference`).catch(console.error);
 
-        return { success: true };
+        return success();
     },
 
     async removeFromConference(userId: string | null, targetIds: string[], channelId: string | null): Promise<Result> {
@@ -784,7 +784,7 @@ const contacting = {
         const newsChannel = await mainGuild.channels.fetch(config.channels.news) as TextChannel;
         newsChannel.send(`${targetIds.map(id => `<@${id}>`).join(", ")} has been removed from the Press Conference`).catch(console.error);
 
-        return { success: true };
+        return success();
     },
 };
 

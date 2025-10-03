@@ -51,7 +51,7 @@ export interface PlayerAbilityArgs {
     };
 
     kiraConnection: {
-        loungeId: number;
+        channelId: string;
     };
 }
 
@@ -93,9 +93,10 @@ export interface OrganisationAbilityArgs {
     };
 
     "Task Force Invite": {
-        userId: string;
+        userId?: string;
         targetId: string;
-        trueName: string;
+        outsource?: boolean;
+        trueName?: string;
     };
 
     "Task Force Kick": {
@@ -106,6 +107,10 @@ export interface OrganisationAbilityArgs {
 
 export interface SharedAbilityArgs {
     "Civilian Arrest": {
+        targetId: string;
+    };
+
+    cancelCivArrest: {
         targetId: string;
     };
 }

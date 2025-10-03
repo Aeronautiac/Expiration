@@ -7,10 +7,7 @@ export interface IOrganisation {
     ogMemberIds: string[]; // array of members who are og
     blacklist: string[]; // array of users who are blacklisted
 }
-
-export interface IOrganisationDocument extends IOrganisation, Document {}
-
-const organisationSchema = new Schema<IOrganisationDocument>({
+const organisationSchema = new Schema<IOrganisation>({
     name: { type: String, required: true },
     leaderId: String,
     memberIds: { type: [String], required: true, default: [] },
@@ -18,7 +15,7 @@ const organisationSchema = new Schema<IOrganisationDocument>({
     blacklist: { type: [String], required: true, default: [] },
 });
 
-const Organisation: Model<IOrganisationDocument> = model<IOrganisationDocument>(
+const Organisation: Model<IOrganisation> = model<IOrganisation>(
     "Organisation",
     organisationSchema
 );

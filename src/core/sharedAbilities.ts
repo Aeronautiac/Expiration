@@ -7,6 +7,8 @@ import polls from "./polls";
 import util from "./util";
 import { OrganisationName } from "../configs/organisations";
 import Season from "../models/season";
+import Poll from "../models/poll";
+import game from "./game";
 
 let client: Client;
 
@@ -82,6 +84,36 @@ const sharedAbilities = {
                 resolvesOnThreshold: false,
             }
         );
+
+        return success();
+    },
+
+    async cancelCivArrest(
+        owner: string,
+        args: SharedAbilityArgs["Civilian Arrest"],
+        checkOnly?: boolean
+    ) {
+        const poll = await Poll.findOne({
+            data: {
+                targetId: args.targetId,
+                arrester: owner,
+            },
+        });
+        if (!poll)
+            return failure(
+                "No civilian arrest is currently active for this user."
+            );
+
+        if (checkOnly) return success();
+
+        // message stuff
+        const playerData = await Player.findOne({ userId: owner });
+        const arresterDisplay = playerData
+            ? util.roleMention(playerData.role)
+            : util.orgMention(owner as OrganisationName);
+        let message = `@everyone the ${arresterDisplay} has cancelled the civilian arrest on <@${args.targetId}>.`;
+        await game.announce(message);
+        await polls.resolve(poll, "cancelled");
 
         return success();
     },

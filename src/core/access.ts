@@ -1,10 +1,11 @@
-import { Client } from "discord.js";
+import { Client, TextChannel } from "discord.js";
 import { config } from "../configs/config";
 
 import Player from "../models/player";
 import { OrganisationName } from "../configs/organisations";
 import util from "./util";
 import { ChannelName } from "../configs/channels";
+import Season from "../models/season";
 
 let client: Client;
 
@@ -21,6 +22,8 @@ interface access {
     grantOrgChannels: (userId: string) => Promise<void>;
     revokeChannels: (userId: string) => Promise<void>;
     updateChannels: (userId: string) => Promise<void>;
+    createInvites: () => Promise<void>;
+    deleteInvites: () => Promise<void>;
 }
 
 const access: Partial<access> = {};
@@ -31,9 +34,67 @@ access.init = function (newClient) {
 
 //////////////////////////////////////////////////////
 
+// create unlimited use unlimited lifetime invites to all game discords (aside from main)
+access.createInvites = async function () {
+    const season = await Season.findOne({});
+    if (!season)
+        throw new Error("Cannot create invites if there is no season data.");
+
+    const createInvitesPromises = Object.values(config.guilds).map(
+        async (guildId) => {
+            if (guildId === config.guilds.main) return;
+
+            const guild = await client.guilds.fetch(guildId);
+            const channels = await guild.channels
+                .fetch()
+                .catch(() => new Map());
+            const channel =
+                guild.systemChannel ||
+                ([...channels.values()].find(
+                    (c) =>
+                        c.isTextBased() &&
+                        c
+                            .permissionsFor(guild.members.me)
+                            .has("CreateInstantInvite")
+                ) as TextChannel);
+
+            if (!channel) {
+                console.warn(
+                    `Cannot create guild invite in ${guild.name}. No suitable channel or invalid permissions.`
+                );
+                return;
+            }
+
+            const invite = await channel.createInvite({
+                maxAge: 0,
+                maxUses: 0,
+                temporary: false,
+                reason: "New season",
+            });
+
+            season.invites.set(guildId, invite.code);
+            await season.save();
+        }
+    );
+    await Promise.allSettled(createInvitesPromises);
+};
+
+access.deleteInvites = async function () {
+    const season = await Season.findOne({});
+    if (!season)
+        throw new Error("Cannot delete invites if there is no season data.");
+
+    const deleteInvitesPromises = Array.from(season.invites.keys()).map(
+        async (inviteCode) => {
+            const invite = await client.fetchInvite(inviteCode);
+            await invite.delete();
+        }
+    );
+    await Promise.allSettled(deleteInvitesPromises);
+};
+
 access.grant = async function (userId, guildIds) {
     console.log(`granting access to: ${guildIds}`);
-    const user = await client.users.fetch(userId);
     const invitePrefix = `https://discord.gg/`;
 
     // we need player data to handle this. if there is no player data, return early.
@@ -43,8 +104,14 @@ access.grant = async function (userId, guildIds) {
         return;
     }
 
-    let inviteMessage: string = `${user} You have been invited to: `
-    let secondInviteMessage: string = "" // This is for when the number of invites are over 10.
+    const season = await Season.findOne({});
+    if (!season) {
+        console.warn("Cannot grant access to guild. There is no season data.");
+        return;
+    }
+
+    let inviteMessage: string = "";
+    let secondInviteMessage: string = ""; // This is for when the number of invites are over 10.
     let guildsInvitedTo: number = 0;
     for (const guildId of guildIds) {
         const guild = await client.guilds.fetch(guildId);
@@ -63,23 +130,6 @@ access.grant = async function (userId, guildIds) {
         // main discord should not be part of the guild access system
         if (guildId === config.guilds.main) continue;
 
-        // create and add the invite to their data
-        const channels = await guild.channels.fetch().catch(() => new Map());
-        const channel =
-            guild.systemChannel ||
-            [...channels.values()].find(
-                (c) =>
-                    c.isTextBased() &&
-                    c.permissionsFor(guild.members.me).has("CreateInstantInvite")
-            );
-
-        if (!channel) {
-            console.warn(
-                `Cannot create guild invite in ${guild.name}. No suitable channel or invalid permissions.`
-            );
-            continue;
-        }
-
         // if they were banned, unban them
         const ban = await guild.bans.fetch(userId).catch(() => null);
         if (!ban) {
@@ -89,22 +139,22 @@ access.grant = async function (userId, guildIds) {
             console.log(`Unbanned user ${userId}`);
         }
 
-        const invite = await channel.createInvite({
-            maxUses: 1,
-            unique: true,
-        });
+        const invite = season.invites.get(guildId);
 
-        playerData.invites.set(guildId, invite.code);
+        playerData.invites.set(guildId, true);
         guildsInvitedTo += 1;
-        if (guildsInvitedTo <= 10) inviteMessage += `\n${invitePrefix}${invite.code}`;
-        if (guildsInvitedTo > 10) secondInviteMessage += `\n${invitePrefix}${invite.code}`;
+        if (guildsInvitedTo <= 10)
+            inviteMessage += `\n${invitePrefix}${invite}`;
+        if (guildsInvitedTo > 10)
+            secondInviteMessage += `\n${invitePrefix}${invite}`;
     }
 
     await playerData.save();
 
     if (guildsInvitedTo === 0) return;
     await util.sendToUser(userId, inviteMessage);
-    if (secondInviteMessage !== "") await util.sendToUser(userId, secondInviteMessage);
+    if (secondInviteMessage !== "")
+        await util.sendToUser(userId, secondInviteMessage);
 
     return;
 };
@@ -126,12 +176,7 @@ access.revoke = async function (userId, guildId) {
         return;
     }
 
-    // remove the invite from their data and delete the invite
-    const inviteCode = playerData.invites.get(guildId);
-    if (inviteCode) {
-        const invite = await guild.invites.fetch(inviteCode).catch(() => null);
-        if (invite) await invite.delete("revoking access");
-    }
+    // remove the invite from their data
     playerData.invites.delete(guildId);
     await playerData.save();
 
@@ -273,7 +318,9 @@ access.grantGroup = async function (userId) {
         }
     }
 
-    const guildIds = Array.from(guildsToGrant).map((guildName) => config.guilds[guildName]);
+    const guildIds = Array.from(guildsToGrant).map(
+        (guildName) => config.guilds[guildName]
+    );
     await access.grant(userId, guildIds);
 };
 

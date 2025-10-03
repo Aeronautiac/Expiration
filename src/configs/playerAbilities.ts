@@ -12,6 +12,7 @@ export type PlayerAbilityName =
     | "anonymousContact"
     | "Civilian Arrest"
     | "kiraConnection"
+    | "cancelCivArrest"
     | "trueNameReroll";
 
 export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
@@ -75,5 +76,10 @@ export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
         charges: 1,
         cooldown: 0,
         bypasses: ["custody"],
-    }
+    },
+    cancelCivArrest: {
+        charges: 999,
+        cooldown: 0,
+        bypasses: ["custody"],
+    },
 };

@@ -12,14 +12,14 @@ import { config } from "../configs/config";
 import access from "./access";
 import notebooks from "./notebooks";
 
-import Player, { IPlayerDocument, PlayerFlag } from "../models/player";
+import Player, { IPlayer, PlayerFlag } from "../models/player";
 import Notebook from "../models/notebook";
 import abilities from "./abilities";
 import { RoleName } from "../configs/roles";
 import Season, { SeasonFlag } from "../models/season";
 import { Result, success, failure } from "../types/Result";
 import mongoose, { ObjectId, Schema } from "mongoose";
-import Bug, { IBugDocument } from "../models/bug";
+import Bug, { IBug } from "../models/bug";
 import util, { ChannelPerms } from "./util";
 import { OrganisationName, organisations } from "../configs/organisations";
 import Kidnapping from "../models/kidnapping";
@@ -59,7 +59,8 @@ const game = {
         role: RoleName,
         trueName?: string
     ): Promise<void> {
-        let playerData = await Player.findOne({ "userId": userId });
+        let playerData = await Player.findOne({ userId: userId });
+        const roleMessage = `Your role is ${util.roleMention(role)}`;
 
         if (!playerData) {
             const name = trueName
@@ -74,8 +75,16 @@ const game = {
                 flags: new Map([["alive", true]]),
             });
 
-            await util.sendToUser(userId, `Your true name is **${names.toReadable(name)}**`);
+            await util.sendToUser(
+                userId,
+                `Your true name is **${names.toReadable(name)}**`
+            );
+            await util.sendToUser(userId, roleMessage);
         } else {
+            // send role update message
+            if (role !== playerData.role)
+                await util.sendToUser(userId, roleMessage);
+
             // revive them
             await Player.updateOne(
                 { userId },
@@ -151,6 +160,7 @@ const game = {
         await Season.create({});
         await orgs.createDefaults();
         await game.initializeLoggableChannels();
+        await access.createInvites();
 
         return success(
             "Successfully created a new season. Run /startseason to begin."
@@ -171,7 +181,7 @@ const game = {
             const guild = await client.guilds.fetch(guildId).catch(() => null);
             if (!guild) continue;
             const loungeChannel = guild.channels.cache.find(
-                channel => channel.type === 0 && channel.name === "lounge"
+                (channel) => channel.type === 0 && channel.name === "lounge"
             );
             if (loungeChannel) {
                 await loungeChannel.permissionOverwrites.edit(
@@ -221,13 +231,17 @@ const game = {
 
             for (const guildId of Object.values(guilds)) {
                 if (guildId === config.guilds.main) continue;
-                const guild = await client.guilds.fetch(guildId).catch(() => null);
+                const guild = await client.guilds
+                    .fetch(guildId)
+                    .catch(() => null);
                 if (!guild) continue;
                 const loungeChannel = guild.channels.cache.find(
-                    channel => channel.type === 0 && channel.name === "lounge"
+                    (channel) => channel.type === 0 && channel.name === "lounge"
                 );
                 if (loungeChannel) {
-                    await loungeChannel.send(config.postGameDiscussionMessage).catch(console.error);
+                    await loungeChannel
+                        .send(config.postGameDiscussionMessage)
+                        .catch(console.error);
                     await loungeChannel.permissionOverwrites.edit(
                         loungeChannel.guild.roles.everyone,
                         { SendMessages: true }
@@ -237,13 +251,15 @@ const game = {
         }
 
         return success(
-            "Season ended. Run /cleanslate to clear all data, messages, and channels that are associated with the season."
+            "Season ended. Run /cleanslate to clear all data, messages, invites, and channels that are associated with the season."
         );
     },
 
     async cleanSlate() {
+        await access.deleteInvites();
         await util.deleteTemporaryChannels();
         await resetDatabase();
+
         return success(
             "The season has been cleared. You may now create a new season with /newseason."
         );
@@ -251,21 +267,23 @@ const game = {
 
     async makeSpectator(userId: string): Promise<boolean> {
         const mainGuild = await client.guilds.fetch(config.guilds.main);
-        const member: GuildMember = await mainGuild.members.fetch(userId).catch(() => null);
+        const member: GuildMember = await mainGuild.members
+            .fetch(userId)
+            .catch(() => null);
         if (!member) return false;
 
         const adminRoleIds = (await mainGuild.roles.fetch())
-            .filter(role => role.permissions.has("Administrator"))
-            .map(role => role.id);
+            .filter((role) => role.permissions.has("Administrator"))
+            .map((role) => role.id);
 
         const rolesToRemove = member.roles.cache
-            .filter(role => !adminRoleIds.includes(role.id))
-            .map(role => role);
+            .filter((role) => !adminRoleIds.includes(role.id))
+            .map((role) => role);
 
         await Promise.all(
             rolesToRemove
-                .filter(role => mainGuild.roles.cache.has(role.id))
-                .map(role => member.roles.remove(role).catch(console.error))
+                .filter((role) => mainGuild.roles.cache.has(role.id))
+                .map((role) => member.roles.remove(role).catch(console.error))
         );
 
         await member.roles.add(discordRoles.Shinigami).catch(console.error);
@@ -410,13 +428,6 @@ const game = {
         await game.announceDayNumber();
     },
 
-    async unlock2ndKira() {
-        await Player.updateMany(
-            { role: "2nd Kira" },
-            { $set: { "flags.kiraConnection": true } }
-        );
-    },
-
     async custody(userId: string) {
         // add custody state
         await util.addState(userId, "custody");
@@ -506,7 +517,8 @@ const game = {
         if (fail) {
             // reveal prosecutor
             game.announce(
-                `@everyone a ${config.organisations[asOrg].rankNames.member
+                `@everyone a ${
+                    config.organisations[asOrg].rankNames.member
                 } of ${util.articledOrgMention(
                     asOrg
                 )}, <@${prosecutorId}> (${names.toReadable(
@@ -631,7 +643,8 @@ const game = {
         // create channels and set loggable
         const kidnapperChannel = await util.createTemporaryChannel(
             guildId,
-            `${await names.getAlias(userId)}-${anonymous ? "anonymous" : "public"
+            `${await names.getAlias(userId)}-${
+                anonymous ? "anonymous" : "public"
             }`,
             config.categoryPrefixes.kidnap,
             [
@@ -644,7 +657,8 @@ const game = {
         await util.setChannelLoggable(kidnapperChannel.id);
         const kidnappedChannel = await util.createTemporaryChannel(
             config.guilds.main,
-            `${await names.getAlias(userId)}-${anonymous ? "anonymous" : "public"
+            `${await names.getAlias(userId)}-${
+                anonymous ? "anonymous" : "public"
             }`,
             config.categoryPrefixes.kidnap,
             [{ ids: [userId], perms: config.loungeMemberPermissions }],
@@ -785,7 +799,10 @@ const game = {
         );
         const user: User = await client.users.fetch(userId).catch(() => null);
         if (user)
-            await util.sendToUser(userId, `Your new true name is **${names.toReadable(newTrueName)}**.`);
+            await util.sendToUser(
+                userId,
+                `Your new true name is **${names.toReadable(newTrueName)}**.`
+            );
         // await user.send(
         //     `Your new true name is **${names.toReadable(newTrueName)}**.`
         // );
@@ -883,7 +900,7 @@ const game = {
         const bugs = await Bug.find({
             source: "bug",
         });
-        const buggedPlayers: IPlayerDocument[] = [];
+        const buggedPlayers: IPlayer[] = [];
 
         // find bugged players (to remove asterisk later)
         for (const log of bugs) {

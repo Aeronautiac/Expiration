@@ -7,8 +7,6 @@ export interface IKidnapping extends Document {
     kidnappedChannelId: string;
 }
 
-export interface IKidnapDocument extends IKidnapping, Document {}
-
 const kidnappingSchema = new Schema<IKidnapping>({
     victimId: { type: String, required: true, unique: true },
     kidnapperId: String,
@@ -16,5 +14,5 @@ const kidnappingSchema = new Schema<IKidnapping>({
     kidnappedChannelId: { type: String, required: true },
 });
 
-const Kidnapping: Model<IKidnapDocument> = model<IKidnapDocument>("kidnapping", kidnappingSchema);
+const Kidnapping: Model<IKidnapping> = model<IKidnapping>("kidnapping", kidnappingSchema);
 export default Kidnapping;

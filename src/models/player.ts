@@ -20,13 +20,11 @@ export interface IPlayer {
     flags: Map<PlayerFlag, boolean>;
     timeOfDeath?: number;
     eyes: number;
-    invites: Map<string, string>;
+    invites: Map<string, Boolean>;
     playersKilled: string[]; // array of userIds of players this player has killed;
 }
 
-export interface IPlayerDocument extends IPlayer, Document {}
-
-const playerSchema = new Schema<IPlayerDocument>({
+const playerSchema = new Schema<IPlayer>({
     userId: { type: String, required: true, unique: true },
     trueName: { type: String, required: true, unique: true },
     role: { type: String, required: true },
@@ -41,10 +39,10 @@ const playerSchema = new Schema<IPlayerDocument>({
     flags: { type: Map, of: Boolean, required: true, default: {} },
     timeOfDeath: Number,
     eyes: { type: Number, required: true, default: 2 },
-    invites: { type: Map, of: String, required: true, default: {} },
+    invites: { type: Map, of: Boolean, required: true, default: {} },
     playersKilled: { type: [String], required: true, default: [] },
 });
 
-const Player: Model<IPlayerDocument> = model<IPlayerDocument>("Player", playerSchema);
+const Player: Model<IPlayer> = model<IPlayer>("Player", playerSchema);
 
 export default Player;

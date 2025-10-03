@@ -12,6 +12,7 @@ export const organisations = {
             "PI+Watari Unlawful Arrest",
             "Task Force Invite",
             "Task Force Kick",
+            "cancelCivArrest",
         ],
         abilityOverrides: {},
         article: "the",

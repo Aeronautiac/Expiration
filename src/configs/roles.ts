@@ -40,14 +40,15 @@ export const roles = {
             "nameReveal",
             "notebookReveal",
             "underTheRadar",
-            "anonymousAnnouncement"
+            "anonymousAnnouncement",
+            "kiraConnection"
         ],
         guilds: ["2nd Kira"],
         abilityOverrides: {},
         guildChannels: {},
     },
     "News Anchor": {
-        abilities: ["Civilian Arrest"],
+        abilities: ["Civilian Arrest", "cancelCivArrest"],
         guildChannels: {},
         guilds: ["News Anchor"],
         abilityOverrides: {},

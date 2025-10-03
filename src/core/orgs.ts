@@ -67,13 +67,13 @@ const orgs = {
             await access.updateChannels(newLeaderId).catch(console.error);
             const user = await client.users.fetch(newLeaderId);
             await util.sendToUser(user.id, `You are now the ${config.organisations[name].rankNames["leader"]
-                } of ${util.articledOrgMention(name, null)}.`).catch(console.error);
+                } of ${util.articledOrgMention(name)}.`).catch(console.error);
         }
         if (oldLeaderId) {
             await access.updateChannels(oldLeaderId).catch(console.error);
             const user = await client.users.fetch(oldLeaderId);
             await util.sendToUser(user.id, `You are no longer the ${config.organisations[name].rankNames["leader"]
-                } of ${util.articledOrgMention(name, null)}.`).catch(console.error);
+                } of ${util.articledOrgMention(name)}.`).catch(console.error);
         }
     },
 

@@ -56,6 +56,8 @@ targetAbilities
     .add("PI+Watari Unlawful Arrest")
     .add("Public Kidnap")
     .add("Unlawful Arrest")
+    .add("Kira's Kingdom Invite")
+    .add("Kira's Kingdom Kick")
     .add("Shinigami Sacrifice");
 
 export const loungeNumberAbilities: Set<OrganisationAbilityName> = new Set();
@@ -415,6 +417,14 @@ const orgAbilities = {
         return sharedAbilities.civilianArrest(orgName, args, checkOnly);
     },
 
+    async cancelCivArrest(
+        userId: string,
+        args: SharedAbilityArgs["cancelCivArrest"],
+        checkOnly?: boolean
+    ) {
+        return sharedAbilities.cancelCivArrest(userId, args, checkOnly);
+    },
+
     "Shinigami Sacrifice": async (
         orgName: OrganisationName,
         args: OrganisationAbilityArgs["Shinigami Sacrifice"],
@@ -469,8 +479,10 @@ const orgAbilities = {
         checkOnly?: boolean
     ) => {
         // is the person inviting allowed to do it?
-        const result = await canDoLeaderAction(args.userId, orgName);
-        if (!result.success) return result;
+        if (!args.outsource) {
+            const result = await canDoLeaderAction(args.userId, orgName);
+            if (!result.success) return result;
+        }
 
         // is the target allowed to be invited with the arguments supplied?
         if (args.targetId === args.userId)
@@ -484,7 +496,10 @@ const orgAbilities = {
             return failure(
                 "This person is already a member of the Task Force."
             );
-        if (targetData.trueName !== names.toInternal(args.trueName))
+        if (
+            !args.outsource &&
+            targetData.trueName !== names.toInternal(args.trueName)
+        )
             return failure("This is not the target's true name.");
 
         if (checkOnly) return success();
@@ -496,9 +511,13 @@ const orgAbilities = {
         const nameRevealMessage = await mainChannel.send(
             `@everyone **${await names.getAlias(
                 args.targetId
-            )}** has been added to the Task Force. Their true name is **${names.toReadable(
-                targetData.trueName
-            )}**.`
+            )}** has been added to the Task Force.${
+                !args.outsource
+                    ? ` Their true name is **${names.toReadable(
+                          targetData.trueName
+                      )}**.`
+                    : ` They were outsourced.`
+            }`
         );
         await nameRevealMessage.pin();
 
