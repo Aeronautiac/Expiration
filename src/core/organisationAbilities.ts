@@ -442,7 +442,7 @@ const orgAbilities = {
             return failure("This is not an og member.");
         const memberData = await Player.findOne({ userId: args.memberId });
         if (!memberData) return failure("The chosen member is not a player.");
-        if (!targetData.flags.get("alive"))
+        if (!memberData.flags.get("alive"))
             return failure("The chosen member is already dead.");
 
         if (checkOnly) return success();
