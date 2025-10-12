@@ -1,6 +1,7 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 import abilities from "../../core/abilities";
 import { AbilityName } from "../../configs/abilityArgs";
+import { executionQueue } from "../../core/game";
 
 export default {
     data: new SlashCommandBuilder()
@@ -39,16 +40,23 @@ export default {
         });
 
         const useFor = interaction.options.getString("usefor") as AbilityName;
-        const result = await abilities.useAbility(interaction.user.id, useFor, {
-            targetId: interaction.options.getUser("target").id,
+
+        await executionQueue.executeQueued(async () => {
+            const result = await abilities.useAbility(
+                interaction.user.id,
+                useFor,
+                {
+                    targetId: interaction.options.getUser("target").id,
+                }
+            );
+            if (!result.success)
+                await interaction.editReply({
+                    content: result.message || "Failed to use eyes.",
+                });
+            else
+                await interaction.editReply({
+                    content: "Success.",
+                });
         });
-        if (!result.success)
-            await interaction.editReply({
-                content: result.message || "Failed to use eyes.",
-            });
-        else
-            await interaction.editReply({
-                content: "Success.",
-            });
     },
 };

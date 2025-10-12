@@ -1,5 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 import contacting from "../../core/contacting";
+import { executionQueue } from "../../core/game";
 
 export default {
     data: new SlashCommandBuilder()
@@ -44,20 +45,23 @@ export default {
         const m2 = interaction.options.getUser("target2");
         const m3 = interaction.options.getUser("target3");
         const m4 = interaction.options.getUser("target4");
-        const members = [
-            m1?.id,
-            m2?.id,
-            m3?.id,
-            m4?.id,
-        ].filter((entry) => Boolean(entry));
-        const result = await contacting.createGroupchat(interaction.user.id, members);
-        if (!result.success)
-            await interaction.editReply({
-                content: result.message || "Failed to create group chat.",
-            });
-        else
-            await interaction.editReply({
-                content: result.message || "Success.",
-            });
+        const members = [m1?.id, m2?.id, m3?.id, m4?.id].filter((entry) =>
+            Boolean(entry)
+        );
+        
+        await executionQueue.executeQueued(async () => {
+            const result = await contacting.createGroupchat(
+                interaction.user.id,
+                members
+            );
+            if (!result.success)
+                await interaction.editReply({
+                    content: result.message || "Failed to create group chat.",
+                });
+            else
+                await interaction.editReply({
+                    content: result.message || "Success.",
+                });
+        });
     },
 };

@@ -2,6 +2,7 @@ import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 import notebooks from "../../core/notebooks";
 import { config } from "../../configs/config";
 import Notebook from "../../models/notebook";
+import { executionQueue } from "../../core/game";
 
 export default {
     data: new SlashCommandBuilder()
@@ -53,25 +54,27 @@ export default {
         if (delay) relayed = relayed.concat(`, dies in ${delay} minutes`);
         if (deathMessage) relayed = relayed.concat(`, ${deathMessage}`);
 
-        const result = await notebooks.write(
-            interaction.user.id,
-            interaction.guildId,
-            name,
-            {
-                deathMessage,
-                delay,
-            }
-        );
+        await executionQueue.executeQueued(async () => {
+            const result = await notebooks.write(
+                interaction.user.id,
+                interaction.guildId,
+                name,
+                {
+                    deathMessage,
+                    delay,
+                }
+            );
 
-        if (result.success) {
-            await interaction.editReply({
-                content: relayed,
-            });
-        } else {
-            await interaction.editReply({ content: relayed });
-            await interaction.followUp({
-                content: result.message || "Failed to use write name.",
-            });
-        }
+            if (result.success) {
+                await interaction.editReply({
+                    content: relayed,
+                });
+            } else {
+                await interaction.editReply({ content: relayed });
+                await interaction.followUp({
+                    content: result.message || "Failed to use write name.",
+                });
+            }
+        });
     },
 };

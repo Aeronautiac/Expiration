@@ -31,8 +31,10 @@ import Organisation from "../models/organisation";
 import Ability from "../models/ability";
 import death from "./death";
 import { guilds } from "../configs/guilds";
+import ExecutionQueue from "../classes/ExecutionQueue";
 
 let client: Client;
+export const executionQueue = new ExecutionQueue();
 
 async function resetDatabase() {
     const collections = await mongoose.connection.db

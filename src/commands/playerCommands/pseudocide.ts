@@ -6,6 +6,7 @@ import util from "../../core/util";
 import { OrgMember } from "../../types/OrgMember";
 import { Organisation } from "../../types/configTypes";
 import { OrganisationName } from "../../configs/organisations";
+import { executionQueue } from "../../core/game";
 
 export default {
     data: new SlashCommandBuilder()
@@ -107,26 +108,28 @@ export default {
             });
         }
 
-        const result = await abilities.useAbility(
-            interaction.user.id,
-            "pseudocide",
-            {
-                targetId: options.getUser("target").id,
-                role: role,
-                trueName: options.getString("truename"),
-                hasBugAbility: options.getBoolean("hasbugability"),
-                hasNotebook: options.getBoolean("hasnotebook"),
-                message: options.getString("deathmessage"),
-                memberObjects,
-            }
-        );
-        if (!result.success)
-            await interaction.editReply({
-                content: result.message || "Failed to use pseudocide.",
-            });
-        else
-            await interaction.editReply({
-                content: "Success.",
-            });
+        await executionQueue.executeQueued(async () => {
+            const result = await abilities.useAbility(
+                interaction.user.id,
+                "pseudocide",
+                {
+                    targetId: options.getUser("target").id,
+                    role: role,
+                    trueName: options.getString("truename"),
+                    hasBugAbility: options.getBoolean("hasbugability"),
+                    hasNotebook: options.getBoolean("hasnotebook"),
+                    message: options.getString("deathmessage"),
+                    memberObjects,
+                }
+            );
+            if (!result.success)
+                await interaction.editReply({
+                    content: result.message || "Failed to use pseudocide.",
+                });
+            else
+                await interaction.editReply({
+                    content: "Success.",
+                });
+        });
     },
 };
