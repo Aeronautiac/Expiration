@@ -91,7 +91,7 @@ export const organisationAbilities: Record<
     },
     "Civilian Arrest": {
         charges: 1,
-        cooldown: 0,
+        cooldown: 1,
         membersRequired: 4,
         rolesRequired: [],
     },
