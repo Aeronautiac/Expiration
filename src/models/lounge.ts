@@ -1,14 +1,23 @@
-import { Document, Schema, Model, model } from 'mongoose';
+import { Document, Schema, Model, model } from "mongoose";
+import { RoleName } from "../configs/roles";
 
 export interface ILounge {
-    anonymous?: boolean;
+    anonymousAsRole?: RoleName;
+    fake?: boolean;
+    owner?: string;
+    contactorChannelId?: string;
+    contactedChannelId?: string;
     contactorId: string;
     contactedId: string;
     loungeId: number;
     channelIds: string[]; // array of channel IDs associated with the lounge
 }
 const loungeSchema = new Schema<ILounge>({
-    anonymous: Boolean,
+    anonymousAsRole: String,
+    fake: Boolean,
+    owner: String,
+    contactorChannelId: { type: String, required: true },
+    contactedChannelId: { type: String, required: true },
     contactorId: { type: String, required: true },
     contactedId: { type: String, required: true },
     loungeId: { type: Number, required: true },

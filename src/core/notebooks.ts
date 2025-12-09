@@ -25,7 +25,8 @@ const notebooks = {
     async setOwner(
         guildId: string,
         ownerId: string,
-        temporary?: boolean
+        temporary?: boolean,
+        fake?: boolean,
     ): Promise<void> {
         const existingBook = await Notebook.findOne({ guildId });
 
@@ -72,6 +73,7 @@ const notebooks = {
             guildId,
             currentOwner: ownerId,
             originalOwner: ownerId,
+            fake
         });
 
         await access.grant(ownerId, [guildId]);
@@ -153,8 +155,8 @@ const notebooks = {
         if (targetPlayer && !targetPlayer.flags.get("alive"))
             return failure("This person is already dead.");
 
-        // if nobody has this true name, then subtract a use and return a failure.
-        if (!targetPlayer || !targetPlayer.flags.get("alive")) {
+        // if nobody has this true name or the notebook is fake, then subtract a use and return a failure.
+        if (!targetPlayer || !targetPlayer.flags.get("alive") || notebook.fake) {
             notebook.attemptsToday.set(
                 userId,
                 Math.max(0, (notebook.attemptsToday.get(userId) ?? 3) - 1)

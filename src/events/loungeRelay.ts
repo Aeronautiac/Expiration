@@ -29,10 +29,18 @@ export default {
         );
         if (channelsToSendTo.length === 0) return;
 
-        const senderName =
-            lounge.anonymous && message.author.id === lounge.contactorId
-                ? senderData.role
-                : await names.getDisplay(message.author.id);
+        let senderName: string;
+        if (lounge.anonymousAsRole && message.author.id === lounge.contactorId)
+            senderName = lounge.anonymousAsRole;
+        else if (lounge.fake) {
+            if (message.channelId === lounge.contactorChannelId)
+                senderName = await names.getDisplay(lounge.contactorId);
+            else if (message.channelId === lounge.contactedChannelId)
+                senderName = await names.getDisplay(lounge.contactedId);
+        }
+        else
+            senderName = await names.getDisplay(message.author.id);
+
         await util.relayMessage(
             message,
             channelsToSendTo,

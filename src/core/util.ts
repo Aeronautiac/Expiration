@@ -333,7 +333,7 @@ const util = {
                     done = true; // all remaining messages are too old
                     break;
                 }
-                if (predicate(msg)) allMessages.push(msg);
+                if (predicate(msg) && msg.createdTimestamp < earliestTimestamp) allMessages.push(msg);
             }
 
             lastId = messages.last().id;

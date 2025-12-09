@@ -5,7 +5,8 @@
     "scripts": {
         "dev": "ts-node-dev --respawn src/index.ts",
         "build": "tsc",
-        "start": "node src/watchdog.js"
+        "start": "node src/watchdog.js",
+        "deploy": "node ./dist/deployCommands.js"
     },
     "keywords": [],
     "author": "",

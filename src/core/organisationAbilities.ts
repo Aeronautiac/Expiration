@@ -20,6 +20,7 @@ import orgs from "./orgs";
 import kill from "../commands/hostCommands/kill";
 import { guilds } from "../configs/guilds";
 import access from "./access";
+import { IAbility } from "../models/ability";
 
 async function canDoLeaderAction(userId: string, orgName: OrganisationName) {
     // is the person using the command allowed to do a task force invite?
@@ -105,6 +106,7 @@ const orgAbilities = {
     },
 
     "Background Check": async (
+        abilityData: IAbility,
         orgName: OrganisationName,
         args: OrganisationAbilityArgs["Background Check"],
         checkOnly?: boolean
@@ -130,6 +132,7 @@ const orgAbilities = {
     },
 
     "Public Kidnap": async (
+        abilityData: IAbility,
         orgName: OrganisationName,
         args: OrganisationAbilityArgs["Public Kidnap"],
         checkOnly?: boolean
@@ -151,6 +154,7 @@ const orgAbilities = {
     },
 
     "Anonymous Kidnap": async (
+        abilityData: IAbility,
         orgName: OrganisationName,
         args: OrganisationAbilityArgs["Anonymous Kidnap"],
         checkOnly?: boolean
@@ -171,14 +175,16 @@ const orgAbilities = {
     },
 
     "2nd Kira+Kira Anonymous Kidnap": async (
+        abilityData: IAbility,
         orgName: OrganisationName,
         args: OrganisationAbilityArgs["Anonymous Kidnap"],
         checkOnly?: boolean
     ) => {
-        return orgAbilities["Anonymous Kidnap"](orgName, args, checkOnly);
+        return orgAbilities["Anonymous Kidnap"](abilityData, orgName, args, checkOnly);
     },
 
     "Unlawful Arrest": async (
+        abilityData: IAbility,
         orgName: OrganisationName,
         args: OrganisationAbilityArgs["Unlawful Arrest"],
         checkOnly?: boolean
@@ -216,15 +222,17 @@ const orgAbilities = {
     },
 
     "PI+Watari Unlawful Arrest": async (
+        abilityData: IAbility,
         orgName: OrganisationName,
         args: OrganisationAbilityArgs["Unlawful Arrest"],
         checkOnly?: boolean
     ) => {
-        return orgAbilities["Unlawful Arrest"](orgName, args, checkOnly);
+        return orgAbilities["Unlawful Arrest"](abilityData, orgName, args, checkOnly);
     },
 
     // need to finish the blackout functions in the game module first
     Blackout: async (
+        abilityData: IAbility,
         orgName: OrganisationName,
         args: OrganisationAbilityArgs["Blackout"],
         checkOnly?: boolean
@@ -243,133 +251,16 @@ const orgAbilities = {
     },
 
     "Tap In": async (
+        abilityData: IAbility,
         orgName: OrganisationName,
-        args: OrganisationAbilityArgs["Tap In"],
+        args: SharedAbilityArgs["Tap In"],
         checkOnly?: boolean
     ) => {
-        const lounge = await Lounge.findOne({ loungeId: args.loungeNumber });
-        if (!lounge) return failure("This is not a valid lounge number.");
-
-        if (checkOnly) return success();
-
-        // get display names
-        const contactorData = await Player.findOne({
-            userId: lounge.contactorId,
-        });
-        const displayNames: { [userId: string]: string } = {
-            [lounge.contactorId]: lounge.anonymous
-                ? contactorData.role
-                : await names.getAlias(lounge.contactorId),
-            [lounge.contactedId]: await names.getAlias(lounge.contactedId),
-        };
-
-        // create tap in channel
-        const logChannel = (await util.createTemporaryChannel(
-            config.guilds[config.organisations[orgName].guild],
-            `tap-in-${args.loungeNumber}`,
-            config.categoryPrefixes.tapIn
-        )) as TextChannel;
-
-        // for anonymous lounges, we will need to get all messages from both channels and then combined them into an array,
-        // then sort that array in reverse order
-        const fetchPromises = lounge.channelIds.map(async (id) => {
-            return await util.fetchAllMessages(
-                id,
-                null,
-                (msg) => !msg.author.bot
-            );
-        });
-        const allMessages = (await Promise.all(fetchPromises))
-            .flat()
-            .sort((a, b) => a.createdTimestamp - b.createdTimestamp);
-
-        let lastSpeakerId = null;
-        let currentBlock = [];
-        let currentBlockName = "";
-        const CHUNK_LIMIT = 2000;
-
-        // Send a block as chunks, ensuring no message is split
-        async function sendBlock(blockName, blockLines) {
-            if (blockLines.length === 0) return;
-            let prefix = `\`\`\`${blockName}:\`\`\`\n`;
-            let chunk = prefix;
-            for (let i = 0; i < blockLines.length; i++) {
-                let line = blockLines[i];
-                // If adding this line would exceed the limit, send the chunk and start a new one (fixes timestamp being cut off and looking very bad lol)
-                if (chunk.length + line.length > CHUNK_LIMIT) {
-                    await logChannel.send(chunk);
-                    await util.sleep(1);
-                    // Start new chunk with prefix and current line
-                    chunk = prefix + line;
-                } else {
-                    chunk += (chunk === prefix ? "" : "\n") + line;
-                }
-            }
-            // Send any remaining chunk
-            if (chunk.length > prefix.length) {
-                await logChannel.send(chunk);
-                await util.sleep(1);
-            }
-        }
-
-        await util.sleep(1);
-
-        for (const msg of allMessages) {
-            const displayName = displayNames[msg.author.id];
-            if (!displayName) continue;
-
-            // Check for image attachments without links (if an img is sent without a link, the bot sends an empty string as a log)
-            let imageLinks = [];
-            if (msg.attachments && msg.attachments.size > 0) {
-                msg.attachments.forEach((att) => {
-                    if (
-                        att.contentType &&
-                        att.contentType.startsWith("image/") &&
-                        att.url
-                    ) {
-                        imageLinks.push(att.url);
-                    }
-                });
-            }
-
-            let msgContent = msg.content;
-            if (imageLinks.length > 0) {
-                msgContent += (msgContent ? "\n" : "") + imageLinks.join("\n");
-            }
-
-            // Format line with timestamp
-            const timestamp = `<t:${Math.floor(msg.createdTimestamp / 1000)}>`;
-            const line = `"${msgContent}" ${timestamp}`;
-
-            if (msg.author.id !== lastSpeakerId) {
-                // Send previous block if exists
-                await sendBlock(currentBlockName, currentBlock);
-                // Start new block
-                currentBlock = [line];
-                currentBlockName = displayName;
-                lastSpeakerId = msg.author.id;
-            } else {
-                currentBlock.push(line);
-            }
-        }
-        // Send last block
-        await sendBlock(currentBlockName, currentBlock);
-
-        // send notif message
-        const notifPromises = lounge.channelIds.map(async (id) => {
-            const channel = (await client.channels.fetch(id)) as TextChannel;
-            await channel.send(
-                `@everyone This lounge has been tapped into by ${util.articledOrgMention(
-                    orgName
-                )}. All messages up to this point have been logged.`
-            );
-        });
-        await Promise.all(notifPromises);
-
-        return success();
+        return sharedAbilities["Tap In"](abilityData, orgName, args, checkOnly);
     },
 
     "Kira's Kingdom Invite": async (
+        abilityData: IAbility,
         orgName: OrganisationName,
         args: OrganisationAbilityArgs["Kira's Kingdom Invite"],
         checkOnly?: boolean
@@ -390,6 +281,7 @@ const orgAbilities = {
     },
 
     "Kira's Kingdom Kick": async (
+        abilityData: IAbility,
         orgName: OrganisationName,
         args: OrganisationAbilityArgs["Kira's Kingdom Kick"],
         checkOnly?: boolean
@@ -410,22 +302,25 @@ const orgAbilities = {
     },
 
     "Civilian Arrest": async (
+        abilityData: IAbility,
         orgName: OrganisationName,
         args: SharedAbilityArgs["Civilian Arrest"],
         checkOnly?: boolean
     ) => {
-        return sharedAbilities.civilianArrest(orgName, args, checkOnly);
+        return sharedAbilities.civilianArrest(abilityData, orgName, args, checkOnly);
     },
 
     async cancelCivArrest(
+        abilityData: IAbility,
         userId: string,
         args: SharedAbilityArgs["cancelCivArrest"],
         checkOnly?: boolean
     ) {
-        return sharedAbilities.cancelCivArrest(userId, args, checkOnly);
+        return sharedAbilities.cancelCivArrest(abilityData, userId, args, checkOnly);
     },
 
     "Shinigami Sacrifice": async (
+        abilityData: IAbility,
         orgName: OrganisationName,
         args: OrganisationAbilityArgs["Shinigami Sacrifice"],
         checkOnly?: boolean
@@ -474,6 +369,7 @@ const orgAbilities = {
     },
 
     "Task Force Invite": async (
+        abilityData: IAbility,
         orgName: OrganisationName,
         args: OrganisationAbilityArgs["Task Force Invite"],
         checkOnly?: boolean
@@ -527,6 +423,7 @@ const orgAbilities = {
     },
 
     "Task Force Kick": async (
+        abilityData: IAbility,
         orgName: OrganisationName,
         args: OrganisationAbilityArgs["Task Force Kick"],
         checkOnly?: boolean

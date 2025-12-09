@@ -1,4 +1,5 @@
 import {
+    Channel,
     Client,
     GuildMember,
     Message,
@@ -513,7 +514,8 @@ const game = {
         // then the prosecution was a failure
         fail = !(
             memberOfProsecutableOrgs.length > 0 ||
-            targetData.flags.get("didPublicKidnap")
+            targetData.flags.get("didPublicKidnap") ||
+            targetData.role == "Wanted Civilian"
         );
 
         if (fail) {
@@ -813,7 +815,8 @@ const game = {
     async bug(
         targetId: string,
         source: string,
-        buggedBy?: string
+        buggedBy?: string,
+        identifier?: string
     ): Promise<void> {
         const target = await client.users.fetch(targetId);
 
@@ -832,48 +835,99 @@ const game = {
         };
 
         const lwatariGuild = await client.guilds.fetch(config.guilds.lwatari);
-        const logChannelWatari = await util.createTemporaryChannel(
-            config.guilds.lwatari,
-            newChannelName,
-            config.categoryPrefixes.buglog,
-            [
-                {
-                    ids: [lwatariGuild.roles.everyone.id],
-                    perms: bugLogPerms,
-                },
-            ]
-        );
         if (source === "bug") {
-            const watarisStolenLaptopGuild = await client.guilds.fetch(
-                config.guilds.watarilaptop
-            );
-            const logChannelStolen = await util.createTemporaryChannel(
-                config.guilds.watarilaptop,
-                newChannelName,
-                config.categoryPrefixes.stolenbuglog,
-                [
-                    {
-                        ids: [watarisStolenLaptopGuild.roles.everyone.id],
-                        perms: bugLogPerms,
-                    },
-                ]
-            );
-
-            // always relay to stolen laptop if it's a normal bug
-            newBug.channelIds.set("stolen", logChannelStolen.id);
-
-            // only relay to L and Watari if the bug was created by Watari
             const buggedByData = await Player.findOne({ userId: buggedBy });
-            if (buggedByData.role === "Watari")
-                newBug.channelIds.set("watari", logChannelWatari.id);
+
+            let logChannelMain: Channel;
+            let logChannelStolen: Channel;
+            if (identifier === "Watari") {
+                logChannelMain = await util.createTemporaryChannel(
+                    config.guilds.lwatari,
+                    newChannelName,
+                    config.categoryPrefixes.buglog,
+                    [
+                        {
+                            ids: [lwatariGuild.roles.everyone.id],
+                            perms: bugLogPerms,
+                        },
+                    ]
+                );
+
+                const watarisStolenLaptopGuild = await client.guilds.fetch(
+                    config.guilds.watarilaptop
+                );
+
+                logChannelStolen = await util.createTemporaryChannel(
+                    config.guilds.watarilaptop,
+                    newChannelName,
+                    config.categoryPrefixes.stolenbuglog,
+                    [
+                        {
+                            ids: [watarisStolenLaptopGuild.roles.everyone.id],
+                            perms: bugLogPerms,
+                        },
+                    ]
+                );
+            } else if (identifier === "Wanted Civilian") {
+                const wantedCivGuild = await client.guilds.fetch(
+                    config.guilds["Wanted Civilian"]
+                );
+
+                logChannelMain = await util.createTemporaryChannel(
+                    config.guilds["Wanted Civilian"],
+                    newChannelName,
+                    config.categoryPrefixes.stolenbuglog,
+                    [
+                        {
+                            ids: [wantedCivGuild.roles.everyone.id],
+                            perms: bugLogPerms,
+                        },
+                    ]
+                );
+
+                const wantedCivLaptopGuild = await client.guilds.fetch(
+                    config.guilds.wantedCivLaptop
+                );
+
+                logChannelStolen = await util.createTemporaryChannel(
+                    config.guilds.wantedCivLaptop,
+                    newChannelName,
+                    config.categoryPrefixes.stolenbuglog,
+                    [
+                        {
+                            ids: [wantedCivLaptopGuild.roles.everyone.id],
+                            perms: bugLogPerms,
+                        },
+                    ]
+                );
+            }
+
+            // always relay to stolen laptop
+            newBug.channelIds.set(`stolen_${identifier}`, logChannelStolen.id);
+
+            // only relay to the main channel if the role that the bug ability belongs to is using it
+            if (buggedByData.role === identifier)
+                newBug.channelIds.set(identifier, logChannelMain.id);
 
             // add a bug asterisk to the target's name
             await game.addBugAsterisk(targetId).catch(console.error);
         }
 
         // always relay to L and Watari even if Watari is dead if it's a custody bug
-        if (source === "custody")
-            newBug.channelIds.set("watari", logChannelWatari.id);
+        if (source === "custody") {
+            const logChannelCustody = await util.createTemporaryChannel(
+                config.guilds.lwatari,
+                newChannelName,
+                config.categoryPrefixes.buglog,
+                [
+                    {
+                        ids: [lwatariGuild.roles.everyone.id],
+                        perms: bugLogPerms,
+                    },
+                ]
+            );
+            newBug.channelIds.set("Watari", logChannelCustody.id);
+        }
 
         await newBug.save();
 

@@ -95,12 +95,25 @@ const abilities = {
             return failure("The season is not yet active.");
 
         // abilities can only be used by a player/organisation that possesses the ability
-        const abilityData = await Ability.findOne({
+        const abilitiesData = await Ability.find({
             owner,
             ability: abilityName,
         });
-        if (!abilityData && !excludeChecks.includes("possession"))
+
+        if (abilitiesData.length === 0 && !excludeChecks.includes("possession"))
             return failure("You do not possess this ability.");
+
+        // try to find an ability with available charges and no cd
+        let abilityData: IAbility;
+        for (const adata of abilitiesData) {
+            if ((adata.charges === undefined || adata.charges > 0) && adata.cooldown === 0)
+            {
+                abilityData = adata;
+                break;
+            }
+        }
+        if (!abilityData)
+            abilityData = abilitiesData[0];
 
         // no player data -- no ability usage (if the user is a player)
         let userData: IPlayer;
@@ -233,7 +246,7 @@ const abilities = {
         // if we're only checking if the ability can be used, this will be the final bit
         // try to use the ability. if it rejects, then reject with the same reasoning.
         // if this check is passed, then the ability was/can be used successfully
-        const result = await abilityCallback(owner, args, checkOnly);
+        const result = await abilityCallback(abilityData, owner, args, checkOnly);
         if (!result.success) return result;
 
         // end before the ability use logic is executed if we're only checking if we can use the ability
@@ -319,6 +332,7 @@ const abilities = {
                 type: "player",
                 owner: userId,
                 ability: abilityName,
+                identifier: playerData.role,
                 roleRestrictions: [playerData.role],
             });
         }

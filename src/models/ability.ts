@@ -1,5 +1,4 @@
 import { Document, Schema, Model, model } from "mongoose";
-import { PlayerAbilityName } from "../configs/playerAbilities";
 import { AbilityName } from "../configs/abilityArgs";
 
 // this can be expanded to work with organisations as well.
@@ -13,6 +12,7 @@ import { AbilityName } from "../configs/abilityArgs";
 
 export interface IAbility extends Document {
   type: "player" | "organisation";
+  identifier?: string;
   queuedCooldown?: Number;
   owner: string;
   ability: AbilityName;
@@ -25,6 +25,7 @@ const abilitySchema = new Schema<IAbility>({
   type: { type: String, required: true },
   roleRestrictions: { type: [String], required: true, default: [] }, // only allow ability to be used while the player has this role.
   queuedCooldown: Number,
+  identifier: String,
   owner: { type: String, required: true }, // abilities may only be used by their owner. each player may only own one copy of an ability at a time.
   ability: { type: String, required: true },
   cooldown: { type: Number, required: true, default: 0 }, // cooldowns are applied at the end of a day if it was used that day.
