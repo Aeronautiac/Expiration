@@ -124,6 +124,7 @@ export interface SharedAbilityArgs {
 
     "Tap In": {
         loungeNumber: number;
+        startedBy: string;
     };
 }
 

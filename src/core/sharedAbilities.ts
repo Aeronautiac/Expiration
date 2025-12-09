@@ -240,13 +240,13 @@ const sharedAbilities = {
             const timestamp = `<t:${Math.floor(msg.createdTimestamp / 1000)}>`;
             const line = `"${msgContent}" ${timestamp}`;
 
-            if (msg.author.id !== lastSpeakerId) {
+            if (senderId !== lastSpeakerId) {
                 // Send previous block if exists
                 await sendBlock(currentBlockName, currentBlock);
                 // Start new block
                 currentBlock = [line];
                 currentBlockName = displayName;
-                lastSpeakerId = msg.author.id;
+                lastSpeakerId = senderId;
             } else {
                 currentBlock.push(line);
             }
@@ -257,7 +257,7 @@ const sharedAbilities = {
         // send notif message
         const tapInDisplay = org
             ? util.articledOrgMention(owner as OrganisationName)
-            : util.roleMention(playerData.role);
+            : `the ${util.roleMention(playerData.role)}`;
         const logDisplay = org
             ? "All messages up to this point have been logged."
             : `All messages up to ${config.playerAbilities["Tap In"].duration} hours ago have been logged.`;
@@ -270,7 +270,11 @@ const sharedAbilities = {
         await Promise.all(notifPromises);
 
         // also need to reveal tap in identity to con artist if the lounge is fake
-        
+        if (lounge.fake)
+            util.sendToUser(
+                lounge.owner,
+                `Your fake lounge **[lounge-${lounge.loungeId}]** has been tapped into by <@${args.startedBy}>.`
+            );
 
         return success();
     },

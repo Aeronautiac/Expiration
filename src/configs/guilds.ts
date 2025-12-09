@@ -10,6 +10,7 @@ export const guilds = {
     notebook1: "1406302123901321216",
     notebook2: "1406302376083722270",
     notebook3: "1406302628450930708",
+    fakenotebook: "1448015864073818198",
     watarilaptop: "1412998755430432788",
     "News Anchor": "1414838956171726870",
     "Rogue Civilian": "1414839208388071507",

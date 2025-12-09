@@ -22,6 +22,7 @@ export default {
                 interaction.user.id,
                 "Tap In",
                 {
+                    startedBy: interaction.user.id,
                     loungeNumber: interaction.options.getInteger("loungenumber"),
                 }
             );
