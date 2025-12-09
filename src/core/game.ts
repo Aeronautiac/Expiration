@@ -527,7 +527,7 @@ const game = {
                     asOrg
                 )}, <@${prosecutorId}> (${names.toReadable(
                     userData.trueName
-                )}) has attempted to carry out a silent prosecution against someone they suspected of being involved in acts of terrorism.\nAfter further investigation, it was determined that this person was **not guilty**.\nDespite this, <@${prosecutorId}> persisted with their efforts.\nAs a result, they have been **permanently banned** from ${util.articledOrgMention(
+                )}) has attempted to carry out a silent prosecution against someone they suspected of being involved in serious crimes.\nAfter further investigation, it was determined that this person was **not guilty**.\nDespite this, <@${prosecutorId}> persisted with their efforts.\nAs a result, they have been **permanently banned** from ${util.articledOrgMention(
                     asOrg
                 )}.`
             ).catch(console.error);
@@ -542,7 +542,7 @@ const game = {
         game.announce(
             `@everyone ${util.articledOrgMention(
                 asOrg
-            )} has carried out a silent prosecution against <@${targetId}>. They have been found guilty of being involved in acts of terrorism.`
+            )} has carried out a silent prosecution against <@${targetId}>. They have been found guilty.`
         ).catch(console.error);
         death
             .kill(targetId, {
@@ -841,17 +841,19 @@ const game = {
             let logChannelMain: Channel;
             let logChannelStolen: Channel;
             if (identifier === "Watari") {
-                logChannelMain = await util.createTemporaryChannel(
-                    config.guilds.lwatari,
-                    newChannelName,
-                    config.categoryPrefixes.buglog,
-                    [
-                        {
-                            ids: [lwatariGuild.roles.everyone.id],
-                            perms: bugLogPerms,
-                        },
-                    ]
-                );
+                if (buggedByData.role === "Watari") {
+                    logChannelMain = await util.createTemporaryChannel(
+                        config.guilds.lwatari,
+                        newChannelName,
+                        config.categoryPrefixes.buglog,
+                        [
+                            {
+                                ids: [lwatariGuild.roles.everyone.id],
+                                perms: bugLogPerms,
+                            },
+                        ]
+                    );
+                }
 
                 const watarisStolenLaptopGuild = await client.guilds.fetch(
                     config.guilds.watarilaptop
@@ -873,17 +875,19 @@ const game = {
                     config.guilds["Wanted Civilian"]
                 );
 
-                logChannelMain = await util.createTemporaryChannel(
-                    config.guilds["Wanted Civilian"],
-                    newChannelName,
-                    config.categoryPrefixes.stolenbuglog,
-                    [
-                        {
-                            ids: [wantedCivGuild.roles.everyone.id],
-                            perms: bugLogPerms,
-                        },
-                    ]
-                );
+                if (buggedByData.role === "Wanted Civilian") {
+                    logChannelMain = await util.createTemporaryChannel(
+                        config.guilds["Wanted Civilian"],
+                        newChannelName,
+                        config.categoryPrefixes.stolenbuglog,
+                        [
+                            {
+                                ids: [wantedCivGuild.roles.everyone.id],
+                                perms: bugLogPerms,
+                            },
+                        ]
+                    );
+                }
 
                 const wantedCivLaptopGuild = await client.guilds.fetch(
                     config.guilds.wantedCivLaptop
@@ -906,7 +910,7 @@ const game = {
             newBug.channelIds.set(`stolen_${identifier}`, logChannelStolen.id);
 
             // only relay to the main channel if the role that the bug ability belongs to is using it
-            if (buggedByData.role === identifier)
+            if (buggedByData.role === identifier && logChannelMain)
                 newBug.channelIds.set(identifier, logChannelMain.id);
 
             // add a bug asterisk to the target's name
