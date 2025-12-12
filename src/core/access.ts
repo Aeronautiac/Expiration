@@ -94,7 +94,6 @@ access.deleteInvites = async function () {
 };
 
 access.grant = async function (userId, guildIds) {
-    console.log(`granting access to: ${guildIds}`);
     const invitePrefix = `https://discord.gg/`;
 
     // we need player data to handle this. if there is no player data, return early.
@@ -114,6 +113,7 @@ access.grant = async function (userId, guildIds) {
     let secondInviteMessage: string = ""; // This is for when the number of invites are over 10.
     let guildsInvitedTo: number = 0;
     for (const guildId of guildIds) {
+        console.log(`granting access to: ${guildId}`);
         const guild = await client.guilds.fetch(guildId);
 
         // check if the player already has access
@@ -280,10 +280,12 @@ access.updateChannels = async function (userId) {
 access.grantRole = async function (userId) {
     const playerData = await Player.findOne({ userId });
     if (!playerData) return;
-
     const role = playerData.role;
+    console.log(role);
     const guildsToGrant: string[] = config.roles[role].guilds || [];
+    console.log(guildsToGrant);
     const guildIds = guildsToGrant.map((guildName) => config.guilds[guildName]);
+    console.log(guildIds);
     await access.grant(userId, guildIds);
 };
 

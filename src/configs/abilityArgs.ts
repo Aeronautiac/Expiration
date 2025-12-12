@@ -1,3 +1,4 @@
+import falseAnonymousContact from "../commands/playerCommands/falseAnonymousContact";
 import { OrgMember } from "../types/OrgMember";
 import { RoleName } from "./roles";
 
@@ -32,6 +33,12 @@ export interface PlayerAbilityArgs {
 
     anonymousContact: {
         targetId: string;
+        asRole: RoleName;
+    };
+
+    falseAnonymousContact: {
+        targetId: string;
+        asRole: RoleName;
     };
 
     autopsy: {
@@ -53,6 +60,11 @@ export interface PlayerAbilityArgs {
     kiraConnection: {
         channelId: string;
     };
+
+    fakeLounge: {
+        contactorId: string;
+        contactedId: string;
+    };
 }
 
 export interface OrganisationAbilityArgs {
@@ -73,10 +85,6 @@ export interface OrganisationAbilityArgs {
 
     "Kira's Kingdom Kick": {
         targetId: string;
-    };
-
-    "Tap In": {
-        loungeNumber: number;
     };
 
     "Background Check": {
@@ -112,6 +120,11 @@ export interface SharedAbilityArgs {
 
     cancelCivArrest: {
         targetId: string;
+    };
+
+    "Tap In": {
+        loungeNumber: number;
+        startedBy: string;
     };
 }
 

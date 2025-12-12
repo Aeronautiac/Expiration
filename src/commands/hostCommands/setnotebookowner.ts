@@ -14,7 +14,13 @@ export default {
                 .setName("ownerid")
                 .setDescription("The userid of the owner of the notebook")
                 .setRequired(true)
-        ).setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        )
+        .addBooleanOption((option) => 
+            option
+                .setName("fake")
+                .setDescription("Is this a fake notebook?")
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
         ,
 
     async execute(interaction: ChatInputCommandInteraction) {
@@ -24,7 +30,9 @@ export default {
 
         await notebooks.setOwner(
             interaction.guild.id,
-            interaction.options.getString("ownerid")
+            interaction.options.getString("ownerid"),
+            false,
+            interaction.options.getBoolean("fake")
         );
 
         await interaction.editReply({

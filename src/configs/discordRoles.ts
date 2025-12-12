@@ -16,7 +16,10 @@ export const discordRoles = {
     Prosecutor: "1406115825928376361",
     Custody: "1406115825907269651",
     Kidnapped: "1406115825928376362",
-    "Press Conference": "1419447605582106684"
+    "Press Conference": "1419447605582106684",
+    Poser: "1440124982553477131",
+    "Wanted Civilian": "1440125634360643697",
+    "Con Artist": "1440125284346236969"
 } as const satisfies { [roleName: string]: string };
 
 export type DiscordRoleName = keyof typeof discordRoles;

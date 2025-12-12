@@ -47,7 +47,7 @@ export const organisationAbilities: Record<
         duration: KIDNAP_DURATION,
     },
     "Task Force Invite": {
-        charges: 2,
+        charges: 1,
         cooldown: 0,
         membersRequired: 0,
         rolesRequired: [],
@@ -59,7 +59,7 @@ export const organisationAbilities: Record<
         rolesRequired: [],
     },
     "Kira's Kingdom Invite": {
-        charges: 2,
+        charges: 1,
         cooldown: 0,
         membersRequired: 0,
         rolesRequired: [],
@@ -91,7 +91,7 @@ export const organisationAbilities: Record<
     },
     "Civilian Arrest": {
         charges: 1,
-        cooldown: 0,
+        cooldown: 1,
         membersRequired: 4,
         rolesRequired: [],
     },

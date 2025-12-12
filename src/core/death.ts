@@ -68,7 +68,7 @@ const death = {
         }
         await names.setNick(userId, await names.getAlias(userId));
 
-        const bugAbility = await Ability.findOne({
+        const bugAbilities = await Ability.find({
             owner: userId,
             ability: "bug",
         });
@@ -81,28 +81,49 @@ const death = {
 
             // transfer notebooks
             const promises = ownedNotebooks.map(async (notebook) => {
-                if (notebook.temporaryOwner) return; // don't transfer notebooks that are temporarily owned (i.e. stolen). they will return at the end of the day.
+                if (
+                    notebook.temporaryOwner &&
+                    notebook.temporaryOwner !== args.killerId
+                )
+                    return; // don't transfer notebooks that are temporarily owned (i.e. stolen). they will return at the end of the day.
                 await notebooks.setOwner(notebook.guildId, args.killerId!);
             });
             await Promise.all(promises);
 
-            // transfer bugs and bug ability
-            if (bugAbility) {
+            // transfer bugs and bug abilities
+            if (bugAbilities.length > 0) {
                 // transfer bugs
-                const activeBugs = await Bug.find({ targetId: userId });
+                const activeBugs = await Bug.find({ buggedBy: userId });
                 const bugPromises = activeBugs.map(async (bug) => {
                     bug.buggedBy = args.killerId;
-                    bug.channelIds.delete("watari"); // remove watari channel if it exists
+                    bug.channelIds.delete("Watari");
+                    bug.channelIds.delete("Wanted Civilian");
                     await bug.save();
                 });
                 await Promise.all(bugPromises);
 
-                // transfer bug ability
-                await access.revoke(userId, config.guilds.watarilaptop);
-                await access.grant(args.killerId, [config.guilds.watarilaptop]);
-                bugAbility.owner = args.killerId;
-                bugAbility.roleRestrictions = [];
-                await bugAbility.save();
+                // transfer bug abilities
+                for (const bugAbility of bugAbilities) {
+                    if (bugAbility.identifier === "Watari") {
+                        await access.revoke(userId, config.guilds.watarilaptop);
+                        await access.grant(args.killerId, [
+                            config.guilds.watarilaptop,
+                        ]);
+                    } else if (bugAbility.identifier === "Wanted Civilian") {
+                        await access.revoke(
+                            userId,
+                            config.guilds.wantedCivLaptop
+                        );
+                        await access.grant(args.killerId, [
+                            config.guilds.wantedCivLaptop,
+                        ]);
+                    }
+
+                    bugAbility.owner = args.killerId;
+                    bugAbility.roleRestrictions = [];
+
+                    await bugAbility.save();
+                }
             }
 
             killerData.playersKilled.push(userId);
@@ -124,22 +145,28 @@ const death = {
                 wasKilledByPlayer: wasKilledByPlayer,
                 deathMessage: args.deathMessage,
                 ownedANotebook: ownedNotebooks.length > 0,
-                ownedBugAbility:
-                    bugAbility !== undefined && bugAbility !== null,
+                ownedBugAbility: bugAbilities.length > 0,
                 role: userData.role,
                 memberObjects: await util.getMemberObjects(userId),
             });
 
-            if (singlePlayerGuilds.includes(userData.role as typeof singlePlayerGuilds[number])) {
+            if (
+                singlePlayerGuilds.includes(
+                    userData.role as (typeof singlePlayerGuilds)[number]
+                )
+            ) {
                 // announce in role server
                 const roleGuildId = guilds[userData.role];
                 if (roleGuildId) {
                     const roleGuild = await client.guilds.fetch(roleGuildId);
                     const loungeChannel = roleGuild.channels.cache.find(
-                        (channel) => channel.type === 0 && channel.name === "lounge"
+                        (channel) =>
+                            channel.type === 0 && channel.name === "lounge"
                     ) as TextChannel;
                     if (loungeChannel) {
-                        await loungeChannel.send(config.postDeathDiscussionMessage);
+                        await loungeChannel.send(
+                            config.postDeathDiscussionMessage
+                        );
                     }
                 }
             }
@@ -208,6 +235,18 @@ const death = {
                     "Kira"
                 )}'s most devoted supporter, `,
             ],
+            [
+                "Wanted Civilian",
+                "They were the notorious criminal mastermind, the "
+            ],
+            [
+                "Con Artist",
+                "They were the deceitful "
+            ],
+            [
+                "Poser",
+                "They were the "
+            ]
         ]);
 
         const roleAddition = revealMessages.get(role) ?? "They were ";
@@ -260,10 +299,10 @@ const death = {
             possessionMessage += `Whoever is responsible for their death has now gained possession of their death note(s)`;
 
         if (args.ownedBugAbility && args.ownedANotebook)
-            possessionMessage += ` and their bug and contact log abilities`;
+            possessionMessage += ` and their laptop(s).`;
 
         if (args.ownedBugAbility && !args.ownedANotebook)
-            possessionMessage += `Whoever is responsible for their death has now gained possession of their bug and contact log abilities`;
+            possessionMessage += `Whoever is responsible for their death has now gained possession of their laptop(s)`;
 
         if (possessionMessage) possessionMessage += `.`;
 

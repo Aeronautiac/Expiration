@@ -6,7 +6,7 @@ import {
     SlashCommandBuilder,
 } from "discord.js";
 import abilities from "../../core/abilities";
-import game from "../../core/game";
+import game, { executionQueue } from "../../core/game";
 import Organisation from "../../models/organisation";
 import { guilds } from "../../configs/guilds";
 import { OrganisationName, organisations } from "../../configs/organisations";
@@ -69,17 +69,19 @@ export default {
                     content: "Performing silent prosecution.",
                     components: [],
                 });
-                const result = await game.silentProsecute(
-                    interaction.user.id,
-                    orgName,
-                    interaction.options.getString("target")
-                );
-                if (!result.success) {
-                    interaction.editReply(
-                        `Failed to silent prosecute. ${result.message}`
+                await executionQueue.executeQueued(async () => {
+                    const result = await game.silentProsecute(
+                        interaction.user.id,
+                        orgName,
+                        interaction.options.getString("target")
                     );
-                    return;
-                } else interaction.editReply("Success.");
+                    if (!result.success) {
+                        interaction.editReply(
+                            `Failed to silent prosecute. ${result.message}`
+                        );
+                        return;
+                    } else interaction.editReply("Success.");
+                });
             } else {
                 await i.update({ content: "Cancelled.", components: [] });
             }

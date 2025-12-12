@@ -5,6 +5,7 @@ export interface INotebook {
     originalOwner: string;
     currentOwner: string;
     temporaryOwner?: string;
+    fake?: boolean;
     usedToday: string[],
     attemptsToday: Map<string, number>;
 }
@@ -14,6 +15,7 @@ const notebookSchema = new Schema({
     originalOwner: { type: String, required: true },
     currentOwner: { type: String, required: true },
     temporaryOwner: { type: String },
+    fake: Boolean,
     usedToday: { type: [String], required: true, default: [] }, // an array of user ids who have killed someone using this notebook today. reset when the day ends.
     attemptsToday: { type: Map, of: Number, default: {}, required: true }, // the number of times somebody has tried and failed to use the notebook today. resets on day end.
 });

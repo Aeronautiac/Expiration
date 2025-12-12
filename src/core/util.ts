@@ -333,7 +333,8 @@ const util = {
                     done = true; // all remaining messages are too old
                     break;
                 }
-                if (predicate(msg)) allMessages.push(msg);
+                let timestampAllowed = !earliestTimestamp || msg.createdTimestamp >= earliestTimestamp;
+                if (predicate(msg) && timestampAllowed) allMessages.push(msg);
             }
 
             lastId = messages.last().id;
@@ -344,7 +345,7 @@ const util = {
 
     // this function will tokenize long messages and send them in chunks.
     // eventually I plan to make it include formatting and everything.
-    async sendMessage(channelId: string, message: string) {},
+    // async sendMessage(channelId: string, message: string) {},
 
     // use this instead of user.send(). This sends to a monologue channel instead of DMs
     async sendToUser(userId: string, message: string) {
@@ -398,6 +399,9 @@ const util = {
             "Rogue Civilian",
             "Private Investigator",
             "News Anchor",
+            "Con Artist",
+            "Poser",
+            "Wanted Civilian"
         ];
         const orgsInOrder = ["Kira's Kingdom", "Task Force"];
 
