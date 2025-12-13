@@ -302,7 +302,10 @@ const util = {
         earliestTimestamp?: number,
         predicate: (msg: Message) => boolean = () => true
     ) {
-        const channel = await client.channels.fetch(channelId);
+        const channel = await client.channels.fetch(channelId).catch(() => null);
+        if (!channel)
+            return [];
+
         if (!channel.isTextBased())
             throw new Error(
                 "Channel must be text based in order to fetch messages."
@@ -325,7 +328,8 @@ const util = {
             const messages = await channel.messages.fetch(options);
             if (messages.size === 0) break;
 
-            for (const msg of Array.from(messages.values())) {
+            for (const mesg of Array.from(messages.values())) {
+                const msg = mesg as Message;
                 if (
                     earliestTimestamp &&
                     msg.createdTimestamp < earliestTimestamp
