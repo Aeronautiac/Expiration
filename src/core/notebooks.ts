@@ -34,8 +34,8 @@ const notebooks = {
                 existingBook.temporaryOwner ?? existingBook.currentOwner;
             const newHolder = ownerId;
 
-            // if the current holder and new holder are the same, do nothing
-            if (currentHolder === newHolder) return;
+            // // if the current holder and new holder are the same, do nothing
+            // if (currentHolder === newHolder) return;
 
             // if temporary, change the temporary owner field, otherwise, change current owner
             if (temporary) {

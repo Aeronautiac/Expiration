@@ -81,7 +81,7 @@ const death = {
 
             // transfer notebooks
             const promises = ownedNotebooks.map(async (notebook) => {
-                if (notebook.temporaryOwner) return; // don't transfer notebooks that are temporarily owned (i.e. stolen). they will return at the end of the day.
+                if (notebook.temporaryOwner && notebook.temporaryOwner !== args.killerId) return; // don't transfer notebooks that are temporarily owned (i.e. stolen). they will return at the end of the day.
                 await notebooks.setOwner(notebook.guildId, args.killerId!);
             });
             await Promise.all(promises);
