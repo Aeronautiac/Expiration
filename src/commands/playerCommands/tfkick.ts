@@ -4,6 +4,7 @@ import { config } from "../../configs/config";
 import orgs from "../../core/orgs";
 import orgAbilities from "../../core/organisationAbilities";
 import abilities from "../../core/abilities";
+import { executionQueue } from "../../core/game";
 
 export default {
     data: new SlashCommandBuilder()
@@ -29,21 +30,23 @@ export default {
             return;
         }
 
-        const result = await abilities.useAbility(
-            "Task Force",
-            "Task Force Kick",
-            {
-                userId: interaction.user.id,
-                targetId: interaction.options.getString("targetid"),
-            }
-        );
-        if (!result.success)
-            await interaction.editReply({
-                content: result.message || "Failed to kick.",
-            });
-        else
-            await interaction.editReply({
-                content: "Success.",
-            });
+        await executionQueue.executeQueued(async () => {
+            const result = await abilities.useAbility(
+                "Task Force",
+                "Task Force Kick",
+                {
+                    userId: interaction.user.id,
+                    targetId: interaction.options.getString("targetid"),
+                }
+            );
+            if (!result.success)
+                await interaction.editReply({
+                    content: result.message || "Failed to kick.",
+                });
+            else
+                await interaction.editReply({
+                    content: "Success.",
+                });
+        });
     },
 };

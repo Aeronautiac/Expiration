@@ -1,4 +1,9 @@
-import { Channel, Client, managerToFetchingStrategyOptions, TextChannel } from "discord.js";
+import {
+    Channel,
+    Client,
+    managerToFetchingStrategyOptions,
+    TextChannel,
+} from "discord.js";
 import Player from "../models/player";
 import access from "./access";
 import { config } from "../configs/config";
@@ -11,6 +16,7 @@ import contact from "../commands/playerCommands/contact";
 import abilities from "./abilities";
 import Season from "../models/season";
 import { group } from "node:console";
+import { RoleName } from "../configs/roles";
 
 let client: Client;
 
@@ -80,8 +86,11 @@ const contacting = {
     async contact(
         userId: string,
         targetId: string,
-        anonymous?: boolean
+        anonymousAsRole?: RoleName
     ): Promise<Result> {
+        // if the player is also the target, return a failure
+        if (userId == targetId) return failure("You cannot contact yourself.");
+
         const userData = await Player.findOne({ userId });
         const targetData = await Player.findOne({ userId: targetId });
 
@@ -92,12 +101,6 @@ const contacting = {
         // if the target cannot contact, return a failure
         const targetCanContactResult = await contacting.canContact(targetId);
         if (!targetCanContactResult.success) return targetCanContactResult;
-
-        // if the player is also the target, return a failure
-        if (userId == targetId && !anonymous)
-            return failure(
-                "You cannot contact yourself if it is not anonymous."
-            );
 
         // if the player is out of contact tokens, return a failure
         if (!userData.contactTokens)
@@ -125,7 +128,7 @@ const contacting = {
         );
         channels.push(contactorChannel);
 
-        if (anonymous) {
+        if (anonymousAsRole) {
             const contactedChannel = await util.createTemporaryChannel(
                 config.guilds.main,
                 channelName,
@@ -160,8 +163,8 @@ const contacting = {
         await targetData.save();
         await userData.save();
 
-        const contactorStr = anonymous
-            ? util.roleMention(userData.role, config.guilds.main)
+        const contactorStr = anonymousAsRole
+            ? util.roleMention(anonymousAsRole)
             : `<@${userId}>`;
         const contactedStr = `<@${targetId}>`;
         const sendPromises = channels.map(async (channel) => {
@@ -178,7 +181,7 @@ const contacting = {
         await Promise.all(setLoggablePromises);
 
         await Lounge.create({
-            anonymous,
+            anonymousAsRole,
             channelIds,
             contactorId: userId,
             contactedId: targetId,
@@ -186,11 +189,60 @@ const contacting = {
         });
 
         // log contact
-        await contacting.logContact(userId, targetId, anonymous);
+        await contacting.logContact(userId, targetId, anonymousAsRole);
 
         return success(
             `Successfully created lounge channel: ${contactorChannel}`
         );
+    },
+
+    async createFakeLounge(
+        owner: string,
+        contactorId: string,
+        contactedId: string
+    ) {
+        const ownerData = await Player.findOne({ userId: owner });
+        const loungeId = (await Lounge.countDocuments({})) + 1;
+        const channelName = `lounge-${loungeId}`;
+
+        async function channel(): Promise<TextChannel> {
+            return await util.createTemporaryChannel(
+                config.guilds.main,
+                channelName,
+                config.categoryPrefixes.lounge,
+                [
+                    { ids: [owner], perms: config.loungeMemberPermissions },
+                    {
+                        ids: [config.discordRoles.Spectator],
+                        perms: config.spectatorPermissions,
+                    },
+                ],
+                true
+            ) as TextChannel;
+        }
+
+        let channels: TextChannel[] = [];
+        const contactorChannel = await channel();
+        const contactedChannel = await channel();
+        channels.push(contactorChannel, contactedChannel);
+
+        ownerData.loungeChannelIds.push(contactorChannel.id, contactedChannel.id);
+        await ownerData.save();
+
+        contacting.logContact(contactorId, contactedId);
+        contactorChannel.send(`<@${owner}>\nThis is from the perspective of <@${contactorId}>. Messages sent here will appear as though they were sent from them. This applies only to tap ins.`);
+        contactedChannel.send(`<@${owner}>\nThis is from the perspective of <@${contactedId}>. Messages sent here will appear as though they were sent from them. This applies only to tap ins.`);
+
+        await Lounge.create({
+            fake: true,
+            owner,
+            contactedId,
+            contactorId,
+            contactedChannelId: contactedChannel.id,
+            contactorChannelId: contactorChannel.id,
+            loungeId,
+            channelIds: channels.map((c) => c.id),
+        });
     },
 
     async canDoGroupchatAction(
@@ -351,7 +403,8 @@ const contacting = {
             return failure("This person is already in the group chat.");
 
         // if the group chat already has 5 people, don't allow it
-        if (groupchat.memberIds.length === config.maxGroupChatSize) return failure("You cannot add any more people to the group chat.");
+        if (groupchat.memberIds.length === config.maxGroupChatSize)
+            return failure("You cannot add any more people to the group chat.");
 
         // add the target to the group chat
         await util.addPermissionsToChannel(groupchatId, [
@@ -503,7 +556,7 @@ const contacting = {
 
         // find closer alias (don't want to leak them if the lounge was anonymous)
         const alias =
-            lounge.anonymous && lounge.contactorId === userId
+            lounge.anonymousAsRole && lounge.contactorId === userId
                 ? userData.role
                 : await names.getAlias(userId);
 
@@ -586,15 +639,15 @@ const contacting = {
     async logContact(
         userId: string,
         targetId: string,
-        anonymous: boolean
+        anonymousAsRole?: string
     ): Promise<void> {
         // if no data, don't log. should be impossible anyway.
         const userData = await Player.findOne({ userId });
         if (!userData) return;
 
         // construct the info strings
-        const contactorStr = anonymous
-            ? `**${userData.role}**`
+        const contactorStr = anonymousAsRole
+            ? `**${anonymousAsRole}**`
             : `**${await names.getAlias(userId)}**`;
         const contactedStr = `**${await names.getAlias(targetId)}**`;
         const timeString = `<t:${Math.floor(Date.now() / 1000)}:F>`;
@@ -685,7 +738,10 @@ const contacting = {
         );
     },
 
-    async canAddOrRemoveToConference(userId: string, channelId: string): Promise<true | Result> {
+    async canAddOrRemoveToConference(
+        userId: string,
+        channelId: string
+    ): Promise<true | Result> {
         const season = await Season.findOne({});
         if (!season) return failure("No season currently exists.");
         if (!season.flags.get("active"))
@@ -695,38 +751,73 @@ const contacting = {
         const playerData = await Player.findOne({ userId });
         if (!playerData) return failure("You are not a player.");
         if (!playerData.flags.get("alive")) return failure("You are dead.");
-        if (playerData.role !== "News Anchor") return failure("Only the News Anchor can add to and from Press Conferences.");
-        if (channelId !== config.channels.news) return failure("This can only be done in the News channel.");
+        if (playerData.role !== "News Anchor")
+            return failure(
+                "Only the News Anchor can add to and from Press Conferences."
+            );
+        if (channelId !== config.channels.news)
+            return failure("This can only be done in the News channel.");
 
         return true;
     },
 
-    async addToConference(userId: string | null, targetIds: string[], channelId: string | null): Promise<Result> {
+    async addToConference(
+        userId: string | null,
+        targetIds: string[],
+        channelId: string | null
+    ): Promise<Result> {
         if (userId) {
-            const canAdd = await contacting.canAddOrRemoveToConference(userId, channelId);
+            const canAdd = await contacting.canAddOrRemoveToConference(
+                userId,
+                channelId
+            );
             if (canAdd !== true) return canAdd;
         }
 
         const playersInConference: string[] = [];
         const mainGuild = await client.guilds.fetch(config.guilds.main);
         for (const [, member] of await mainGuild.members.fetch()) {
-            if (member.roles.cache.has(config.discordRoles["Press Conference"])) {
+            if (
+                member.roles.cache.has(config.discordRoles["Press Conference"])
+            ) {
                 playersInConference.push(member.id);
             }
         }
 
-        if (playersInConference.length + targetIds.length > config.maxPlayersInConference || playersInConference.length >= config.maxPlayersInConference) {
-            return failure("The conference is either full or will be too crowded after this command. There are currently " + playersInConference.length + " players in the conference, and the maximum is " + config.maxPlayersInConference + ".");
+        if (
+            playersInConference.length + targetIds.length >
+                config.maxPlayersInConference ||
+            playersInConference.length >= config.maxPlayersInConference
+        ) {
+            return failure(
+                "The conference is either full or will be too crowded after this command. There are currently " +
+                    playersInConference.length +
+                    " players in the conference, and the maximum is " +
+                    config.maxPlayersInConference +
+                    "."
+            );
         }
 
         for (const targetId of targetIds) {
             const targetData = await Player.findOne({ userId: targetId });
-            if (!targetData) return failure(`The user <@${targetId}> is not a player.`);
-            if (!targetData.flags.get("alive")) return failure(`The user <@${targetId}> is dead.`);
-            if (targetData.flags.get("kidnapped")) return failure(`The user <@${targetId}> is kidnapped and cannot be added to the Conference.`);
-            if (targetData.flags.get("incarcerated")) return failure(`The user <@${targetId}> is incarcerated and cannot be added to the Conference.`);
-            if (playersInConference.includes(targetId)) return failure(`The user <@${targetId}> is already in the Conference.`);
-            if (userId !== null && userId == targetId) return failure("You cannot add yourself to the Conference.");
+            if (!targetData)
+                return failure(`The user <@${targetId}> is not a player.`);
+            if (!targetData.flags.get("alive"))
+                return failure(`The user <@${targetId}> is dead.`);
+            if (targetData.flags.get("kidnapped"))
+                return failure(
+                    `The user <@${targetId}> is kidnapped and cannot be added to the Conference.`
+                );
+            if (targetData.flags.get("incarcerated"))
+                return failure(
+                    `The user <@${targetId}> is incarcerated and cannot be added to the Conference.`
+                );
+            if (playersInConference.includes(targetId))
+                return failure(
+                    `The user <@${targetId}> is already in the Conference.`
+                );
+            if (userId !== null && userId == targetId)
+                return failure("You cannot add yourself to the Conference.");
         }
         for (const targetId of targetIds) {
             const member = await mainGuild.members
@@ -739,22 +830,39 @@ const contacting = {
             }
         }
 
-        const newsChannel = await mainGuild.channels.fetch(config.channels.news) as TextChannel;
-        newsChannel.send(`${targetIds.map(id => `<@${id}>`).join(", ")} has been added to the Press Conference`).catch(console.error);
+        const newsChannel = (await mainGuild.channels.fetch(
+            config.channels.news
+        )) as TextChannel;
+        newsChannel
+            .send(
+                `${targetIds
+                    .map((id) => `<@${id}>`)
+                    .join(", ")} has been added to the Press Conference`
+            )
+            .catch(console.error);
 
         return success();
     },
 
-    async removeFromConference(userId: string | null, targetIds: string[], channelId: string | null): Promise<Result> {
+    async removeFromConference(
+        userId: string | null,
+        targetIds: string[],
+        channelId: string | null
+    ): Promise<Result> {
         if (userId) {
-            const canRemove = await contacting.canAddOrRemoveToConference(userId, channelId);
+            const canRemove = await contacting.canAddOrRemoveToConference(
+                userId,
+                channelId
+            );
             if (canRemove !== true) return canRemove;
         }
 
         const playersInConference: string[] = [];
         const mainGuild = await client.guilds.fetch(config.guilds.main);
         for (const [, member] of await mainGuild.members.fetch()) {
-            if (member.roles.cache.has(config.discordRoles["Press Conference"])) {
+            if (
+                member.roles.cache.has(config.discordRoles["Press Conference"])
+            ) {
                 playersInConference.push(member.id);
             }
         }
@@ -766,9 +874,16 @@ const contacting = {
 
         for (const targetId of targetIds) {
             const targetData = await Player.findOne({ userId: targetId });
-            if (!targetData) return failure(`The user <@${targetId}> is not a player.`);
-            if (!playersInConference.includes(targetId)) return failure(`The user <@${targetId}> is not in the Conference.`);
-            if (userId !== null && userId == targetId) return failure("You cannot remove yourself from the Conference.");
+            if (!targetData)
+                return failure(`The user <@${targetId}> is not a player.`);
+            if (!playersInConference.includes(targetId))
+                return failure(
+                    `The user <@${targetId}> is not in the Conference.`
+                );
+            if (userId !== null && userId == targetId)
+                return failure(
+                    "You cannot remove yourself from the Conference."
+                );
         }
         for (const targetId of targetIds) {
             const member = await mainGuild.members
@@ -781,8 +896,16 @@ const contacting = {
             }
         }
 
-        const newsChannel = await mainGuild.channels.fetch(config.channels.news) as TextChannel;
-        newsChannel.send(`${targetIds.map(id => `<@${id}>`).join(", ")} has been removed from the Press Conference`).catch(console.error);
+        const newsChannel = (await mainGuild.channels.fetch(
+            config.channels.news
+        )) as TextChannel;
+        newsChannel
+            .send(
+                `${targetIds
+                    .map((id) => `<@${id}>`)
+                    .join(", ")} has been removed from the Press Conference`
+            )
+            .catch(console.error);
 
         return success();
     },

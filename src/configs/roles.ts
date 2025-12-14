@@ -65,6 +65,24 @@ export const roles = {
         guilds: ["Rogue Civilian"],
         abilityOverrides: {},
     },
+    "Poser": {
+        abilities: ["anonymousAnnouncement", "falseAnonymousContact"],
+        guildChannels: {},
+        guilds: ["Poser"],
+        abilityOverrides: {},
+    },
+    "Con Artist": {
+        abilities: ["fakeLounge"],
+        guildChannels: {},
+        guilds: ["Con Artist"],
+        abilityOverrides: {},
+    },
+    "Wanted Civilian": {
+        abilities: ["bug", "Tap In"],
+        guildChannels: {},
+        guilds: ["Wanted Civilian"],
+        abilityOverrides: {},
+    }
 } as const satisfies { [roleName: string]: Role };
 
 export type RoleName = keyof typeof roles;

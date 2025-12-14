@@ -30,6 +30,7 @@ const pollCallbacks = {
             const loungeNumber = poll.data["loungeNumber"] as number | null;
             const kidnapperId = poll.data["kidnapperId"] as string | null;
             const memberId = poll.data["memberId"] as string | null;
+            const startedBy = poll.data["startedBy"] as string | null;
             const pollChannel = (await client.channels.fetch(
                 poll.location.channelId
             )) as TextChannel;
@@ -49,6 +50,7 @@ const pollCallbacks = {
                         orgName,
                         abilityName as AbilityName,
                         {
+                            startedBy,
                             targetId,
                             loungeNumber,
                             kidnapperId,

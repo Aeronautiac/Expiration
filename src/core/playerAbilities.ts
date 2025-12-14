@@ -14,6 +14,8 @@ import Notebook from "../models/notebook";
 import { guilds } from "../configs/guilds";
 import sharedAbilities from "./sharedAbilities";
 import Lounge from "../models/lounge";
+import { IAbility } from "../models/ability";
+import fakeLounge from "../commands/playerCommands/fakeLounge";
 
 let client: Client;
 
@@ -23,6 +25,7 @@ const playerAbilities = {
     },
 
     async pseudocide(
+        abilityData: IAbility,
         userId: string,
         args: PlayerAbilityArgs["pseudocide"],
         checkOnly?: boolean
@@ -79,6 +82,7 @@ const playerAbilities = {
     },
 
     async ipp(
+        abilityData: IAbility,
         userId: string,
         args: PlayerAbilityArgs["ipp"],
         checkOnly?: boolean
@@ -104,6 +108,7 @@ const playerAbilities = {
     },
 
     async underTheRadar(
+        abilityData: IAbility,
         userId: string,
         args: PlayerAbilityArgs["underTheRadar"],
         checkOnly?: boolean
@@ -117,6 +122,7 @@ const playerAbilities = {
     },
 
     async bug(
+        abilityData: IAbility,
         userId: string,
         args: PlayerAbilityArgs["bug"],
         checkOnly?: boolean
@@ -128,12 +134,13 @@ const playerAbilities = {
 
         if (checkOnly) return success();
 
-        await game.bug(args.targetId, "bug", userId);
+        await game.bug(args.targetId, "bug", userId, abilityData.identifier);
 
         return success();
     },
 
     async anonymousAnnouncement(
+        abilityData: IAbility,
         userId: string,
         args: PlayerAbilityArgs["anonymousAnnouncement"],
         checkOnly?: boolean
@@ -144,15 +151,27 @@ const playerAbilities = {
     },
 
     async anonymousContact(
+        abilityData: IAbility,
         userId: string,
         args: PlayerAbilityArgs["anonymousContact"],
         checkOnly?: boolean
     ) {
         if (checkOnly) return success();
-        return await contacting.contact(userId, args.targetId, true);
+        return await contacting.contact(userId, args.targetId, args.asRole);
+    },
+
+    async falseAnonymousContact(
+        abilityData: IAbility,
+        userId: string,
+        args: PlayerAbilityArgs["falseAnonymousContact"],
+        checkOnly?: boolean
+    ) {
+        if (checkOnly) return success();
+        return await contacting.contact(userId, args.targetId, args.asRole);
     },
 
     async nameReveal(
+        abilityData: IAbility,
         userId: string,
         args: PlayerAbilityArgs["nameReveal"],
         checkOnly?: boolean
@@ -178,6 +197,7 @@ const playerAbilities = {
     },
 
     async notebookReveal(
+        abilityData: IAbility,
         userId: string,
         args: PlayerAbilityArgs["notebookReveal"],
         checkOnly?: boolean
@@ -245,6 +265,7 @@ const playerAbilities = {
     // currently hardcoded to PI, but eventually, this should work for all roles. need to remove the option for multiple guilds for roles or just add
     // a main guild option to roles. (This one is better)
     async autopsy(
+        abilityData: IAbility,
         userId: string,
         args: PlayerAbilityArgs["autopsy"],
         checkOnly?: boolean
@@ -357,22 +378,34 @@ const playerAbilities = {
     },
 
     "Civilian Arrest": async (
+        abilityData: IAbility,
         userId: string,
         args: SharedAbilityArgs["Civilian Arrest"],
         checkOnly?: boolean
     ) => {
-        return sharedAbilities.civilianArrest(userId, args, checkOnly);
+        return sharedAbilities.civilianArrest(abilityData, userId, args, checkOnly);
     },
 
     async cancelCivArrest(
+        abilityData: IAbility,
         userId: string,
         args: SharedAbilityArgs["cancelCivArrest"],
         checkOnly?: boolean
     ) {
-        return sharedAbilities.cancelCivArrest(userId, args, checkOnly);
+        return sharedAbilities.cancelCivArrest(abilityData, userId, args, checkOnly);
+    },
+
+    async "Tap In"(
+        abilityData: IAbility,
+        userId: string,
+        args: SharedAbilityArgs["Tap In"],
+        checkOnly?: boolean
+    ) {
+        return sharedAbilities["Tap In"](abilityData, userId, args, checkOnly);
     },
 
     async trueNameReroll(
+        abilityData: IAbility,
         userId: string,
         args: PlayerAbilityArgs["notebookReveal"],
         checkOnly?: boolean
@@ -389,7 +422,27 @@ const playerAbilities = {
         return success();
     },
 
+    async fakeLounge(
+        abilityData: IAbility,
+        userId: string,
+        args: PlayerAbilityArgs["fakeLounge"],
+        checkOnly?: boolean
+    ) {
+        if (args.contactedId === args.contactorId) return failure("The contactor and contacted user must be different people.");
+
+        const contactorData = await Player.findOne({ userId: args.contactorId });
+        const contactedData = await Player.findOne({ userId: args.contactedId });
+        if (!contactorData || !contactedData) return failure("One of these people are not a valid player.");
+
+        if (checkOnly) return success();
+
+        contacting.createFakeLounge(userId, args.contactorId, args.contactedId);
+
+        return success();
+    },
+
     async kiraConnection(
+        abilityData: IAbility,
         userId: string,
         args: PlayerAbilityArgs["kiraConnection"],
         checkOnly?: boolean
@@ -403,7 +456,7 @@ const playerAbilities = {
         const lounge = await Lounge.findOne({
             channelIds: args.channelId,
         });
-        if (!lounge || lounge.anonymous)
+        if (!lounge || lounge.anonymousAsRole)
             return failure(
                 "This can only be used in a regular contact lounge."
             );

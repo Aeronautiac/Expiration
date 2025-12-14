@@ -16,6 +16,7 @@ import {
     loungeNumberAbilities,
     targetAbilities,
 } from "../../core/organisationAbilities";
+import { executionQueue } from "../../core/game";
 
 export default {
     data: new SlashCommandBuilder()
@@ -108,60 +109,64 @@ export default {
         }
 
         // can they use the ability?
-        const canUseResult = await abilities.canUseAbility(
-            orgName,
-            ability as AbilityName,
-            {
-                targetId,
-                loungeNumber,
-                kidnapperId,
-                memberId,
-            }
-        );
-        if (!canUseResult.success) {
-            interaction.editReply(
-                canUseResult.message || `Cannot use ability ${ability}.`
-            );
-            return;
-        }
-
-        // ability can currently be used, it is safe to start the vote.
-        interaction.editReply("Vote started.");
-
-        // poll message
-        let pollMessage = `@everyone A vote has been started by <@${userId}> to use ability **${ability}**.`;
-        if (targetId && targetAbilities.has(ability))
-            pollMessage += `\nTarget: <@${targetId}>`;
-        if (memberId && memberAbilities.has(ability))
-            pollMessage += `\nMember Used: <@${kidnapperId}>`;
-        if (loungeNumber && loungeNumberAbilities.has(ability))
-            pollMessage += `\nLounge number: **${loungeNumber}**`;
-
-        // create the poll
-        await polls.create(
-            {
-                messageContent: pollMessage,
-                channelId: interaction.channelId,
-            },
-            ability,
-            {
-                threshold: "orgMajority",
-                canContinue: "orgAbility",
-                resolve: "orgAbility",
-                filter: "validOrgVoter",
-            },
-            {
+        await executionQueue.executeQueued(async () => {
+            const canUseResult = await abilities.canUseAbility(
                 orgName,
-                targetId,
-                loungeNumber,
-                kidnapperId,
-                memberId,
-            },
-            {
-                resolvesOnThreshold: true,
-                prioritizeInconclusive: true,
-                resolveAt: Date.now() + util.hrsToMs(config.orgPollDuration),
+                ability as AbilityName,
+                {
+                    targetId,
+                    loungeNumber,
+                    kidnapperId,
+                    memberId,
+                }
+            );
+            if (!canUseResult.success) {
+                interaction.editReply(
+                    canUseResult.message || `Cannot use ability ${ability}.`
+                );
+                return;
             }
-        );
+
+            // ability can currently be used, it is safe to start the vote.
+            interaction.editReply("Vote started.");
+
+            // poll message
+            let pollMessage = `@everyone A vote has been started by <@${userId}> to use ability **${ability}**.`;
+            if (targetId && targetAbilities.has(ability))
+                pollMessage += `\nTarget: <@${targetId}>`;
+            if (memberId && memberAbilities.has(ability))
+                pollMessage += `\nMember Used: <@${kidnapperId}>`;
+            if (loungeNumber && loungeNumberAbilities.has(ability))
+                pollMessage += `\nLounge number: **${loungeNumber}**`;
+
+            // create the poll
+            await polls.create(
+                {
+                    messageContent: pollMessage,
+                    channelId: interaction.channelId,
+                },
+                ability,
+                {
+                    threshold: "orgMajority",
+                    canContinue: "orgAbility",
+                    resolve: "orgAbility",
+                    filter: "validOrgVoter",
+                },
+                {
+                    startedBy: interaction.user.id,
+                    orgName,
+                    targetId,
+                    loungeNumber,
+                    kidnapperId,
+                    memberId,
+                },
+                {
+                    resolvesOnThreshold: true,
+                    prioritizeInconclusive: true,
+                    resolveAt:
+                        Date.now() + util.hrsToMs(config.orgPollDuration),
+                }
+            );
+        });
     },
 };

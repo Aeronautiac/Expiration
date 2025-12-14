@@ -10,9 +10,12 @@ export type PlayerAbilityName =
     | "anonymousAnnouncement"
     | "ipp"
     | "anonymousContact"
+    | "falseAnonymousContact"
     | "Civilian Arrest"
     | "kiraConnection"
     | "cancelCivArrest"
+    | "Tap In"
+    | "fakeLounge"
     | "trueNameReroll";
 
 export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
@@ -48,7 +51,7 @@ export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
         bypasses: [],
     },
     anonymousAnnouncement: {
-        charges: 3,
+        charges: 2,
         cooldown: 0,
         bypasses: [],
     },
@@ -58,7 +61,12 @@ export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
         bypasses: [],
     },
     anonymousContact: {
-        charges: 2,
+        charges: 1,
+        cooldown: 0,
+        bypasses: [],
+    },
+    falseAnonymousContact: {
+        charges: 1,
         cooldown: 0,
         bypasses: [],
     },
@@ -82,4 +90,15 @@ export const playerAbilities: Record<PlayerAbilityName, PlayerAbility> = {
         cooldown: 0,
         bypasses: ["custody"],
     },
+    "Tap In": {
+        charges: 1,
+        cooldown: 0,
+        bypasses: [],
+        duration: 12, // hrs back
+    },
+    fakeLounge: {
+        charges: 2,
+        cooldown: 0,
+        bypasses: [],
+    }
 };

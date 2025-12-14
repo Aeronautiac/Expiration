@@ -1,5 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 import contacting from "../../core/contacting";
+import { executionQueue } from "../../core/game";
 
 export default {
     data: new SlashCommandBuilder()
@@ -16,19 +17,22 @@ export default {
             ephemeral: true,
         });
 
-        const result = await contacting.changeGroupchatOwner(
-            interaction.user.id,
-            interaction.options.getUser("newowner").id,
-            interaction.channel.id
-        );
-        if (!result.success)
-            await interaction.editReply({
-                content:
-                    result.message || "Failed to change owner of group chat.",
-            });
-        else
-            await interaction.editReply({
-                content: result.message || "Success.",
-            });
+        await executionQueue.executeQueued(async () => {
+            const result = await contacting.changeGroupchatOwner(
+                interaction.user.id,
+                interaction.options.getUser("newowner").id,
+                interaction.channel.id
+            );
+            if (!result.success)
+                await interaction.editReply({
+                    content:
+                        result.message ||
+                        "Failed to change owner of group chat.",
+                });
+            else
+                await interaction.editReply({
+                    content: result.message || "Success.",
+                });
+        });
     },
 };

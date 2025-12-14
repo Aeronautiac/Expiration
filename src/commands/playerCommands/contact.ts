@@ -7,6 +7,8 @@ import {
 } from "discord.js";
 import contacting from "../../core/contacting";
 import abilities from "../../core/abilities";
+import { executionQueue } from "../../core/game";
+import Player from "../../models/player";
 
 export default {
     data: new SlashCommandBuilder()
@@ -32,30 +34,34 @@ export default {
 
         const anonymous = interaction.options.getBoolean("anonymous");
         const target = interaction.options.getUser("target");
-        const result = anonymous
-            ? await abilities.useAbility(
-                  interaction.user.id,
-                  "anonymousContact",
-                  {
-                      targetId: target.id,
-                  }
-              )
-            : await contacting.contact(
-                  interaction.user.id,
-                  interaction.options.getUser("target").id,
-                  interaction.options.getBoolean("anonymous")
-              );
-        if (!result.success)
-            await interaction.editReply({
-                content:
-                    result.message ||
-                    `Failed to contact ${interaction.options.getUser(
-                        "target"
-                    )}`,
-            });
-        else
-            await interaction.editReply({
-                content: result.message,
-            });
+
+        await executionQueue.executeQueued(async () => {
+            const userData = await Player.findOne({ userId: interaction.user.id });
+            const result = anonymous
+                ? await abilities.useAbility(
+                      interaction.user.id,
+                      "anonymousContact",
+                      {
+                          asRole: userData.role,
+                          targetId: target.id,
+                      }
+                  )
+                : await contacting.contact(
+                      interaction.user.id,
+                      interaction.options.getUser("target").id
+                  );
+            if (!result.success)
+                await interaction.editReply({
+                    content:
+                        result.message ||
+                        `Failed to contact ${interaction.options.getUser(
+                            "target"
+                        )}`,
+                });
+            else
+                await interaction.editReply({
+                    content: result.message,
+                });
+        });
     },
 };
