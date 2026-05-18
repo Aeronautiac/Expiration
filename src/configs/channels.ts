@@ -7,7 +7,7 @@ export const channels = {
   news: "1448401475100348556",
   courtroom: "1423264458486317098",
   stolenContactLogs: "1498420842453930025",
-  tfLounge: "1448402376452079759",
+  tfLounge: "1498411924243877888",
   kkLounge: "1448402016836653117",
   tfChiefDescription: "1406119727230619773",
   anonymousCourtroom: "1498420033099927623",
