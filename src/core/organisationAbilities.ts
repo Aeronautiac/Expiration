@@ -2,8 +2,8 @@ import { Client, Message, TextChannel } from "discord.js";
 import { OrganisationAbilityName } from "../configs/organisationAbilities";
 import { OrganisationName } from "../configs/organisations";
 import {
-    OrganisationAbilityArgs,
-    SharedAbilityArgs,
+  OrganisationAbilityArgs,
+  SharedAbilityArgs,
 } from "../configs/abilityArgs";
 import Player from "../models/player";
 import { failure, success } from "../types/Result";
@@ -12,36 +12,30 @@ import names from "./names";
 import Organisation from "../models/organisation";
 import game from "./game";
 import Season from "../models/season";
-import Lounge from "../models/lounge";
 import util from "./util";
 import sharedAbilities from "./sharedAbilities";
 import death from "./death";
 import orgs from "./orgs";
-import kill from "../commands/hostCommands/kill";
-import { guilds } from "../configs/guilds";
-import access from "./access";
 import { IAbility } from "../models/ability";
 
 async function canDoLeaderAction(userId: string, orgName: OrganisationName) {
-    // is the person using the command allowed to do a task force invite?
-    const orgData = await Organisation.findOne({ name: orgName });
-    if (orgData.leaderId !== userId)
-        return failure(
-            `You are not the ${
-                config.organisations[orgName].rankNames["leader"] ?? "leader"
-            } of ${util.articledOrgMention(orgName, null)}`
-        );
-    if (!orgData.memberIds.includes(userId))
-        return failure(
-            `You are not a ${
-                config.organisations[orgName].rankNames.member
-            } of the ${util.articledOrgMention(orgName, null)}.`
-        );
-    const userData = await Player.findOne({ userId });
-    if (!userData) return failure("You are not a player.");
-    if (!userData.flags.get("alive")) return failure("You are dead.");
+  // is the person using the command allowed to do a task force invite?
+  const orgData = await Organisation.findOne({ name: orgName });
+  if (orgData.leaderId !== userId)
+    return failure(
+      `You are not the ${config.organisations[orgName].rankNames["leader"] ?? "leader"
+      } of ${util.articledOrgMention(orgName, null)}`
+    );
+  if (!orgData.memberIds.includes(userId))
+    return failure(
+      `You are not a ${config.organisations[orgName].rankNames.member
+      } of the ${util.articledOrgMention(orgName, null)}.`
+    );
+  const userData = await Player.findOne({ userId });
+  if (!userData) return failure("You are not a player.");
+  if (!userData.flags.get("alive")) return failure("You are dead.");
 
-    return success();
+  return success();
 }
 
 export const memberAbilities: Set<OrganisationAbilityName> = new Set();
@@ -50,413 +44,410 @@ memberAbilities.add("Shinigami Sacrifice");
 
 export const targetAbilities: Set<OrganisationAbilityName> = new Set();
 targetAbilities
-    .add("2nd Kira+Kira Anonymous Kidnap")
-    .add("Anonymous Kidnap")
-    .add("Background Check")
-    .add("Civilian Arrest")
-    .add("PI+Watari Unlawful Arrest")
-    .add("Public Kidnap")
-    .add("Unlawful Arrest")
-    .add("Kira's Kingdom Invite")
-    .add("Kira's Kingdom Kick")
-    .add("Shinigami Sacrifice");
+  .add("2nd Kira+Kira Anonymous Kidnap")
+  .add("Anonymous Kidnap")
+  .add("Background Check")
+  .add("Civilian Arrest")
+  .add("PI+Watari Unlawful Arrest")
+  .add("Public Kidnap")
+  .add("Unlawful Arrest")
+  .add("Kira's Kingdom Invite")
+  .add("Kira's Kingdom Kick")
+  .add("Shinigami Sacrifice");
 
 export const loungeNumberAbilities: Set<OrganisationAbilityName> = new Set();
 loungeNumberAbilities.add("Tap In");
 
 async function kidnapCheck(orgName: OrganisationName, args: any) {
-    const targetData = await Player.findOne({ userId: args.targetId });
-    // if the target is dead or is not a player, they cannot be kidnapped
-    if (!targetData) return failure("This person is not a player.");
-    if (!targetData.flags.get("alive")) return failure("This person is dead.");
-    // if the target is already locked up in some way, or is protected by ipp, they cannot be kidnapped
-    if (
-        targetData.flags.get("custody") ||
-        targetData.flags.get("incarcerated") ||
-        targetData.flags.get("kidnapped") ||
-        targetData.flags.get("ipp")
-    )
-        return failure("This person cannot be kidnapped right now.");
+  const targetData = await Player.findOne({ userId: args.targetId });
+  // if the target is dead or is not a player, they cannot be kidnapped
+  if (!targetData) return failure("This person is not a player.");
+  if (!targetData.flags.get("alive")) return failure("This person is dead.");
+  // if the target is already locked up in some way, or is protected by ipp, they cannot be kidnapped
+  if (
+    targetData.flags.get("custody") ||
+    targetData.flags.get("incarcerated") ||
+    targetData.flags.get("kidnapped") ||
+    targetData.flags.get("ipp")
+  )
+    return failure("This person cannot be kidnapped right now.");
 
-    if (!args.kidnapperId) return success();
-    // if the kidnapper is not a player, they cannot kidnap
-    const kidnapperData = await Player.findOne({
-        userId: args.kidnapperId,
-    });
-    // if the kidnapper is the person being kidnapped, should return a failure
-    if (args.kidnapperId === args.targetId)
-        return failure("The kidnapper cannot kidnap themselves.");
-    if (!kidnapperData) return failure("The kidnapper is not a player.");
-    // if they are not part of the org, they cannot be the kidnapper.
-    const orgData = await Organisation.findOne({ name: orgName });
-    if (!orgData.memberIds.includes(args.kidnapperId))
-        return failure("The kidnapper is not part of the organization.");
-    // if they have an ability restrictor, they cannot be the kidnapper.
-    if (kidnapperData.abilityRestrictors.size > 0)
-        return failure("This person cannot kidnap anyone right now.");
+  if (!args.kidnapperId) return success();
+  // if the kidnapper is not a player, they cannot kidnap
+  const kidnapperData = await Player.findOne({
+    userId: args.kidnapperId,
+  });
+  // if the kidnapper is the person being kidnapped, should return a failure
+  if (args.kidnapperId === args.targetId)
+    return failure("The kidnapper cannot kidnap themselves.");
+  if (!kidnapperData) return failure("The kidnapper is not a player.");
+  // if they are not part of the org, they cannot be the kidnapper.
+  const orgData = await Organisation.findOne({ name: orgName });
+  if (!orgData.memberIds.includes(args.kidnapperId))
+    return failure("The kidnapper is not part of the organization.");
+  // if they have an ability restrictor, they cannot be the kidnapper.
+  if (kidnapperData.abilityRestrictors.size > 0)
+    return failure("This person cannot kidnap anyone right now.");
 
-    return success();
+  return success();
 }
 
 let client: Client;
 
 const orgAbilities = {
-    init(c: Client) {
-        client = c;
-    },
+  init(c: Client) {
+    client = c;
+  },
 
-    "Background Check": async (
-        abilityData: IAbility,
-        orgName: OrganisationName,
-        args: OrganisationAbilityArgs["Background Check"],
-        checkOnly?: boolean
-    ) => {
-        const targetData = await Player.findOne({ userId: args.targetId });
-        if (!targetData) return failure("This person is not a player.");
-        if (!targetData.flags.get("alive"))
-            return failure("This person is dead.");
+  "Background Check": async (
+    abilityData: IAbility,
+    orgName: OrganisationName,
+    args: OrganisationAbilityArgs["Background Check"],
+    checkOnly?: boolean
+  ) => {
+    const targetData = await Player.findOne({ userId: args.targetId });
+    if (!targetData) return failure("This person is not a player.");
+    if (!targetData.flags.get("alive"))
+      return failure("This person is dead.");
 
-        if (checkOnly) return success();
+    if (checkOnly) return success();
 
-        const mainChannel = (await client.channels.fetch(
-            config.channels[config.organisations[orgName].mainChannel]
-        )) as TextChannel;
-        const nameRevealMessage = await mainChannel.send(
-            `@everyone The true name of **${await names.getAlias(
-                args.targetId
-            )}** is **${names.toReadable(targetData.trueName)}**.`
-        );
-        await nameRevealMessage.pin();
+    const mainChannel = (await client.channels.fetch(
+      config.channels[config.organisations[orgName].mainChannel]
+    )) as TextChannel;
+    const nameRevealMessage = await mainChannel.send(
+      `@everyone The true name of **${await names.getAlias(
+        args.targetId
+      )}** is **${names.toReadable(targetData.trueName)}**.`
+    );
+    await nameRevealMessage.pin();
 
-        return success();
-    },
+    return success();
+  },
 
-    "Public Kidnap": async (
-        abilityData: IAbility,
-        orgName: OrganisationName,
-        args: OrganisationAbilityArgs["Public Kidnap"],
-        checkOnly?: boolean
-    ) => {
-        const kidnapCheckResult = await kidnapCheck(orgName, args);
-        if (!kidnapCheckResult.success) return kidnapCheckResult;
+  "Public Kidnap": async (
+    abilityData: IAbility,
+    orgName: OrganisationName,
+    args: OrganisationAbilityArgs["Public Kidnap"],
+    checkOnly?: boolean
+  ) => {
+    const kidnapCheckResult = await kidnapCheck(orgName, args);
+    if (!kidnapCheckResult.success) return kidnapCheckResult;
 
-        if (checkOnly) return success();
+    if (checkOnly) return success();
 
-        const orgConfig = config.organisations[orgName];
-        await game.kidnap(args.targetId, config.guilds[orgConfig.guild], {
-            kidnapperId: args.kidnapperId,
-            duration: config.organisationAbilities["Public Kidnap"].duration,
-            announce: true,
-            kidnapperOrg: orgName,
-        });
+    const orgConfig = config.organisations[orgName];
+    await game.kidnap(args.targetId, config.guilds[orgConfig.guild], {
+      kidnapperId: args.kidnapperId,
+      duration: config.organisationAbilities["Public Kidnap"].duration,
+      announce: true,
+      kidnapperOrg: orgName,
+    });
 
-        return success();
-    },
+    return success();
+  },
 
-    "Anonymous Kidnap": async (
-        abilityData: IAbility,
-        orgName: OrganisationName,
-        args: OrganisationAbilityArgs["Anonymous Kidnap"],
-        checkOnly?: boolean
-    ) => {
-        const kidnapCheckResult = await kidnapCheck(orgName, args);
-        if (!kidnapCheckResult.success) return kidnapCheckResult;
+  "Anonymous Kidnap": async (
+    abilityData: IAbility,
+    orgName: OrganisationName,
+    args: OrganisationAbilityArgs["Anonymous Kidnap"],
+    checkOnly?: boolean
+  ) => {
+    const kidnapCheckResult = await kidnapCheck(orgName, args);
+    if (!kidnapCheckResult.success) return kidnapCheckResult;
 
-        if (checkOnly) return success();
+    if (checkOnly) return success();
 
-        const orgConfig = config.organisations[orgName];
-        await game.kidnap(args.targetId, config.guilds[orgConfig.guild], {
-            duration: config.organisationAbilities["Anonymous Kidnap"].duration,
-            announce: true,
-            kidnapperOrg: orgName,
-        });
+    const orgConfig = config.organisations[orgName];
+    await game.kidnap(args.targetId, config.guilds[orgConfig.guild], {
+      duration: config.organisationAbilities["Anonymous Kidnap"].duration,
+      announce: true,
+      kidnapperOrg: orgName,
+    });
 
-        return success();
-    },
+    return success();
+  },
 
-    "2nd Kira+Kira Anonymous Kidnap": async (
-        abilityData: IAbility,
-        orgName: OrganisationName,
-        args: OrganisationAbilityArgs["Anonymous Kidnap"],
-        checkOnly?: boolean
-    ) => {
-        return orgAbilities["Anonymous Kidnap"](abilityData, orgName, args, checkOnly);
-    },
+  "2nd Kira+Kira Anonymous Kidnap": async (
+    abilityData: IAbility,
+    orgName: OrganisationName,
+    args: OrganisationAbilityArgs["Anonymous Kidnap"],
+    checkOnly?: boolean
+  ) => {
+    return orgAbilities["Anonymous Kidnap"](abilityData, orgName, args, checkOnly);
+  },
 
-    "Unlawful Arrest": async (
-        abilityData: IAbility,
-        orgName: OrganisationName,
-        args: OrganisationAbilityArgs["Unlawful Arrest"],
-        checkOnly?: boolean
-    ) => {
-        const targetData = await Player.findOne({ userId: args.targetId });
-        // if the target is dead or is not a player, they cannot be arrested
-        if (!targetData) return failure("This person is not a player.");
-        if (!targetData.flags.get("alive"))
-            return failure("This person is dead.");
-        // if the target is already locked up in some way, they cannot be arrested, or is protected by ipp, they cannot be arrested
-        if (
-            targetData.flags.get("incarcerated") ||
-            targetData.flags.get("kidnapped") ||
-            targetData.flags.get("ipp")
-        )
-            return failure("This person cannot be arrested right now.");
+  "Unlawful Arrest": async (
+    abilityData: IAbility,
+    orgName: OrganisationName,
+    args: OrganisationAbilityArgs["Unlawful Arrest"],
+    checkOnly?: boolean
+  ) => {
+    const targetData = await Player.findOne({ userId: args.targetId });
+    // if the target is dead or is not a player, they cannot be arrested
+    if (!targetData) return failure("This person is not a player.");
+    if (!targetData.flags.get("alive"))
+      return failure("This person is dead.");
+    // if the target is already locked up in some way, they cannot be arrested, or is protected by ipp, they cannot be arrested
+    if (
+      targetData.flags.get("incarcerated") ||
+      targetData.flags.get("kidnapped") ||
+      targetData.flags.get("ipp")
+    )
+      return failure("This person cannot be arrested right now.");
 
-        if (checkOnly) return success();
+    if (checkOnly) return success();
 
-        const duration =
-            config.organisationAbilities["Unlawful Arrest"].duration;
-        const message = `@everyone ${util.articledOrgMention(
-            orgName
-        )} has performed an unlawful arrest on <@${
-            args.targetId
-        }>. They will now be <@&${
-            config.discordRoles.Incarcerated
-        }> for ${duration} hours.`;
-        await game.incarcerate(args.targetId, {
-            duration,
-            message,
-        });
+    const duration =
+      config.organisationAbilities["Unlawful Arrest"].duration;
+    const message = `@everyone ${util.articledOrgMention(
+      orgName
+    )} has performed an unlawful arrest on <@${args.targetId
+      }>. They will now be <@&${config.discordRoles.Incarcerated
+      }> for ${duration} hours.`;
+    await game.incarcerate(args.targetId, {
+      duration,
+      message,
+    });
 
-        return success();
-    },
+    return success();
+  },
 
-    "PI+Watari Unlawful Arrest": async (
-        abilityData: IAbility,
-        orgName: OrganisationName,
-        args: OrganisationAbilityArgs["Unlawful Arrest"],
-        checkOnly?: boolean
-    ) => {
-        return orgAbilities["Unlawful Arrest"](abilityData, orgName, args, checkOnly);
-    },
+  "PI+Watari Unlawful Arrest": async (
+    abilityData: IAbility,
+    orgName: OrganisationName,
+    args: OrganisationAbilityArgs["Unlawful Arrest"],
+    checkOnly?: boolean
+  ) => {
+    return orgAbilities["Unlawful Arrest"](abilityData, orgName, args, checkOnly);
+  },
 
-    // need to finish the blackout functions in the game module first
-    Blackout: async (
-        abilityData: IAbility,
-        orgName: OrganisationName,
-        args: OrganisationAbilityArgs["Blackout"],
-        checkOnly?: boolean
-    ) => {
-        const season = await Season.findOne({});
-        if (season.flags.get("blackout"))
-            return failure("A blackout is already active.");
+  // need to finish the blackout functions in the game module first
+  Blackout: async (
+    abilityData: IAbility,
+    orgName: OrganisationName,
+    args: OrganisationAbilityArgs["Blackout"],
+    checkOnly?: boolean
+  ) => {
+    const season = await Season.findOne({});
+    if (season.flags.get("blackout"))
+      return failure("A blackout is already active.");
 
-        if (checkOnly) return success();
+    if (checkOnly) return success();
 
-        await game.startBlackout(
-            config.organisationAbilities.Blackout.duration
-        );
+    await game.startBlackout(
+      config.organisationAbilities.Blackout.duration
+    );
 
-        return success();
-    },
+    return success();
+  },
 
-    "Tap In": async (
-        abilityData: IAbility,
-        orgName: OrganisationName,
-        args: SharedAbilityArgs["Tap In"],
-        checkOnly?: boolean
-    ) => {
-        return sharedAbilities["Tap In"](abilityData, orgName, args, checkOnly);
-    },
+  "Tap In": async (
+    abilityData: IAbility,
+    orgName: OrganisationName,
+    args: SharedAbilityArgs["Tap In"],
+    checkOnly?: boolean
+  ) => {
+    return sharedAbilities["Tap In"](abilityData, orgName, args, checkOnly);
+  },
 
-    "Kira's Kingdom Invite": async (
-        abilityData: IAbility,
-        orgName: OrganisationName,
-        args: OrganisationAbilityArgs["Kira's Kingdom Invite"],
-        checkOnly?: boolean
-    ) => {
-        const targetData = await Player.findOne({ userId: args.targetId });
-        if (!targetData) return failure("This person is not a player.");
-        if (!targetData.flags.get("alive"))
-            return failure("This person is dead.");
-        const orgData = await Organisation.findOne({ name: orgName });
-        if (orgData.memberIds.includes(args.targetId))
-            return failure("This is already a member of Kira's Kingdom.");
+  "Kira's Kingdom Invite": async (
+    abilityData: IAbility,
+    orgName: OrganisationName,
+    args: OrganisationAbilityArgs["Kira's Kingdom Invite"],
+    checkOnly?: boolean
+  ) => {
+    const targetData = await Player.findOne({ userId: args.targetId });
+    if (!targetData) return failure("This person is not a player.");
+    if (!targetData.flags.get("alive"))
+      return failure("This person is dead.");
+    const orgData = await Organisation.findOne({ name: orgName });
+    if (orgData.memberIds.includes(args.targetId))
+      return failure("This is already a member of Kira's Kingdom.");
 
-        if (checkOnly) return success();
+    if (checkOnly) return success();
 
-        await orgs.addToOrg(args.targetId, orgName, {});
+    await orgs.addToOrg(args.targetId, orgName, {});
 
-        return success();
-    },
+    return success();
+  },
 
-    "Kira's Kingdom Kick": async (
-        abilityData: IAbility,
-        orgName: OrganisationName,
-        args: OrganisationAbilityArgs["Kira's Kingdom Kick"],
-        checkOnly?: boolean
-    ) => {
-        const targetData = await Player.findOne({ userId: args.targetId });
-        if (!targetData) return failure("This person is not a player.");
-        if (!targetData.flags.get("alive"))
-            return failure("This person is dead.");
-        const orgData = await Organisation.findOne({ name: orgName });
-        if (!orgData.memberIds.includes(args.targetId))
-            return failure("This is not a member of Kira's Kingdom.");
+  "Kira's Kingdom Kick": async (
+    abilityData: IAbility,
+    orgName: OrganisationName,
+    args: OrganisationAbilityArgs["Kira's Kingdom Kick"],
+    checkOnly?: boolean
+  ) => {
+    const targetData = await Player.findOne({ userId: args.targetId });
+    if (!targetData) return failure("This person is not a player.");
+    if (!targetData.flags.get("alive"))
+      return failure("This person is dead.");
+    const orgData = await Organisation.findOne({ name: orgName });
+    if (!orgData.memberIds.includes(args.targetId))
+      return failure("This is not a member of Kira's Kingdom.");
 
-        if (checkOnly) return success();
+    if (checkOnly) return success();
 
-        await orgs.removeFromOrg(args.targetId, orgName);
+    await orgs.removeFromOrg(args.targetId, orgName);
 
-        return success();
-    },
+    return success();
+  },
 
-    "Civilian Arrest": async (
-        abilityData: IAbility,
-        orgName: OrganisationName,
-        args: SharedAbilityArgs["Civilian Arrest"],
-        checkOnly?: boolean
-    ) => {
-        return sharedAbilities.civilianArrest(abilityData, orgName, args, checkOnly);
-    },
+  "Civilian Arrest": async (
+    abilityData: IAbility,
+    orgName: OrganisationName,
+    args: SharedAbilityArgs["Civilian Arrest"],
+    checkOnly?: boolean
+  ) => {
+    return sharedAbilities.civilianArrest(abilityData, orgName, args, checkOnly);
+  },
 
-    async cancelCivArrest(
-        abilityData: IAbility,
-        userId: string,
-        args: SharedAbilityArgs["cancelCivArrest"],
-        checkOnly?: boolean
-    ) {
-        return sharedAbilities.cancelCivArrest(abilityData, userId, args, checkOnly);
-    },
+  async cancelCivArrest(
+    abilityData: IAbility,
+    userId: string,
+    args: SharedAbilityArgs["cancelCivArrest"],
+    checkOnly?: boolean
+  ) {
+    return sharedAbilities.cancelCivArrest(abilityData, userId, args, checkOnly);
+  },
 
-    "Shinigami Sacrifice": async (
-        abilityData: IAbility,
-        orgName: OrganisationName,
-        args: OrganisationAbilityArgs["Shinigami Sacrifice"],
-        checkOnly?: boolean
-    ) => {
-        const targetData = await Player.findOne({ userId: args.targetId });
-        // if the target is dead or is not a player, they cannot be arrested
-        if (!targetData) return failure("This person is not a player.");
-        if (!targetData.flags.get("alive"))
-            return failure("This person is dead.");
-        const orgData = await Organisation.findOne({ name: orgName });
-        if (!orgData.memberIds.includes(args.memberId))
-            return failure("This person is not a member.");
-        if (!orgData.ogMemberIds.includes(args.memberId))
-            return failure("This is not an og member.");
-        const memberData = await Player.findOne({ userId: args.memberId });
-        if (!memberData) return failure("The chosen member is not a player.");
-        if (!memberData.flags.get("alive"))
-            return failure("The chosen member is already dead.");
+  "Shinigami Sacrifice": async (
+    abilityData: IAbility,
+    orgName: OrganisationName,
+    args: OrganisationAbilityArgs["Shinigami Sacrifice"],
+    checkOnly?: boolean
+  ) => {
+    const targetData = await Player.findOne({ userId: args.targetId });
+    // if the target is dead or is not a player, they cannot be arrested
+    if (!targetData) return failure("This person is not a player.");
+    if (!targetData.flags.get("alive"))
+      return failure("This person is dead.");
+    const orgData = await Organisation.findOne({ name: orgName });
+    if (!orgData.memberIds.includes(args.memberId))
+      return failure("This person is not a member.");
+    if (!orgData.ogMemberIds.includes(args.memberId))
+      return failure("This is not an og member.");
+    const memberData = await Player.findOne({ userId: args.memberId });
+    if (!memberData) return failure("The chosen member is not a player.");
+    if (!memberData.flags.get("alive"))
+      return failure("The chosen member is already dead.");
 
-        if (checkOnly) return success();
+    if (checkOnly) return success();
 
-        // the killer should be a person who could have voted
-        const killerPool = (await orgs.getVotingMembers(orgName)).filter(
-            (memberId) => memberId !== args.memberId
-        );
-        await death.kill(args.memberId, {
-            killerId: killerPool[Math.floor(Math.random() * killerPool.length)],
-            deathMessage: `Their soul was sold to a shinigami by ${util.articledOrgMention(
-                orgName
-            )} in exchange for a true name.`,
-            bypassIPP: true,
-        });
+    // the killer should be a person who could have voted
+    const killerPool = (await orgs.getVotingMembers(orgName)).filter(
+      (memberId) => memberId !== args.memberId
+    );
+    await death.kill(args.memberId, {
+      killerId: killerPool[Math.floor(Math.random() * killerPool.length)],
+      deathMessage: `Their soul was sold to a shinigami by ${util.articledOrgMention(
+        orgName
+      )} in exchange for a true name.`,
+      bypassIPP: true,
+    });
 
-        // send message
-        const channel = (await client.channels.fetch(
-            config.channels[config.organisations[orgName].mainChannel]
-        )) as TextChannel;
-        const msg: Message = await channel.send(
-            `@everyone The true name of **${await names.getAlias(
-                args.targetId
-            )}** is **${names.toReadable(targetData.trueName)}**.`
-        );
-        await msg.pin();
+    // send message
+    const channel = (await client.channels.fetch(
+      config.channels[config.organisations[orgName].mainChannel]
+    )) as TextChannel;
+    const msg: Message = await channel.send(
+      `@everyone The true name of **${await names.getAlias(
+        args.targetId
+      )}** is **${names.toReadable(targetData.trueName)}**.`
+    );
+    await msg.pin();
 
-        return success();
-    },
+    return success();
+  },
 
-    "Task Force Invite": async (
-        abilityData: IAbility,
-        orgName: OrganisationName,
-        args: OrganisationAbilityArgs["Task Force Invite"],
-        checkOnly?: boolean
-    ) => {
-        // is the person inviting allowed to do it?
-        if (!args.outsource) {
-            const result = await canDoLeaderAction(args.userId, orgName);
-            if (!result.success) return result;
-        }
+  "Task Force Invite": async (
+    abilityData: IAbility,
+    orgName: OrganisationName,
+    args: OrganisationAbilityArgs["Task Force Invite"],
+    checkOnly?: boolean
+  ) => {
+    // is the person inviting allowed to do it?
+    if (!args.outsource) {
+      const result = await canDoLeaderAction(args.userId, orgName);
+      if (!result.success) return result;
+    }
 
-        // is the target allowed to be invited with the arguments supplied?
-        if (args.targetId === args.userId)
-            return failure("You cannot invite yourself.");
-        const orgData = await Organisation.findOne({ name: orgName });
-        const targetData = await Player.findOne({ userId: args.targetId });
-        if (!targetData) return failure("This person is not a player.");
-        if (!targetData.flags.get("alive"))
-            return failure("This person is dead.");
-        if (orgData.memberIds.includes(args.targetId))
-            return failure(
-                "This person is already a member of the Task Force."
-            );
-        if (
-            !args.outsource &&
-            targetData.trueName !== names.toInternal(args.trueName)
-        )
-            return failure("This is not the target's true name.");
+    // is the target allowed to be invited with the arguments supplied?
+    if (args.targetId === args.userId)
+      return failure("You cannot invite yourself.");
+    const orgData = await Organisation.findOne({ name: orgName });
+    const targetData = await Player.findOne({ userId: args.targetId });
+    if (!targetData) return failure("This person is not a player.");
+    if (!targetData.flags.get("alive"))
+      return failure("This person is dead.");
+    if (orgData.memberIds.includes(args.targetId))
+      return failure(
+        "This person is already a member of the Task Force."
+      );
+    if (
+      !args.outsource &&
+      targetData.trueName !== names.toInternal(args.trueName)
+    )
+      return failure("This is not the target's true name.");
 
-        if (checkOnly) return success();
+    if (checkOnly) return success();
 
-        // send true name in task force channel
-        const mainChannel = (await client.channels.fetch(
-            config.channels[config.organisations[orgName].mainChannel]
-        )) as TextChannel;
-        const nameRevealMessage = await mainChannel.send(
-            `@everyone **${await names.getAlias(
-                args.targetId
-            )}** has been added to the Task Force.${
-                !args.outsource
-                    ? ` Their true name is **${names.toReadable(
-                          targetData.trueName
-                      )}**.`
-                    : ` They were outsourced.`
-            }`
-        );
-        await nameRevealMessage.pin();
+    // send true name in task force channel
+    const mainChannel = (await client.channels.fetch(
+      config.channels[config.organisations[orgName].mainChannel]
+    )) as TextChannel;
+    const nameRevealMessage = await mainChannel.send(
+      `@everyone **${await names.getAlias(
+        args.targetId
+      )}** has been added to the Task Force.${!args.outsource
+        ? ` Their true name is **${names.toReadable(
+          targetData.trueName
+        )}**.`
+        : ` They were outsourced.`
+      }`
+    );
+    await nameRevealMessage.pin();
 
-        await orgs.addToOrg(args.targetId, orgName, {});
+    await orgs.addToOrg(args.targetId, orgName, {});
 
-        return success();
-    },
+    return success();
+  },
 
-    "Task Force Kick": async (
-        abilityData: IAbility,
-        orgName: OrganisationName,
-        args: OrganisationAbilityArgs["Task Force Kick"],
-        checkOnly?: boolean
-    ) => {
-        // is the person using the command allowed to do a task force kick?
-        const result = await canDoLeaderAction(args.userId, orgName);
-        if (!result.success) return result;
+  "Task Force Kick": async (
+    abilityData: IAbility,
+    orgName: OrganisationName,
+    args: OrganisationAbilityArgs["Task Force Kick"],
+    checkOnly?: boolean
+  ) => {
+    // is the person using the command allowed to do a task force kick?
+    const result = await canDoLeaderAction(args.userId, orgName);
+    if (!result.success) return result;
 
-        // is the target allowed to be kicked with the arguments supplied?
-        if (args.targetId === args.userId)
-            return failure("You cannot kick yourself.");
-        const targetData = await Player.findOne({ userId: args.targetId });
-        if (!targetData) return failure("This person is not a player.");
-        const orgData = await Organisation.findOne({ name: orgName });
-        if (!orgData.memberIds.includes(args.targetId))
-            return failure("This person is not a member of the Task Force.");
+    // is the target allowed to be kicked with the arguments supplied?
+    if (args.targetId === args.userId)
+      return failure("You cannot kick yourself.");
+    const targetData = await Player.findOne({ userId: args.targetId });
+    if (!targetData) return failure("This person is not a player.");
+    const orgData = await Organisation.findOne({ name: orgName });
+    if (!orgData.memberIds.includes(args.targetId))
+      return failure("This person is not a member of the Task Force.");
 
-        if (checkOnly) return success();
+    if (checkOnly) return success();
 
-        await orgs.removeFromOrg(args.targetId, orgName);
+    await orgs.removeFromOrg(args.targetId, orgName);
 
-        // send notifier in task force channel
-        const mainChannel = (await client.channels.fetch(
-            config.channels[config.organisations[orgName].mainChannel]
-        )) as TextChannel;
-        await mainChannel.send(
-            `@everyone **${await names.getAlias(
-                args.targetId
-            )}** has been kicked from the Task Force.`
-        );
+    // send notifier in task force channel
+    const mainChannel = (await client.channels.fetch(
+      config.channels[config.organisations[orgName].mainChannel]
+    )) as TextChannel;
+    await mainChannel.send(
+      `@everyone **${await names.getAlias(
+        args.targetId
+      )}** has been kicked from the Task Force.`
+    );
 
-        return success();
-    },
+    return success();
+  },
 };
 
 export default orgAbilities;
